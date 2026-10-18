@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Duolingo Helper
 // @namespace    https://github.com/Vidrimers/Duolingo-helper
-// @version      0.5.10
+// @version      0.5.11
 // @description  Проверка взаимной подписки на профилях Duolingo. Панель, бейджи, кеш.
 // @author       Vidrimers
 // @match        *://*.duolingo.com/*
@@ -43,6 +43,8 @@
       settings: {
         autoCheck: true,
         cacheMinutes: 30,
+        requestDelay: 350, // мс между запросами (rate limit)
+        inactiveDays: 3, // порог «неактивных» друзей
         showBadge: true,
         badgePos: "top-right",
         accent: "#58cc02",
@@ -1448,7 +1450,6 @@
                     <button class="dh-btn dh-btn-primary" id="dh-friends-load">Обновить</button>
                 </div>
                 <div class="dh-muted" style="display:flex;gap:12px;margin-bottom:8px;font-size:11px">
-                    <button type="button" id="dh-unfollow-all" style="background:none;border:none;color:#c0392b;cursor:pointer;font:inherit;font-size:11px;padding:0;text-decoration:underline">Отписаться от неподписанных ❌</button>
                     <button type="button" id="dh-history-open" style="background:none;border:none;color:#888;cursor:pointer;font:inherit;font-size:11px;padding:0;text-decoration:underline">История</button>
                     <button type="button" id="dh-changes-open" style="background:none;border:none;color:#888;cursor:pointer;font:inherit;font-size:11px;padding:0;text-decoration:underline">Изменения<span id="dh-changes-badge" style="display:none;min-width:16px;height:16px;padding:0 4px;margin-left:4px;border-radius:8px;background:#c0392b;color:#fff;font-size:10px;font-weight:700;line-height:16px;text-align:center;vertical-align:middle;text-decoration:none"></span></button>
                     <button type="button" id="dh-history-back" style="display:none;background:none;border:none;color:#888;cursor:pointer;font:inherit;font-size:11px;padding:0;text-decoration:underline">← Друзья</button>
@@ -1457,6 +1458,14 @@
                     <button class="dh-tab active" data-friend-filter="all">Все</button>
                     <button class="dh-tab" data-friend-filter="nobody">❌ Не подписаны</button>
                     <button class="dh-tab" data-friend-filter="mutual">✅ Взаимно</button>
+                    <button class="dh-tab" data-friend-filter="inactive">💤 Неактивные</button>
+                </div>
+                <div class="dh-row" id="dh-nobody-tools" style="display:none;margin:0 0 8px">
+                    <button class="dh-btn dh-btn-danger" id="dh-unfollow-all" style="padding:5px 10px;font-size:11px">Отписаться от неподписанных</button>
+                </div>
+                <div class="dh-row" id="dh-inactive-tools" style="display:none;margin:0 0 8px">
+                    <button class="dh-btn dh-btn-primary" id="dh-scan-activity" style="padding:5px 10px;font-size:11px">Проверить активность</button>
+                    <button class="dh-btn" id="dh-scan-stop" style="padding:5px 10px;font-size:11px">Стоп</button>
                 </div>
                 <div class="dh-muted dh-op-status" id="dh-friends-status"></div>
                 <div id="dh-friends-list" style="display:flex;flex-direction:column;gap:4px;max-height:52vh;overflow-y:auto"></div>
@@ -1685,6 +1694,20 @@
                 </div>
                 <div class="dh-setting-row">
                     <div class="dh-setting-label">
+                        Задержка между запросами (мс)
+                        <small>Чтобы не словить rate limit</small>
+                    </div>
+                    <input class="dh-num-input" id="dh-set-delay" type="number" min="0" max="5000" step="50" />
+                </div>
+                <div class="dh-setting-row">
+                    <div class="dh-setting-label">
+                        Неактивные, дней
+                        <small>Порог для фильтра «Неактивные»</small>
+                    </div>
+                    <input class="dh-num-input" id="dh-set-inactive" type="number" min="1" max="365" />
+                </div>
+                <div class="dh-setting-row">
+                    <div class="dh-setting-label">
                         Версия скрипта
                         <small id="dh-current-version">…</small>
                     </div>
@@ -1797,6 +1820,7 @@
       friendFilters: [...modal.querySelectorAll("[data-friend-filter]")],
       friendsFiltersWrap: modal.querySelector("#dh-friends-filters"),
       unfollowAll: modal.querySelector("#dh-unfollow-all"),
+      nobodyTools: modal.querySelector("#dh-nobody-tools"),
       historyOpen: modal.querySelector("#dh-history-open"),
       historyBack: modal.querySelector("#dh-history-back"),
       historyList: modal.querySelector("#dh-history-list"),
@@ -1804,6 +1828,11 @@
       changesList: modal.querySelector("#dh-changes-list"),
       changesBadge: modal.querySelector("#dh-changes-badge"),
       setCache: modal.querySelector("#dh-set-cache"),
+      setDelay: modal.querySelector("#dh-set-delay"),
+      setInactive: modal.querySelector("#dh-set-inactive"),
+      scanActivity: modal.querySelector("#dh-scan-activity"),
+      scanStop: modal.querySelector("#dh-scan-stop"),
+      inactiveTools: modal.querySelector("#dh-inactive-tools"),
       clearCache: modal.querySelector("#dh-clear-cache"),
       refreshPage: modal.querySelector("#dh-refresh-page"),
       exportBtn: modal.querySelector("#dh-export"),
@@ -4134,6 +4163,10 @@
     if (els.historyOpen) els.historyOpen.style.display = "";
     if (els.changesOpen) els.changesOpen.style.display = "";
     if (els.historyBack) els.historyBack.style.display = "none";
+    if (els.inactiveTools) {
+      els.inactiveTools.style.display = friendFilter === "inactive" ? "flex" : "none";
+    }
+    renderFriends();
   }
 
   function showHistoryView() {
@@ -4143,6 +4176,8 @@
     if (els.friendsFiltersWrap) els.friendsFiltersWrap.style.display = "none";
     if (els.historyOpen) els.historyOpen.style.display = "none";
     if (els.changesOpen) els.changesOpen.style.display = "none";
+    if (els.inactiveTools) els.inactiveTools.style.display = "none";
+    if (els.nobodyTools) els.nobodyTools.style.display = "none";
     if (els.historyBack) els.historyBack.style.display = "";
     renderHistory();
     setFriendsStatus("История действий");
@@ -4221,6 +4256,8 @@
     if (els.friendsFiltersWrap) els.friendsFiltersWrap.style.display = "none";
     if (els.historyOpen) els.historyOpen.style.display = "none";
     if (els.changesOpen) els.changesOpen.style.display = "none";
+    if (els.inactiveTools) els.inactiveTools.style.display = "none";
+    if (els.nobodyTools) els.nobodyTools.style.display = "none";
     if (els.historyBack) els.historyBack.style.display = "";
     // счётчик гасим по клику
     DATA.friendChangesUnread = 0;
@@ -4357,6 +4394,17 @@
     showToast("✓ Отписка завершена: " + ok);
   }
 
+  function friendsCountLabel(shown) {
+    const cache = friendsCache || {};
+    const following = cache.followingCount != null ? cache.followingCount : (cache.rows || []).length;
+    const followers = cache.followersCount != null ? cache.followersCount : 0;
+    if (friendFilter === "inactive") {
+      const base = (cache.scanUsers || []).length || following + followers;
+      return `Показано: ${shown} · проверяется: ${base} (подписки ∪ подписчики)`;
+    }
+    return `Показано: ${shown} · всего: ${following} подписок`;
+  }
+
   function renderFriends() {
     if (!els.friendsList) return;
     const q = (els.friendsSearch && els.friendsSearch.value || "")
@@ -4366,6 +4414,25 @@
 
     if (friendFilter === "mutual") rows = rows.filter((r) => r.followsMe);
     if (friendFilter === "nobody") rows = rows.filter((r) => !r.followsMe);
+    if (friendFilter === "inactive") {
+      const days = DATA.settings.inactiveDays || 3;
+      const inRows = rows.filter((r) => r.inactive === true || r.inactiveDays >= days);
+      const extras = ((friendsCache && friendsCache.scanUsers) || []).filter((u) => {
+        const id = String(u.userId);
+        const inList = rows.some((r) => String(r.userId) === id);
+        return (
+          !inList &&
+          (u.inactive === true || (u.inactiveDays || 0) >= days)
+        );
+      });
+      rows = inRows.concat(extras);
+      if (els.inactiveTools) els.inactiveTools.style.display = "flex";
+    } else if (els.inactiveTools) {
+      els.inactiveTools.style.display = "none";
+    }
+    if (els.nobodyTools) {
+      els.nobodyTools.style.display = friendFilter === "nobody" ? "flex" : "none";
+    }
     if (q) {
       rows = rows.filter((r) => {
         return (
@@ -4378,6 +4445,7 @@
     els.friendsList.innerHTML = "";
     if (!rows.length) {
       els.friendsList.innerHTML = '<div class="dh-muted">Пусто</div>';
+      setFriendsStatus(friendsCountLabel(0));
       return;
     }
 
@@ -4388,10 +4456,11 @@
       row.style.padding = "5px 2px";
       row.style.cursor = "pointer";
       const icon = r.followsMe ? "✅" : "❌";
+      const deadIcon = r.inactive ? " · 💤" : "";
       const sub = r.username ? "@" + r.username : String(r.userId || "");
       row.innerHTML = `<div class="dh-setting-label" style="min-width:0">
           <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
-            ${icon} ${r.name || sub}
+            ${icon} ${r.name || sub}${deadIcon}
           </div>
           <small>${sub}</small>
         </div>
@@ -4430,7 +4499,7 @@
       }
       els.friendsList.appendChild(row);
     }
-    setFriendsStatus(`Показано: ${rows.length} · всего: ${friendsCache ? friendsCache.rows.length : 0}`);
+    setFriendsStatus(friendsCountLabel(rows.length));
   }
 
   async function loadFriends() {
@@ -4467,8 +4536,22 @@
         return String(a.name).localeCompare(String(b.name));
       });
 
+      const rowIds = new Set(rows.map((r) => String(r.userId)));
+      const scanUsers = rows.map((r) => ({ ...r })).concat(
+        followers
+          .filter((f) => !rowIds.has(String(f.userId)))
+          .map((f) => ({
+            userId: String(f.userId),
+            name: f.displayName || f.username || f.userId,
+            username: f.username || "",
+            followsMe: true,
+            iFollow: false,
+          })),
+      );
+
       friendsCache = {
         rows,
+        scanUsers,
         followingCount: following.length,
         followersCount: followers.length,
       };
@@ -4481,6 +4564,101 @@
     } finally {
       if (btn) btn.disabled = false;
     }
+  }
+
+  let scanRunning = false;
+
+  /** Опрашивает друзей и помечает неактивных. */
+  async function scanFriendActivity() {
+    const cache = friendsCache;
+    const targets = (cache && (cache.scanUsers || cache.rows)) || [];
+    if (!targets.length) {
+      showToast("Сначала обнови список друзей");
+      return;
+    }
+    if (scanRunning) return;
+    scanRunning = true;
+    const btn = els.scanActivity;
+    if (btn) btn.disabled = true;
+    const delay = Math.max(0, DATA.settings.requestDelay || 350);
+    const daysLimit = DATA.settings.inactiveDays || 3;
+    let scanned = 0;
+
+    setFriendsStatus(`Проверка активности 0/${targets.length}…`);
+    for (const r of targets) {
+      if (!scanRunning) break;
+      try {
+        const data = await apiGet(
+          `${API.users}/${r.userId}?fields=totalXp,streak,streakData`,
+        );
+        const streakData = data && data.streakData;
+        const cur = streakData && streakData.currentStreak;
+        const daysLimit = DATA.settings.inactiveDays || 3;
+
+        // дата последней активности
+        let activityTs = NaN;
+        if (cur) {
+          const lastExt = cur.lastExtendedDate ? Date.parse(cur.lastExtendedDate) : NaN;
+          const start = cur.startDate ? Date.parse(cur.startDate) : NaN;
+          activityTs = Number.isFinite(lastExt) ? lastExt : start;
+        }
+        if (!Number.isFinite(activityTs) && streakData && streakData.previousStreak && streakData.previousStreak.endDate) {
+          activityTs = Date.parse(streakData.previousStreak.endDate);
+        }
+
+        let inactive = false;
+        let inactiveDays = 999;
+        if (Number.isFinite(activityTs)) {
+          inactiveDays = Math.floor((Date.now() - activityTs) / 86400000);
+          inactive = inactiveDays >= daysLimit;
+        } else {
+          // нет даты активности — серия отсутствует
+          inactive = !cur || !cur.startDate;
+          inactiveDays = inactive ? 999 : 0;
+        }
+
+        r.inactive = inactive;
+        r.inactiveDays = inactiveDays;
+        r.lastXp = data.totalXp != null ? data.totalXp : r.lastXp;
+      } catch {
+        // не помечаем при ошибке
+      }
+      scanned++;
+      if (scanned % 5 === 0 || scanned === targets.length) {
+        setFriendsStatus(`Проверка активности ${scanned}/${targets.length}…`);
+      }
+      if (delay) {
+        await new Promise((res) => setTimeout(res, delay));
+      }
+    }
+
+    if (friendsCache) {
+      // синхронизируем флаги в rows по userId
+      const byId = new Map(targets.map((t) => [String(t.userId), t]));
+      friendsCache.rows = (friendsCache.rows || []).map((r) => {
+        const t = byId.get(String(r.userId));
+        return t
+          ? { ...r, inactive: t.inactive, inactiveDays: t.inactiveDays, lastXp: t.lastXp }
+          : r;
+      });
+      friendsCache.scanUsers = targets;
+      friendsCache.scannedAt = Date.now();
+    }
+    renderFriends();
+    const dead = targets.filter((r) => r.inactive).length;
+    setFriendsStatus(
+      scanRunning
+        ? `Проверено: ${targets.length} · неактивных: ${dead} (порог ${daysLimit} дн.)`
+        : `Проверка остановлена на ${scanned}/${targets.length} · неактивных: ${dead}`,
+    );
+    showToast(scanRunning ? "✓ Активность проверена: " + dead + " неактивных" : "Проверка остановлена");
+    scanRunning = false;
+    if (btn) btn.disabled = false;
+  }
+
+  function stopActivityScan() {
+    scanRunning = false;
+    showToast("Проверка активности остановлена");
   }
 
   // ========== XP: фейк-буст + накрутка ==========
@@ -5597,6 +5775,8 @@
       els.setBadge.classList.toggle("on", !!DATA.settings.showBadge);
       if (els.setOpen) els.setOpen.classList.toggle("on", !!DATA.settings.openOnStart);
       els.setCache.value = DATA.settings.cacheMinutes;
+      if (els.setDelay) els.setDelay.value = DATA.settings.requestDelay;
+      if (els.setInactive) els.setInactive.value = DATA.settings.inactiveDays;
     };
     syncSwitches();
 
@@ -5815,6 +5995,30 @@
       els.setCache.value = v;
       saveData();
     });
+
+    if (els.setDelay) {
+      els.setDelay.addEventListener("change", () => {
+        const v = Math.max(0, Math.min(5000, parseInt(els.setDelay.value, 10) || 0));
+        DATA.settings.requestDelay = v;
+        els.setDelay.value = v;
+        saveData();
+      });
+    }
+    if (els.setInactive) {
+      els.setInactive.addEventListener("change", () => {
+        const v = Math.max(1, Math.min(365, parseInt(els.setInactive.value, 10) || 3));
+        DATA.settings.inactiveDays = v;
+        els.setInactive.value = v;
+        saveData();
+        renderFriends();
+      });
+    }
+    if (els.scanActivity) {
+      els.scanActivity.addEventListener("click", () => scanFriendActivity());
+    }
+    if (els.scanStop) {
+      els.scanStop.addEventListener("click", () => stopActivityScan());
+    }
 
     els.clearCache.addEventListener("click", () => {
       DATA.followCache = {};
