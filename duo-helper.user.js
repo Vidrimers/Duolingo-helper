@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Duolingo Helper
 // @namespace    https://github.com/Vidrimers/Duolingo-helper
-// @version      0.4.1
+// @version      0.4.2
 // @description  Проверка взаимной подписки на профилях Duolingo. Панель, бейджи, кеш.
 // @author       Vidrimers
 // @match        *://*.duolingo.com/*
@@ -1272,9 +1272,22 @@
                     <div id="dh-shop-list" style="margin-top:8px;display:flex;flex-direction:column;gap:6px;max-height:260px;overflow-y:auto"></div>
                 </div>
 
+                <div class="dh-card">
+                    <div class="dh-card-title">⚠️ Гемы (алмазы) — на свой страх и риск</div>
+                    <div class="dh-muted" style="margin-bottom:8px">
+                        Сбор rewardBundles (SKILL_COMPLETION). Кнопки GET в магазине баланс гемов НЕ пополняют.
+                    </div>
+                    <div class="dh-row" style="margin-bottom:6px">
+                        <button class="dh-btn dh-btn-primary" id="dh-gems-once">Собрать</button>
+                        <button class="dh-btn dh-btn-danger" id="dh-gems-farm">Фарм</button>
+                        <button class="dh-btn" id="dh-gems-stop">Стоп</button>
+                    </div>
+                    <div class="dh-muted" id="dh-gems-status">Баланс: —</div>
+                </div>
+
                 <div class="dh-placeholder">
                     🔜 Дальше: streak, авторешение уроков,<br/>
-                    XP / gems / league, Free Max, аккаунты
+                    XP / league, Free Max, аккаунты
                 </div>
             </div>
 
@@ -1394,6 +1407,10 @@
       shopSuper: modal.querySelector("#dh-shop-super"),
       shopStatus: modal.querySelector("#dh-shop-status"),
       shopList: modal.querySelector("#dh-shop-list"),
+      gemsOnce: modal.querySelector("#dh-gems-once"),
+      gemsFarm: modal.querySelector("#dh-gems-farm"),
+      gemsStop: modal.querySelector("#dh-gems-stop"),
+      gemsStatus: modal.querySelector("#dh-gems-status"),
       setCache: modal.querySelector("#dh-set-cache"),
       clearCache: modal.querySelector("#dh-clear-cache"),
       refreshPage: modal.querySelector("#dh-refresh-page"),
@@ -2309,6 +2326,175 @@
     }
   }
 
+  // ========== Gems (алмазы) ==========
+  // ⚠️ Сбор rewardBundles — чит, на свой страх и риск.
+  let gemsRunning = false;
+
+  function setGemsStatus(text) {
+    if (els.gemsStatus) els.gemsStatus.textContent = text;
+  }
+
+  function gemsFetch(method, url, data) {
+    return new Promise((resolve) => {
+      GM_xmlhttpRequest({
+        method,
+        url,
+        headers: {
+          accept: "application/json",
+          "content-type": "application/json",
+          authorization: "Bearer " + (getToken() || ""),
+        },
+        data: data ? JSON.stringify(data) : undefined,
+        timeout: 15000,
+        onload(resp) {
+          let body = null;
+          try {
+            body = JSON.parse(resp.responseText || "null");
+          } catch {}
+          resolve({ status: resp.status, body });
+        },
+        onerror() {
+          resolve({ status: 0, body: null });
+        },
+        ontimeout() {
+          resolve({ status: 0, body: null });
+        },
+      });
+    });
+  }
+
+  async function getGemCount() {
+    const myId = getMyId();
+    if (!myId) return null;
+    const res = await gemsFetch(
+      "GET",
+      `https://www.duolingo.com/2023-05-23/users/${myId}?fields=gemsConfig`,
+    );
+    if (res.status !== 200 || !res.body) return null;
+    const g =
+      res.body.gemsConfig && res.body.gemsConfig.gems != null
+        ? res.body.gemsConfig.gems
+        : null;
+    return g;
+  }
+
+  async function fetchGemRewards() {
+    const myId = getMyId();
+    if (!myId) return [];
+    const res = await gemsFetch(
+      "GET",
+      `https://www.duolingo.com/2023-05-23/users/${myId}?fields=rewardBundles{rewards}`,
+    );
+    if (res.status !== 200 || !res.body) return [];
+    const bundles = res.body.rewardBundles || [];
+    const out = [];
+    for (const bundle of bundles) {
+      for (const reward of bundle.rewards || []) {
+        const rid = reward.id || "";
+        if (reward.consumed) continue;
+        if (
+          rid.startsWith("SKILL_COMPLETION-") ||
+          rid.startsWith("SKILL_COMPLETION_BALANCED-")
+        ) {
+          out.push({ id: rid, amount: reward.amount || 0 });
+        }
+      }
+    }
+    return out;
+  }
+
+  async function claimGemReward(rewardId) {
+    const myId = getMyId();
+    if (!myId) return false;
+    const langs = await getMeLanguages();
+    const res = await gemsFetch(
+      "PATCH",
+      `https://www.duolingo.com/2023-05-23/users/${myId}/rewards/${rewardId}`,
+      {
+        consumed: true,
+        fromLanguage: langs.fromLanguage,
+        learningLanguage: langs.learningLanguage,
+      },
+    );
+    return res.status >= 200 && res.status < 300;
+  }
+
+  async function claimGemsOnce() {
+    const btn = els.gemsOnce;
+    if (btn) btn.disabled = true;
+    setGemsStatus("Поиск наград…");
+    try {
+      const rewards = await fetchGemRewards();
+      if (!rewards.length) {
+        setGemsStatus("Нет свободных наград");
+        showToast("Нет свободных gem-наград");
+        return;
+      }
+      let ok = 0;
+      let gained = 0;
+      for (const r of rewards) {
+        if (await claimGemReward(r.id)) {
+          ok++;
+          gained += r.amount || 0;
+        }
+      }
+      const gems = await getGemCount();
+      setGemsStatus(
+        `Собрано: ${ok}/${rewards.length} (+${gained}) · баланс: ${
+          gems != null ? gems : "—"
+        }`,
+      );
+      showToast("✓ Наград: " + ok);
+    } catch (e) {
+      setGemsStatus("Ошибка: " + (e && e.message));
+      showToast("Ошибка сбора гемов", true);
+    } finally {
+      if (btn) btn.disabled = false;
+    }
+  }
+
+  async function farmGems() {
+    if (gemsRunning) return;
+    gemsRunning = true;
+    if (els.gemsFarm) els.gemsFarm.disabled = true;
+    if (els.gemsOnce) els.gemsOnce.disabled = true;
+    let total = 0;
+    let rounds = 0;
+    setGemsStatus("Фарм…");
+    try {
+      while (gemsRunning) {
+        const rewards = await fetchGemRewards();
+        if (!rewards.length) {
+          rounds++;
+          if (rounds >= 4) break;
+          await new Promise((r) => setTimeout(r, 800));
+          continue;
+        }
+        rounds = 0;
+        for (const r of rewards) {
+          if (!gemsRunning) break;
+          if (await claimGemReward(r.id)) {
+            total += r.amount || 0;
+            setGemsStatus("Фарм… + " + total);
+          }
+          await new Promise((r2) => setTimeout(r2, 150));
+        }
+      }
+      const gems = await getGemCount();
+      setGemsStatus(`Фарм стоп · +${total} · баланс: ${gems != null ? gems : "—"}`);
+      showToast(total ? "✓ Собрано гемов: " + total : "Фарм завершён");
+    } finally {
+      gemsRunning = false;
+      if (els.gemsFarm) els.gemsFarm.disabled = false;
+      if (els.gemsOnce) els.gemsOnce.disabled = false;
+    }
+  }
+
+  function stopGemsFarm() {
+    gemsRunning = false;
+    showToast("Фарм гемов остановлен");
+  }
+
   // ========== Toast ==========
   function showToast(msg, isError = false) {
     if (!shadow) return;
@@ -3189,6 +3375,16 @@
     }
     if (els.shopSuper) {
       els.shopSuper.addEventListener("click", () => buySuper3Days());
+    }
+
+    if (els.gemsOnce) {
+      els.gemsOnce.addEventListener("click", () => claimGemsOnce());
+    }
+    if (els.gemsFarm) {
+      els.gemsFarm.addEventListener("click", () => farmGems());
+    }
+    if (els.gemsStop) {
+      els.gemsStop.addEventListener("click", () => stopGemsFarm());
     }
 
     els.setCache.addEventListener("change", () => {
