@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Duolingo Helper
 // @namespace    https://github.com/Vidrimers/Duolingo-helper
-// @version      0.2.0
+// @version      0.2.1
 // @description  Проверка взаимной подписки на профилях Duolingo. Панель, бейджи, кеш.
 // @author       Vidrimers
 // @match        *://*.duolingo.com/*
@@ -9,8 +9,12 @@
 // @grant        GM_getValue
 // @grant        GM_addStyle
 // @grant        GM_listValues
+// @grant        GM_xmlhttpRequest
+// @connect      raw.githubusercontent.com
 // @run-at       document-end
 // @noframes
+// @updateURL    https://raw.githubusercontent.com/Vidrimers/Duolingo-helper/refs/heads/master/duo-helper.user.js
+// @downloadURL  https://raw.githubusercontent.com/Vidrimers/Duolingo-helper/refs/heads/master/duo-helper.user.js
 // ==/UserScript==
 
 (function () {
@@ -725,6 +729,37 @@
                 background: #F5F2E2;
                 font-family: Tahoma, sans-serif;
             }
+
+            /* ===== Update banner (XP) ===== */
+            .dh-update-banner {
+                display: none;
+                align-items: center;
+                justify-content: space-between;
+                gap: 8px;
+                padding: 7px 10px;
+                margin-bottom: 2px;
+                background: linear-gradient(to bottom, #E8F5D8, #C8E0A8);
+                border: 1px solid #6A9A3A;
+                border-radius: 2px;
+                font-size: 11px;
+                color: #2D5A1A;
+                font-family: Tahoma, sans-serif;
+                font-weight: 700;
+            }
+            .dh-update-banner span { flex: 1; }
+            .dh-update-btn {
+                padding: 3px 10px;
+                border: 1px solid #2D6B36;
+                border-radius: 3px;
+                background: linear-gradient(to bottom, #6EC27A, #3D8F4A);
+                color: #fff;
+                font-size: 11px;
+                font-weight: 700;
+                cursor: pointer;
+                font-family: Tahoma, sans-serif;
+                white-space: nowrap;
+            }
+            .dh-update-btn:hover { filter: brightness(1.1); }
         `;
     shadow.appendChild(style);
 
@@ -762,6 +797,11 @@
         </div>
 
         <div class="dh-body">
+            <div class="dh-update-banner" id="dh-update-banner">
+                <span id="dh-update-text"></span>
+                <button class="dh-update-btn" id="dh-update-btn">⬆️ Установить</button>
+            </div>
+
             <div class="dh-tabs">
                 <button class="dh-tab active" data-tab="check">👤 Проверка</button>
                 <button class="dh-tab" data-tab="tools">🧰 Инструменты</button>
@@ -839,6 +879,13 @@
                 </div>
                 <div class="dh-setting-row">
                     <div class="dh-setting-label">
+                        Версия скрипта
+                        <small id="dh-current-version">…</small>
+                    </div>
+                    <button class="dh-btn" id="dh-check-update" style="padding:5px 10px;font-size:11px">🔍 Проверить обновления</button>
+                </div>
+                <div class="dh-setting-row">
+                    <div class="dh-setting-label">
                         Сбросить позицию окна
                         <small>Вернуть окно в место по умолчанию</small>
                     </div>
@@ -890,11 +937,17 @@
       clearCache: modal.querySelector("#dh-clear-cache"),
       refreshPage: modal.querySelector("#dh-refresh-page"),
       exportBtn: modal.querySelector("#dh-export"),
+      updateBanner: modal.querySelector("#dh-update-banner"),
+      updateText: modal.querySelector("#dh-update-text"),
+      updateBtn: modal.querySelector("#dh-update-btn"),
+      checkUpdateBtn: modal.querySelector("#dh-check-update"),
+      currentVersion: modal.querySelector("#dh-current-version"),
     };
 
     bindEvents();
     initDrag();
     applyWinPos();
+    initUpdateCheck();
   }
 
   // ========== Toast ==========
@@ -1122,6 +1175,86 @@
       setTimeout(onNavigate, 50);
     };
     window.addEventListener("popstate", () => setTimeout(onNavigate, 50));
+  }
+
+  // ========== ПРОВЕРКА ОБНОВЛЕНИЙ ==========
+  const CURRENT_VERSION = "0.2.1";
+  const UPDATE_URL =
+    "https://raw.githubusercontent.com/Vidrimers/Duolingo-helper/refs/heads/master/duo-helper.user.js";
+  const UPDATE_CHECK_KEY = "dh_update_last_check";
+  const UPDATE_CHECK_INTERVAL = 24 * 60 * 60 * 1000;
+
+  function parseVersion(str) {
+    return String(str).trim().split(".").map(Number);
+  }
+
+  function isNewer(remote, current) {
+    const r = parseVersion(remote);
+    const c = parseVersion(current);
+    for (let i = 0; i < Math.max(r.length, c.length); i++) {
+      const rv = r[i] || 0;
+      const cv = c[i] || 0;
+      if (rv > cv) return true;
+      if (rv < cv) return false;
+    }
+    return false;
+  }
+
+  function showUpdateBanner(remoteVersion) {
+    try {
+      if (!els.updateBanner || !els.updateText || !els.updateBtn) return;
+      els.updateText.textContent = `🆕 Доступно обновление: v${CURRENT_VERSION} → v${remoteVersion}`;
+      els.updateBanner.style.display = "flex";
+      els.updateBtn.onclick = () => window.open(UPDATE_URL, "_blank");
+    } catch (e) {
+      console.warn("[DuoHelper] update banner error", e);
+    }
+  }
+
+  function checkForUpdates(force = false) {
+    const lastCheck = GM_getValue(UPDATE_CHECK_KEY, 0);
+    const now = Date.now();
+    if (!force && now - lastCheck < UPDATE_CHECK_INTERVAL) return;
+    GM_xmlhttpRequest({
+      method: "GET",
+      url: UPDATE_URL + "?_=" + now,
+      timeout: 8000,
+      onload(resp) {
+        if (resp.status !== 200) return;
+        const match = resp.responseText.match(/\/\/ @version\s+([^\s]+)/);
+        if (!match) return;
+        const remoteVersion = match[1];
+        GM_setValue(UPDATE_CHECK_KEY, now);
+        if (isNewer(remoteVersion, CURRENT_VERSION)) {
+          showUpdateBanner(remoteVersion);
+        }
+      },
+      onerror() {},
+      ontimeout() {},
+    });
+  }
+
+  function initUpdateCheck() {
+    if (els.currentVersion) els.currentVersion.textContent = "v" + CURRENT_VERSION;
+    if (els.checkUpdateBtn) {
+      els.checkUpdateBtn.addEventListener("click", () => {
+        const btn = els.checkUpdateBtn;
+        btn.textContent = "⏳ Проверяем...";
+        btn.disabled = true;
+        GM_setValue(UPDATE_CHECK_KEY, 0);
+        checkForUpdates(true);
+        setTimeout(() => {
+          btn.textContent = "🔍 Проверить обновления";
+          btn.disabled = false;
+          const banner = els.updateBanner;
+          if (banner && banner.style.display === "none") {
+            showToast("✓ Обновлений нет, версия актуальна");
+          }
+        }, 3000);
+      });
+    }
+    // тихая проверка при открытии панели — не чаще раза в сутки
+    checkForUpdates(false);
   }
 
   // ========== Window drag + position ==========
