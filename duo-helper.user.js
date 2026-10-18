@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Duolingo Helper
 // @namespace    https://github.com/Vidrimers/Duolingo-helper
-// @version      0.5.12
+// @version      0.5.13
 // @description  Проверка взаимной подписки на профилях Duolingo. Панель, бейджи, кеш.
 // @author       Vidrimers
 // @match        *://*.duolingo.com/*
@@ -1491,6 +1491,9 @@
                     <button class="dh-tab" data-friend-filter="mutual">✅ Взаимно</button>
                     <button class="dh-tab" data-friend-filter="inactive">💤 Неактивные</button>
                 </div>
+                <div class="dh-row" id="dh-all-tools" style="display:none;margin:0 0 8px">
+                    <button type="button" id="dh-unfollow-anyone" style="background:none;border:none;color:#c0392b;cursor:pointer;font:inherit;font-size:11px;padding:0;text-decoration:underline">Отписаться от всех</button>
+                </div>
                 <div class="dh-row" id="dh-nobody-tools" style="display:none;margin:0 0 8px">
                     <button class="dh-btn dh-btn-danger" id="dh-unfollow-all" style="padding:5px 10px;font-size:11px">Отписаться от неподписанных</button>
                 </div>
@@ -1860,6 +1863,8 @@
       friendsFiltersWrap: modal.querySelector("#dh-friends-filters"),
       unfollowAll: modal.querySelector("#dh-unfollow-all"),
       nobodyTools: modal.querySelector("#dh-nobody-tools"),
+      allTools: modal.querySelector("#dh-all-tools"),
+      unfollowAnyone: modal.querySelector("#dh-unfollow-anyone"),
       historyOpen: modal.querySelector("#dh-history-open"),
       historyBack: modal.querySelector("#dh-history-back"),
       historyList: modal.querySelector("#dh-history-list"),
@@ -4323,6 +4328,7 @@
     if (els.blocksOpen) els.blocksOpen.style.display = "none";
     if (els.inactiveTools) els.inactiveTools.style.display = "none";
     if (els.nobodyTools) els.nobodyTools.style.display = "none";
+    if (els.allTools) els.allTools.style.display = "none";
     if (els.historyBack) els.historyBack.style.display = "";
     updateListBadges();
   }
@@ -4460,6 +4466,9 @@
     if (els.nobodyTools) {
       els.nobodyTools.style.display = friendFilter === "nobody" ? "flex" : "none";
     }
+    if (els.allTools) {
+      els.allTools.style.display = friendFilter === "all" ? "flex" : "none";
+    }
     updateListBadges();
     renderFriends();
   }
@@ -4477,6 +4486,7 @@
     if (els.blocksOpen) els.blocksOpen.style.display = "none";
     if (els.inactiveTools) els.inactiveTools.style.display = "none";
     if (els.nobodyTools) els.nobodyTools.style.display = "none";
+    if (els.allTools) els.allTools.style.display = "none";
     if (els.historyBack) els.historyBack.style.display = "";
     updateListBadges();
     renderHistory();
@@ -4564,6 +4574,7 @@
     if (els.blocksOpen) els.blocksOpen.style.display = "none";
     if (els.inactiveTools) els.inactiveTools.style.display = "none";
     if (els.nobodyTools) els.nobodyTools.style.display = "none";
+    if (els.allTools) els.allTools.style.display = "none";
     if (els.historyBack) els.historyBack.style.display = "";
     // счётчик гасим по клику
     DATA.friendChangesUnread = 0;
@@ -4708,6 +4719,51 @@
     }
     renderFriends();
     setFriendsStatus(`Отписался от ${ok} / ${targets.length}`);
+    showToast("✓ Отписка завершена: " + ok);
+  }
+
+  /** Отписка от всех подписок (кроме исключений). Двойное подтверждение. */
+  async function massUnfollowAnyone() {
+    const rows = (friendsCache && friendsCache.rows) || [];
+    const targets = rows.filter((r) => !isExcluded(r.userId));
+    if (!targets.length) {
+      showToast("Нет подписок для отписки");
+      return;
+    }
+    const okGo = await showConfirm(
+      `Отписаться от ${targets.length} пользователей? Исключения (🛡) не тронем.`,
+      "Отписка от всех",
+    );
+    if (!okGo) return;
+    const okGo2 = await showConfirm(
+      `Точно отписаться от ${targets.length} человек? Это действие нельзя отменить одной кнопкой (undo есть в «Истории»).`,
+      "Подтверждение",
+    );
+    if (!okGo2) return;
+
+    const delay = Math.max(0, DATA.settings.requestDelay || 350);
+    const ids = [];
+    let ok = 0;
+    for (let i = 0; i < targets.length; i++) {
+      setFriendsStatus(`Отписка от всех ${i + 1}/${targets.length}…`);
+      const success = await unfollowUser(targets[i].userId);
+      if (success) {
+        ok++;
+        ids.push(targets[i].userId);
+      }
+      if (delay) await new Promise((r) => setTimeout(r, delay));
+    }
+    logAction({
+      type: "unfollow_mass",
+      ids,
+      name: `отписка от ${ok} пользователей`,
+    });
+    if (friendsCache) {
+      const idSet = new Set(ids.map(String));
+      friendsCache.rows = friendsCache.rows.filter((r) => !idSet.has(String(r.userId)));
+    }
+    renderFriends();
+    setFriendsStatus(`Отписался от всех: ${ok} / ${targets.length}`);
     showToast("✓ Отписка завершена: " + ok);
   }
 
@@ -4896,6 +4952,9 @@
     }
     if (els.nobodyTools) {
       els.nobodyTools.style.display = friendFilter === "nobody" ? "flex" : "none";
+    }
+    if (els.allTools) {
+      els.allTools.style.display = friendFilter === "all" ? "flex" : "none";
     }
     if (q) {
       rows = rows.filter((r) => {
@@ -6593,6 +6652,9 @@
 
     if (els.unfollowAll) {
       els.unfollowAll.addEventListener("click", () => massUnfollowNonFollowers());
+    if (els.unfollowAnyone) {
+      els.unfollowAnyone.addEventListener("click", () => massUnfollowAnyone());
+    }
     if (els.unfollowInactive) {
       els.unfollowInactive.addEventListener("click", () => massUnfollowInactive());
     if (els.blockInactive) {
