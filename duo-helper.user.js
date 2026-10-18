@@ -4063,6 +4063,24 @@
     if (els.friendsStatus) els.friendsStatus.textContent = t;
   }
 
+  function openUserProfile(username, userId) {
+    const u = username || "";
+    if (u) {
+      window.open(
+        "https://www.duolingo.com/profile/" + encodeURIComponent(u),
+        "_blank",
+      );
+    }
+  }
+
+  function wireProfileRow(row, user) {
+    row.style.cursor = "pointer";
+    row.addEventListener("click", (e) => {
+      if (e.target && e.target.closest && e.target.closest("button")) return;
+      openUserProfile(user && user.username, user && user.userId);
+    });
+  }
+
   async function unfollowUser(targetId) {
     const myId = getMyId();
     if (!myId || !targetId) return false;
@@ -4228,11 +4246,13 @@
           </div>
           <small>${u.username ? "@" + u.username : ""}</small>
         </div>`;
+      wireProfileRow(row, u);
       const b = document.createElement("button");
       b.className = "dh-btn";
       b.style.cssText = "padding:4px 8px;font-size:11px;flex-shrink:0";
       b.textContent = "Убрать";
-      b.addEventListener("click", () => {
+      b.addEventListener("click", (e) => {
+        e.stopPropagation();
         removeExclude(u.userId);
         renderExclusions();
         showToast("Убран из исключений");
@@ -4264,11 +4284,13 @@
           </div>
           <small>${u.username ? "@" + u.username : ""} · ${fmtTime(u.ts)}</small>
         </div>`;
+      wireProfileRow(row, u);
       const b = document.createElement("button");
       b.className = "dh-btn";
       b.style.cssText = "padding:4px 8px;font-size:11px;flex-shrink:0";
       b.textContent = "Разблокировать";
-      b.addEventListener("click", async () => {
+      b.addEventListener("click", async (e) => {
+        e.stopPropagation();
         b.disabled = true;
         b.textContent = "…";
         const ok = await unblockUser(u.userId);
@@ -4348,12 +4370,16 @@
           </div>
           <small>${when}</small>
         </div>`;
+      if (item.userId || item.username) {
+        wireProfileRow(row, item);
+      }
       if (!item.undone) {
         const b = document.createElement("button");
         b.className = "dh-btn";
         b.style.cssText = "padding:4px 8px;font-size:11px;flex-shrink:0";
         b.textContent = "Вернуть";
-        b.addEventListener("click", async () => {
+        b.addEventListener("click", async (e) => {
+          e.stopPropagation();
           b.disabled = true;
           b.textContent = "…";
           const ok = await undoAction(item);
@@ -4491,9 +4517,11 @@
             ? "подписался на тебя"
             : c.kind === "i_unfollowed"
               ? "ты отписался"
-              : c.kind === "i_followed"
-                ? "ты подписался"
-                : c.kind || "";
+              : c.kind === "i_blocked"
+                ? "ты заблокировал"
+                : c.kind === "i_followed"
+                  ? "ты подписался"
+                  : c.kind || "";
       row.innerHTML = `<div class="dh-setting-label" style="min-width:0">
           <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
             ${sign} ${c.name || c.username || c.userId} · ${label}
@@ -4556,11 +4584,20 @@
     const curFollowing = new Map(following.map((u) => [String(u.userId), u]));
     const curFollowers = new Map(followers.map((u) => [String(u.userId), u]));
 
-    const myLogIds = new Set(
+    const myUnfollowIds = new Set(
       (DATA.actionLog || [])
         .filter((a) => a.type === "unfollow" && a.userId)
         .map((a) => String(a.userId)),
     );
+    const myBlockIds = new Set(
+      (DATA.actionLog || [])
+        .filter((a) => a.type === "block" && a.userId)
+        .map((a) => String(a.userId)),
+    );
+    (DATA.actionLog || [])
+      .filter((a) => a.type === "block_mass" && a.ids)
+      .forEach((a) => a.ids.forEach((id) => myBlockIds.add(String(id))));
+    (DATA.blockList || []).forEach((b) => myBlockIds.add(String(b.userId)));
 
     const add = (kind, dir, id, meta) => {
       DATA.friendChanges.unshift({
@@ -4576,28 +4613,30 @@
     };
 
     if (prev) {
-      // кто-то отписался от меня
+      // 1) кто-то отписался от меня (только если это НЕ моя блокировка/отписка)
       for (const id of prevFollowers) {
-        if (!curFollowers.has(id)) {
-          const meta = prev.followersMeta && prev.followersMeta[id];
-          add("unfollowed_me", "minus", id, meta);
-        }
+        if (curFollowers.has(id)) continue;
+        if (myBlockIds.has(id) || myUnfollowIds.has(id)) continue;
+        const meta = prev.followersMeta && prev.followersMeta[id];
+        add("unfollowed_me", "minus", id, meta);
       }
       // подписался на меня
       for (const [id, u] of curFollowers) {
         if (!prevFollowers.has(id)) add("followed_me", "plus", id, u);
       }
-      // я отписался (по diff following; если есть в actionLog — явно)
+      // 2) исчез из моих подписок — классифицируем по действиям
       for (const id of prevFollowing) {
-        if (!curFollowing.has(id)) {
-          const meta = prev.followingMeta && prev.followingMeta[id];
-          add(
-            myLogIds.has(id) ? "i_unfollowed" : "unfollowed_me",
-            "minus",
-            id,
-            meta,
-          );
+        if (curFollowing.has(id)) continue;
+        const meta = prev.followingMeta && prev.followingMeta[id];
+        if (myBlockIds.has(id)) {
+          add("i_blocked", "minus", id, meta);
+        } else if (myUnfollowIds.has(id)) {
+          add("i_unfollowed", "minus", id, meta);
+        } else if (!prevFollowers.has(id)) {
+          // не был подписан на меня — явно я убрал из подписок
+          add("i_unfollowed", "minus", id, meta);
         }
+        // если был подписчиком и уже помечен как unfollowed_me выше — не дублируем
       }
       // я подписался
       for (const [id, u] of curFollowing) {
