@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Duolingo Helper
 // @namespace    https://github.com/Vidrimers/Duolingo-helper
-// @version      0.5.6
+// @version      0.5.7
 // @description  Проверка взаимной подписки на профилях Duolingo. Панель, бейджи, кеш.
 // @author       Vidrimers
 // @match        *://*.duolingo.com/*
@@ -740,8 +740,21 @@
                 background: #ECE9D8;
                 border-top: 1px solid #D6D2B8;
                 flex-shrink: 0;
+                justify-content: center;
+                align-items: center;
             }
             .dh-footer .dh-btn { flex: 1; text-align: center; padding: 6px 10px; }
+
+            .dh-donate-link {
+                color: #888;
+                font-size: 12px;
+                text-decoration: none;
+                transition: color 0.2s;
+            }
+            .dh-donate-link:hover {
+                color: #ccc;
+                text-decoration: underline;
+            }
 
             .dh-op-status:empty { display: none; }
 
@@ -1258,6 +1271,7 @@
 
             <div class="dh-tabs">
                 <button class="dh-tab active" data-tab="check">👤 Проверка</button>
+                <button class="dh-tab" data-tab="friends">👥 Друзья</button>
                 <button class="dh-tab" data-tab="tools">🧰 Инструменты</button>
                 <button class="dh-tab" data-tab="settings">⚙️ Настройки</button>
             </div>
@@ -1298,6 +1312,20 @@
                     <button class="dh-btn dh-btn-ghost" id="dh-copy-btn">📋 Копировать</button>
                     <button class="dh-btn dh-btn-ghost" id="dh-refresh-page">🔄 Обновить</button>
                 </div>
+            </div>
+
+            <div class="dh-tab-content" data-tab="friends">
+                <div class="dh-row">
+                    <input class="dh-input" id="dh-friends-search" placeholder="Поиск по имени" />
+                    <button class="dh-btn dh-btn-primary" id="dh-friends-load">Обновить</button>
+                </div>
+                <div class="dh-tabs" style="margin:8px 0">
+                    <button class="dh-tab active" data-friend-filter="all">Все</button>
+                    <button class="dh-tab" data-friend-filter="nobody">❌ Не подписаны</button>
+                    <button class="dh-tab" data-friend-filter="mutual">✅ Взаимно</button>
+                </div>
+                <div class="dh-muted dh-op-status" id="dh-friends-status"></div>
+                <div id="dh-friends-list" style="display:flex;flex-direction:column;gap:4px;max-height:52vh;overflow-y:auto"></div>
             </div>
 
             <div class="dh-tab-content" data-tab="tools">
@@ -1552,6 +1580,9 @@
                 </div>
             </div>
         </div>
+        <div class="dh-footer">
+            <a class="dh-donate-link" href="https://vidrimers.online/donate" target="_blank" rel="noopener">Поддержать проект</a>
+        </div>
         <input type="file" id="dh-import-file" accept="application/json,.json" style="display:none" />
     `;
     shadow.appendChild(modal);
@@ -1567,7 +1598,7 @@
       minBtn: modal.querySelector("#dh-min-btn"),
       closeBtn: modal.querySelector("#dh-close-btn"),
       resetPosBtn: modal.querySelector("#dh-reset-pos"),
-      tabs: [...modal.querySelectorAll(".dh-tab")],
+      tabs: [...modal.querySelectorAll(".dh-tab[data-tab]")],
       tabContents: [...modal.querySelectorAll(".dh-tab-content")],
       status: modal.querySelector("#dh-status"),
       statusSub: modal.querySelector("#dh-status-sub"),
@@ -1623,6 +1654,11 @@
       lbTarget: modal.querySelector("#dh-lb-target"),
       lbFarm: modal.querySelector("#dh-lb-farm"),
       lbStop: modal.querySelector("#dh-lb-stop"),
+      friendsSearch: modal.querySelector("#dh-friends-search"),
+      friendsLoad: modal.querySelector("#dh-friends-load"),
+      friendsStatus: modal.querySelector("#dh-friends-status"),
+      friendsList: modal.querySelector("#dh-friends-list"),
+      friendFilters: [...modal.querySelectorAll("[data-friend-filter]")],
       setCache: modal.querySelector("#dh-set-cache"),
       clearCache: modal.querySelector("#dh-clear-cache"),
       refreshPage: modal.querySelector("#dh-refresh-page"),
@@ -3797,6 +3833,157 @@
     showToast("Фарм лиги остановлен");
   }
 
+  // ========== Список друзей ==========
+  let friendsCache = null;
+  let friendFilter = "all";
+
+  function setFriendsStatus(t) {
+    if (els.friendsStatus) els.friendsStatus.textContent = t;
+  }
+
+  async function unfollowUser(targetId) {
+    const myId = getMyId();
+    if (!myId || !targetId) return false;
+    return new Promise((resolve) => {
+      GM_xmlhttpRequest({
+        method: "DELETE",
+        url: `https://www.duolingo.com/2017-06-30/friends/users/${myId}/follow/${targetId}`,
+        headers: {
+          accept: "application/json",
+          authorization: "Bearer " + (getToken() || ""),
+        },
+        timeout: 15000,
+        onload(resp) {
+          resolve(resp.status === 200 || resp.status === 201 || resp.status === 204);
+        },
+        onerror() {
+          resolve(false);
+        },
+        ontimeout() {
+          resolve(false);
+        },
+      });
+    });
+  }
+
+  function renderFriends() {
+    if (!els.friendsList) return;
+    const q = (els.friendsSearch && els.friendsSearch.value || "")
+      .trim()
+      .toLowerCase();
+    let rows = (friendsCache && friendsCache.rows) || [];
+
+    if (friendFilter === "mutual") rows = rows.filter((r) => r.followsMe);
+    if (friendFilter === "nobody") rows = rows.filter((r) => !r.followsMe);
+    if (q) {
+      rows = rows.filter((r) => {
+        return (
+          (r.name || "").toLowerCase().includes(q) ||
+          (r.username || "").toLowerCase().includes(q)
+        );
+      });
+    }
+
+    els.friendsList.innerHTML = "";
+    if (!rows.length) {
+      els.friendsList.innerHTML = '<div class="dh-muted">Пусто</div>';
+      return;
+    }
+
+    for (const r of rows) {
+      const row = document.createElement("div");
+      row.className = "dh-setting-row";
+      row.style.borderBottom = "none";
+      row.style.padding = "5px 2px";
+      row.style.cursor = "pointer";
+      const icon = r.followsMe ? "✅" : "❌";
+      const sub = r.username ? "@" + r.username : String(r.userId || "");
+      row.innerHTML = `<div class="dh-setting-label" style="min-width:0">
+          <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+            ${icon} ${r.name || sub}
+          </div>
+          <small>${sub}</small>
+        </div>
+        <button class="dh-btn" data-unfollow="1" style="padding:4px 8px;font-size:11px;flex-shrink:0">Отписаться</button>`;
+      row.addEventListener("click", (e) => {
+        if (e.target && e.target.closest && e.target.closest("[data-unfollow]")) return;
+        const u = r.username || r.name;
+        if (u) window.open("https://www.duolingo.com/profile/" + encodeURIComponent(u), "_blank");
+      });
+      const unBtn = row.querySelector("[data-unfollow]");
+      if (unBtn) {
+        unBtn.addEventListener("click", async (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          unBtn.disabled = true;
+          unBtn.textContent = "…";
+          const ok = await unfollowUser(r.userId);
+          if (ok) {
+            showToast("Отписался от " + (r.name || sub));
+            if (friendsCache) {
+              friendsCache.rows = friendsCache.rows.filter((x) => String(x.userId) !== String(r.userId));
+            }
+            renderFriends();
+          } else {
+            unBtn.disabled = false;
+            unBtn.textContent = "Отписаться";
+            showToast("Не удалось отписаться", true);
+          }
+        });
+      }
+      els.friendsList.appendChild(row);
+    }
+    setFriendsStatus(`Показано: ${rows.length} · всего: ${friendsCache ? friendsCache.rows.length : 0}`);
+  }
+
+  async function loadFriends() {
+    const btn = els.friendsLoad;
+    if (btn) btn.disabled = true;
+    setFriendsStatus("Загрузка друзей…");
+    try {
+      const me = await getMe();
+      if (!me || !me.id) throw new Error("Не выполнен вход");
+
+      const [following, followers] = await Promise.all([
+        fetchUserList(me.id, "following"),
+        fetchUserList(me.id, "followers"),
+      ]);
+
+      const followersSet = new Map();
+      for (const f of followers) {
+        followersSet.set(String(f.userId), f);
+      }
+
+      const rows = following.map((u) => {
+        const hit = followersSet.get(String(u.userId));
+        return {
+          userId: String(u.userId),
+          name: u.displayName || u.username || u.userId,
+          username: u.username || (hit && hit.username) || "",
+          followsMe: !!hit,
+        };
+      });
+
+      // сортировка: сначала не подписаны, потом взаимные
+      rows.sort((a, b) => {
+        if (a.followsMe !== b.followsMe) return a.followsMe ? 1 : -1;
+        return String(a.name).localeCompare(String(b.name));
+      });
+
+      friendsCache = {
+        rows,
+        followingCount: following.length,
+        followersCount: followers.length,
+      };
+      renderFriends();
+    } catch (e) {
+      setFriendsStatus("Ошибка: " + (e && e.message));
+      showToast("Не удалось загрузить друзей", true);
+    } finally {
+      if (btn) btn.disabled = false;
+    }
+  }
+
   // ========== XP: фейк-буст + накрутка ==========
   // ⚠️ Читы, на свой страх и риск.
   let xpRunning = false;
@@ -4809,6 +4996,14 @@
         els.tabContents.forEach((c) =>
           c.classList.toggle("active", c.dataset.tab === name),
         );
+        if (name === "friends") {
+          // автозагрузка при открытии вкладки
+          if (!friendsCache) {
+            loadFriends();
+          } else {
+            renderFriends();
+          }
+        }
       });
     });
 
@@ -5048,6 +5243,24 @@
     }
     if (els.lbStop) {
       els.lbStop.addEventListener("click", () => stopLeagueFarm());
+    }
+
+    if (els.friendsLoad) {
+      els.friendsLoad.addEventListener("click", () => loadFriends());
+    }
+    if (els.friendsSearch) {
+      els.friendsSearch.addEventListener("input", () => renderFriends());
+    }
+    if (els.friendFilters && els.friendFilters.length) {
+      els.friendFilters.forEach((b) => {
+        b.addEventListener("click", () => {
+          friendFilter = b.dataset.friendFilter || "all";
+          els.friendFilters.forEach((x) =>
+            x.classList.toggle("active", x === b),
+          );
+          renderFriends();
+        });
+      });
     }
 
     els.setCache.addEventListener("change", () => {
