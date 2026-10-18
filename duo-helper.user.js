@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Duolingo Helper
 // @namespace    https://github.com/Vidrimers/duolingo-ext
-// @version      0.1.0
+// @version      0.2.0
 // @description  Проверка взаимной подписки на профилях Duolingo. Панель, бейджи, кеш.
 // @author       Vidrimers
 // @match        *://*.duolingo.com/*
@@ -35,6 +35,7 @@
         showBadge: true,
         badgePos: "top-right",
         accent: "#58cc02",
+        winPos: null, // { x, y } — позиция окна после drag
       },
       // username -> { followsMe: true/false, checkedAt: ts, theirId, theirName }
       followCache: {},
@@ -385,238 +386,344 @@
             }
 
             /* ===== Modal ===== */
+            /* ===== XP Window ===== */
             .dh-modal {
                 position: fixed;
-                top: 50%;
-                right: 10%;
-                transform: translate(20%, -50%) scale(0.95);
+                left: 420px;
+                top: 120px;
                 pointer-events: auto;
-                width: 460px;
+                width: 420px;
                 max-width: 92vw;
-                max-height: 75vh;
-                overflow-y: auto;
-                background: linear-gradient(160deg, #1a1a2e, #16213e);
-                border: 1px solid rgba(255,255,255,0.08);
-                border-radius: 20px;
-                padding: 28px;
+                max-height: 78vh;
                 z-index: 2147483645;
-                color: #e0e0e0;
-                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-                font-size: 14px;
-                line-height: 1.4;
-                box-shadow: 0 24px 80px rgba(0,0,0,0.6);
-                opacity: 0;
-                transition: opacity 0.3s, transform 0.3s;
                 display: none;
+                flex-direction: column;
+                background: #ECE9D8;
+                border: 3px solid;
+                border-color: #0055EA #003DD7 #003DD7 #0055EA;
+                border-radius: 8px 8px 3px 3px;
+                box-shadow:
+                    2px 2px 12px rgba(0,0,0,0.45),
+                    inset 0 0 0 1px rgba(255,255,255,0.12);
+                color: #000;
+                font-family: Tahoma, 'Segoe UI', sans-serif;
+                font-size: 12px;
+                line-height: 1.35;
+                overflow: hidden;
             }
-            .dh-modal.open {
-                display: block;
-                opacity: 1;
-                transform: translate(20%, -50%) scale(1);
-            }
-            .dh-modal h2 {
-                margin: 0 0 18px;
-                font-size: 19px;
-                font-weight: 700;
-                color: #fff;
+            .dh-modal.open { display: flex; }
+
+            /* Title bar (drag handle) */
+            .dh-titlebar {
+                height: 30px;
+                flex-shrink: 0;
                 display: flex;
                 align-items: center;
+                gap: 6px;
+                padding: 0 4px 0 8px;
+                cursor: move;
+                user-select: none;
+                -webkit-user-select: none;
+                background: linear-gradient(
+                    to bottom,
+                    #0A246A 0%,
+                    #3A6EA5 4%,
+                    #0058EE 8%,
+                    #3593FF 18%,
+                    #288EFF 40%,
+                    #127DFF 65%,
+                    #0058EE 88%,
+                    #003DD7 93%,
+                    #001CB8 98%
+                );
+                border-radius: 5px 5px 0 0;
+                box-shadow: inset 0 1px 0 rgba(255,255,255,0.25);
+            }
+            .dh-titlebar .dh-title-icon {
+                font-size: 15px;
+                line-height: 1;
+                filter: drop-shadow(0 1px 1px rgba(0,0,0,0.35));
+            }
+            .dh-titlebar .dh-title-text {
+                flex: 1;
+                color: #fff;
+                font-weight: 700;
+                font-size: 13px;
+                letter-spacing: 0.2px;
+                text-shadow: 1px 1px 2px rgba(0,0,0,0.55);
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+            .dh-titlebar .dh-chip {
+                font-size: 10px;
+                background: rgba(255,255,255,0.18);
+                color: #fff;
+                padding: 1px 7px;
+                border-radius: 8px;
+                font-weight: 600;
+                text-shadow: none;
+            }
+
+            /* XP window buttons */
+            .dh-win-btns { display: flex; gap: 2px; flex-shrink: 0; }
+            .dh-win-btn {
+                width: 22px;
+                height: 22px;
+                border-radius: 3px;
+                border: 1px solid rgba(255,255,255,0.55);
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 13px;
+                font-weight: 700;
+                line-height: 1;
+                padding: 0;
+                font-family: Tahoma, sans-serif;
+                color: #fff;
+                text-shadow: 1px 1px 1px rgba(0,0,0,0.4);
+            }
+            .dh-win-btn.min {
+                background: linear-gradient(to bottom, #4080FF, #1050D0);
+            }
+            .dh-win-btn.close {
+                background: linear-gradient(to bottom, #F5875C, #E03C15);
+            }
+            .dh-win-btn:hover { filter: brightness(1.12); }
+            .dh-win-btn:active { filter: brightness(0.9); }
+
+            /* Body */
+            .dh-body {
+                flex: 1;
+                overflow-y: auto;
+                padding: 10px 12px 12px;
+                background: #ECE9D8;
+                display: flex;
+                flex-direction: column;
                 gap: 10px;
             }
-            .dh-chip {
-                font-size: 11px;
-                background: rgba(88,204,2,0.2);
-                color: #9fe070;
-                padding: 3px 10px;
-                border-radius: 20px;
-                font-weight: 600;
+            .dh-body::-webkit-scrollbar { width: 14px; }
+            .dh-body::-webkit-scrollbar-track {
+                background: #F1F1F1;
+                border-left: 1px solid #D6D2B8;
+            }
+            .dh-body::-webkit-scrollbar-thumb {
+                background: linear-gradient(to right, #F5F4EA, #C8C4A8);
+                border: 1px solid #9C9A7E;
+                border-radius: 2px;
             }
 
-            /* ===== Tabs ===== */
+            /* ===== Tabs (XP) ===== */
             .dh-tabs {
                 display: flex;
-                gap: 4px;
-                margin-bottom: 18px;
-                background: rgba(0,0,0,0.3);
-                border-radius: 10px;
-                padding: 4px;
+                gap: 2px;
+                margin: 0 0 -1px;
+                padding: 0 0 0 4px;
+                position: relative;
+                z-index: 1;
             }
             .dh-tab {
-                flex: 1;
-                padding: 7px 4px;
-                border: none;
-                background: transparent;
-                color: #888;
-                font-size: 12px;
-                font-weight: 600;
+                padding: 5px 12px;
+                border: 1px solid #919B9C;
+                border-bottom: none;
+                background: linear-gradient(to bottom, #F0EDE1 0%, #DCD8C8 100%);
+                color: #333;
+                font-size: 11px;
+                font-weight: 700;
                 cursor: pointer;
-                border-radius: 8px;
-                transition: all 0.2s;
-                font-family: inherit;
+                border-radius: 3px 3px 0 0;
+                font-family: Tahoma, sans-serif;
+                position: relative;
+                top: 1px;
             }
             .dh-tab.active {
-                background: rgba(88,204,2,0.18);
-                color: #b8f08a;
+                background: #ECE9D8;
+                color: #0A246A;
+                top: 1px;
+                z-index: 2;
+                box-shadow: 0 1px 0 #ECE9D8;
             }
-            .dh-tab:hover:not(.active) { color: #ccc; }
+            .dh-tab:hover:not(.active) { background: linear-gradient(to bottom, #F8F6EE, #E5E1D0); }
 
-            .dh-tab-content { display: none; flex-direction: column; gap: 12px; }
+            .dh-tab-content { display: none; flex-direction: column; gap: 10px; }
             .dh-tab-content.active { display: flex; }
 
-            /* ===== Inputs / Buttons ===== */
+            /* ===== Inputs / Buttons (XP) ===== */
             .dh-input {
                 width: 100%;
-                padding: 10px 14px;
-                background: rgba(0,0,0,0.4);
-                border: 1px solid rgba(255,255,255,0.08);
-                border-radius: 8px;
-                color: #fff;
-                font-size: 13px;
+                padding: 5px 8px;
+                background: #fff;
+                border: 2px solid;
+                border-color: #7F9DB9 #DFE7F0 #DFE7F0 #7F9DB9;
+                border-radius: 1px;
+                color: #000;
+                font-size: 12px;
                 outline: none;
-                transition: border-color 0.2s;
-                font-family: inherit;
+                font-family: Tahoma, sans-serif;
             }
-            .dh-input:focus { border-color: rgba(88,204,2,0.5); }
-            .dh-input::placeholder { color: #555; }
+            .dh-input:focus { border-color: #3C7FB1 #B9D5EA #B9D5EA #3C7FB1; }
+            .dh-input::placeholder { color: #9A9A9A; }
 
             .dh-btn {
-                padding: 10px 16px;
-                border: none;
-                border-radius: 8px;
-                font-size: 13px;
-                font-weight: 600;
+                padding: 5px 14px;
+                border: 1px solid #003C74;
+                border-radius: 3px;
+                background: linear-gradient(to bottom, #F5F4EA 0%, #E5E1D0 45%, #D2CEB8 100%);
+                color: #000;
+                font-size: 12px;
+                font-weight: 400;
                 cursor: pointer;
-                transition: all 0.2s;
-                font-family: inherit;
+                font-family: Tahoma, sans-serif;
                 white-space: nowrap;
+                box-shadow: inset 0 1px 0 rgba(255,255,255,0.7);
             }
-            .dh-btn-primary { background: linear-gradient(135deg, #58cc02, #46a302); color: #fff; }
-            .dh-btn-primary:hover { opacity: 0.9; transform: translateY(-1px); }
+            .dh-btn:hover { filter: brightness(1.04); }
+            .dh-btn:active {
+                background: linear-gradient(to bottom, #D2CEB8, #E5E1D0);
+                box-shadow: inset 0 1px 2px rgba(0,0,0,0.12);
+            }
+            .dh-btn-primary {
+                background: linear-gradient(to bottom, #6EC27A 0%, #4FA85C 45%, #3D8F4A 100%);
+                border-color: #2D6B36;
+                color: #fff;
+                font-weight: 700;
+                text-shadow: 0 1px 1px rgba(0,0,0,0.25);
+            }
             .dh-btn-ghost {
-                background: rgba(255,255,255,0.05);
-                color: #aaa;
-                border: 1px solid rgba(255,255,255,0.1);
+                background: linear-gradient(to bottom, #F5F4EA 0%, #E5E1D0 45%, #D2CEB8 100%);
+                border-color: #003C74;
+                color: #000;
             }
-            .dh-btn-ghost:hover { background: rgba(255,255,255,0.1); color: #fff; }
-            .dh-btn-danger { background: #e74c3c; color: #fff; }
-            .dh-btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none !important; }
+            .dh-btn-danger {
+                background: linear-gradient(to bottom, #E9847A 0%, #D6483A 45%, #B93C30 100%);
+                border-color: #8B2A20;
+                color: #fff;
+                font-weight: 700;
+                text-shadow: 0 1px 1px rgba(0,0,0,0.25);
+            }
+            .dh-btn:disabled {
+                color: #9A9A9A;
+                background: #ECE9D8;
+                border-color: #C0BDA4;
+                cursor: not-allowed;
+                box-shadow: none;
+                filter: none;
+            }
 
-            /* ===== Result card ===== */
+            /* ===== Cards ===== */
             .dh-card {
-                background: rgba(0,0,0,0.25);
-                border: 1px solid rgba(255,255,255,0.06);
-                border-radius: 12px;
-                padding: 14px 16px;
+                background: #fff;
+                border: 1px solid #919B9C;
+                border-radius: 2px;
+                padding: 10px 12px;
+                box-shadow: inset 0 0 0 1px #F5F4EA;
             }
             .dh-card-title {
-                font-size: 11px;
+                font-size: 10px;
                 text-transform: uppercase;
-                letter-spacing: 0.06em;
-                color: #777;
-                margin: 0 0 8px;
-                font-weight: 600;
+                letter-spacing: 0.05em;
+                color: #666;
+                margin: 0 0 6px;
+                font-weight: 700;
+                font-family: Tahoma, sans-serif;
             }
             .dh-status-line {
                 display: flex;
                 align-items: center;
-                gap: 10px;
-                font-size: 15px;
-                font-weight: 700;
-            }
-            .dh-status-line .icon { font-size: 20px; }
-            .dh-status-yes { color: #2ecc71; }
-            .dh-status-no { color: #e74c3c; }
-            .dh-status-checking { color: #f1c40f; }
-            .dh-status-error { color: #e67e22; }
-            .dh-muted { color: #777; font-size: 12px; font-weight: 500; }
-            .dh-row {
-                display: flex;
                 gap: 8px;
-                align-items: center;
+                font-size: 13px;
+                font-weight: 700;
+                font-family: Tahoma, sans-serif;
             }
+            .dh-status-line .icon { font-size: 18px; }
+            .dh-status-yes { color: #1F7A1F; }
+            .dh-status-no { color: #B02A1E; }
+            .dh-status-checking { color: #A57A00; }
+            .dh-status-error { color: #B06A1E; }
+            .dh-muted { color: #666; font-size: 11px; font-weight: 400; }
+            .dh-row { display: flex; gap: 6px; align-items: center; }
             .dh-row .dh-input { flex: 1; }
 
-            /* ===== Setting rows ===== */
+            /* ===== Settings ===== */
             .dh-setting-row {
                 display: flex;
                 align-items: center;
                 justify-content: space-between;
-                padding: 10px 0;
-                border-bottom: 1px solid rgba(255,255,255,0.05);
-                gap: 12px;
+                padding: 7px 2px;
+                border-bottom: 1px solid #D6D2B8;
+                gap: 10px;
             }
-            .dh-setting-label { font-size: 13px; color: #aaa; flex: 1; }
-            .dh-setting-label small { display: block; color: #666; font-size: 11px; margin-top: 2px; }
+            .dh-setting-label { font-size: 12px; color: #333; flex: 1; }
+            .dh-setting-label small {
+                display: block;
+                color: #777;
+                font-size: 10px;
+                margin-top: 1px;
+            }
 
             .dh-switch {
                 position: relative;
-                width: 42px;
-                height: 24px;
-                border-radius: 12px;
-                background: rgba(255,255,255,0.12);
+                width: 40px;
+                height: 22px;
+                border-radius: 3px;
+                background: linear-gradient(to bottom, #E5E1D0, #C8C4A8);
+                border: 1px solid #919B9C;
                 cursor: pointer;
                 flex-shrink: 0;
-                transition: background 0.2s;
             }
-            .dh-switch.on { background: #58cc02; }
+            .dh-switch.on {
+                background: linear-gradient(to bottom, #6EC27A, #3D8F4A);
+                border-color: #2D6B36;
+            }
             .dh-switch::after {
                 content: "";
                 position: absolute;
-                top: 3px;
-                left: 3px;
-                width: 18px;
-                height: 18px;
-                border-radius: 50%;
-                background: #fff;
-                transition: transform 0.2s;
+                top: 2px;
+                left: 2px;
+                width: 16px;
+                height: 16px;
+                border-radius: 2px;
+                background: linear-gradient(to bottom, #FFF, #E8E4D4);
+                border: 1px solid #919B9C;
+                transition: transform 0.15s;
             }
             .dh-switch.on::after { transform: translateX(18px); }
 
             .dh-num-input {
-                width: 72px;
-                padding: 6px 8px;
-                background: rgba(0,0,0,0.4);
-                border: 1px solid rgba(255,255,255,0.08);
-                border-radius: 6px;
-                color: #fff;
+                width: 64px;
+                padding: 4px 6px;
+                background: #fff;
+                border: 2px solid;
+                border-color: #7F9DB9 #DFE7F0 #DFE7F0 #7F9DB9;
+                border-radius: 1px;
+                color: #000;
                 font-size: 12px;
                 outline: none;
-                font-family: inherit;
+                font-family: Tahoma, sans-serif;
                 text-align: center;
             }
 
             /* ===== Footer ===== */
             .dh-footer {
                 display: flex;
-                gap: 8px;
-                margin-top: 18px;
-                flex-wrap: wrap;
+                gap: 6px;
+                padding: 8px 12px;
+                background: #ECE9D8;
+                border-top: 1px solid #D6D2B8;
+                flex-shrink: 0;
             }
-            .dh-footer .dh-btn { flex: 1; min-width: 110px; text-align: center; padding: 8px 10px; }
-
-            .dh-close {
-                position: absolute;
-                top: 12px;
-                right: 14px;
-                background: none;
-                border: none;
-                color: #666;
-                font-size: 22px;
-                cursor: pointer;
-                transition: color 0.2s;
-                line-height: 1;
-                padding: 0;
-                font-family: inherit;
-            }
-            .dh-close:hover { color: #fff; }
+            .dh-footer .dh-btn { flex: 1; text-align: center; padding: 6px 10px; }
 
             .dh-placeholder {
                 color: #666;
-                font-size: 12px;
+                font-size: 11px;
                 text-align: center;
-                padding: 18px 8px;
-                border: 1px dashed rgba(255,255,255,0.1);
-                border-radius: 10px;
+                padding: 16px 10px;
+                border: 1px dashed #B0A98C;
+                border-radius: 2px;
+                background: #F5F2E2;
+                font-family: Tahoma, sans-serif;
             }
         `;
     shadow.appendChild(style);
@@ -640,94 +747,110 @@
     `;
     shadow.appendChild(badge);
 
-    // Modal
+    // Modal (XP window)
     const modal = document.createElement("div");
     modal.className = "dh-modal";
     modal.innerHTML = `
-        <button class="dh-close" title="Закрыть">×</button>
-        <h2>🦉 Duolingo Helper <span class="dh-chip">v0.1</span></h2>
-
-        <div class="dh-tabs">
-            <button class="dh-tab active" data-tab="check">👤 Проверка</button>
-            <button class="dh-tab" data-tab="tools">🧰 Инструменты</button>
-            <button class="dh-tab" data-tab="settings">⚙️ Настройки</button>
-        </div>
-
-        <div class="dh-tab-content active" data-tab="check">
-            <div class="dh-card">
-                <div class="dh-card-title">Текущий профиль</div>
-                <div class="dh-status-line" id="dh-status">
-                    <span class="icon">…</span>
-                    <span class="text">Открой профиль пользователя</span>
-                </div>
-                <div class="dh-muted" id="dh-status-sub" style="margin-top:6px">
-                    Скрипт покажет, подписан ли он на тебя в ответ.
-                </div>
-            </div>
-
-            <div class="dh-row">
-                <input class="dh-input" id="dh-user-input" placeholder="username для проверки" />
-                <button class="dh-btn dh-btn-primary" id="dh-check-btn">Проверить</button>
-            </div>
-
-            <div class="dh-card" id="dh-manual-card" style="display:none">
-                <div class="dh-card-title">Ручная проверка</div>
-                <div class="dh-status-line" id="dh-manual-status">
-                    <span class="icon">…</span>
-                    <span class="text">—</span>
-                </div>
-                <div class="dh-muted" id="dh-manual-sub" style="margin-top:6px"></div>
-            </div>
-
-            <div class="dh-card" id="dh-me-card">
-                <div class="dh-card-title">Твой аккаунт</div>
-                <div class="dh-muted" id="dh-me-info">Определение…</div>
-            </div>
-
-            <div class="dh-row">
-                <button class="dh-btn dh-btn-ghost" id="dh-recheck-btn">🔄 Перепроверить</button>
-                <button class="dh-btn dh-btn-ghost" id="dh-copy-btn">📋 Копировать результат</button>
+        <div class="dh-titlebar" id="dh-titlebar">
+            <span class="dh-title-icon">🦉</span>
+            <span class="dh-title-text">Duolingo Helper</span>
+            <span class="dh-chip">v0.2</span>
+            <div class="dh-win-btns">
+                <button class="dh-win-btn min" id="dh-min-btn" title="Свернуть">–</button>
+                <button class="dh-win-btn close" id="dh-close-btn" title="Закрыть">×</button>
             </div>
         </div>
 
-        <div class="dh-tab-content" data-tab="tools">
-            <div class="dh-placeholder">
-                🔜 Здесь появятся функции:<br/>
-                • защита сердец<br/>
-                • массовое удаление друзей<br/>
-                • массовая отписка от тех, кто не подписан в ответ<br/>
-                • и другие инструменты
+        <div class="dh-body">
+            <div class="dh-tabs">
+                <button class="dh-tab active" data-tab="check">👤 Проверка</button>
+                <button class="dh-tab" data-tab="tools">🧰 Инструменты</button>
+                <button class="dh-tab" data-tab="settings">⚙️ Настройки</button>
             </div>
-        </div>
 
-        <div class="dh-tab-content" data-tab="settings">
-            <div class="dh-setting-row">
-                <div class="dh-setting-label">
-                    Автопроверка на профиле
-                    <small>Сам проверять подписку при открытии профиля</small>
+            <div class="dh-tab-content active" data-tab="check">
+                <div class="dh-card">
+                    <div class="dh-card-title">Текущий профиль</div>
+                    <div class="dh-status-line" id="dh-status">
+                        <span class="icon">…</span>
+                        <span class="text">Открой профиль пользователя</span>
+                    </div>
+                    <div class="dh-muted" id="dh-status-sub" style="margin-top:6px">
+                        Скрипт покажет, подписан ли он на тебя в ответ.
+                    </div>
                 </div>
-                <div class="dh-switch" id="dh-set-auto"></div>
+
+                <div class="dh-row">
+                    <input class="dh-input" id="dh-user-input" placeholder="username для проверки" />
+                    <button class="dh-btn dh-btn-primary" id="dh-check-btn">Проверить</button>
+                </div>
+
+                <div class="dh-card" id="dh-manual-card" style="display:none">
+                    <div class="dh-card-title">Ручная проверка</div>
+                    <div class="dh-status-line" id="dh-manual-status">
+                        <span class="icon">…</span>
+                        <span class="text">—</span>
+                    </div>
+                    <div class="dh-muted" id="dh-manual-sub" style="margin-top:6px"></div>
+                </div>
+
+                <div class="dh-card" id="dh-me-card">
+                    <div class="dh-card-title">Твой аккаунт</div>
+                    <div class="dh-muted" id="dh-me-info">Определение…</div>
+                </div>
+
+                <div class="dh-row">
+                    <button class="dh-btn dh-btn-ghost" id="dh-recheck-btn">🔄 Перепроверить</button>
+                    <button class="dh-btn dh-btn-ghost" id="dh-copy-btn">📋 Копировать результат</button>
+                </div>
             </div>
-            <div class="dh-setting-row">
-                <div class="dh-setting-label">
-                    Показывать бейдж
-                    <small>Плашка поверх страницы профиля</small>
+
+            <div class="dh-tab-content" data-tab="tools">
+                <div class="dh-placeholder">
+                    🔜 Здесь появятся функции:<br/>
+                    • защита сердец<br/>
+                    • массовое удаление друзей<br/>
+                    • массовая отписка от тех, кто не подписан в ответ<br/>
+                    • и другие инструменты
                 </div>
-                <div class="dh-switch" id="dh-set-badge"></div>
             </div>
-            <div class="dh-setting-row">
-                <div class="dh-setting-label">
-                    Кеш (минут)
-                    <small>Не перезапрашивать API, пока результат свежий</small>
+
+            <div class="dh-tab-content" data-tab="settings">
+                <div class="dh-setting-row">
+                    <div class="dh-setting-label">
+                        Автопроверка на профиле
+                        <small>Сам проверять подписку при открытии профиля</small>
+                    </div>
+                    <div class="dh-switch" id="dh-set-auto"></div>
                 </div>
-                <input class="dh-num-input" id="dh-set-cache" type="number" min="1" max="1440" />
-            </div>
-            <div class="dh-setting-row" style="border-bottom:none">
-                <div class="dh-setting-label">
-                    Очистить кеш
-                    <small>Удалить сохранённые результаты проверок</small>
+                <div class="dh-setting-row">
+                    <div class="dh-setting-label">
+                        Показывать бейдж
+                        <small>Плашка поверх страницы профиля</small>
+                    </div>
+                    <div class="dh-switch" id="dh-set-badge"></div>
                 </div>
-                <button class="dh-btn dh-btn-danger" id="dh-clear-cache" style="padding:7px 12px;font-size:12px">Очистить</button>
+                <div class="dh-setting-row">
+                    <div class="dh-setting-label">
+                        Кеш (минут)
+                        <small>Не перезапрашивать API, пока результат свежий</small>
+                    </div>
+                    <input class="dh-num-input" id="dh-set-cache" type="number" min="1" max="1440" />
+                </div>
+                <div class="dh-setting-row">
+                    <div class="dh-setting-label">
+                        Сбросить позицию окна
+                        <small>Вернуть окно в место по умолчанию</small>
+                    </div>
+                    <button class="dh-btn" id="dh-reset-pos" style="padding:5px 10px;font-size:11px">Сброс</button>
+                </div>
+                <div class="dh-setting-row" style="border-bottom:none">
+                    <div class="dh-setting-label">
+                        Очистить кеш
+                        <small>Удалить сохранённые результаты проверок</small>
+                    </div>
+                    <button class="dh-btn dh-btn-danger" id="dh-clear-cache" style="padding:5px 10px;font-size:11px">Очистить</button>
+                </div>
             </div>
         </div>
 
@@ -745,7 +868,10 @@
       badgeText: badge.querySelector(".dh-badge-text"),
       badgeSub: badge.querySelector(".dh-badge-sub"),
       modal,
-      close: modal.querySelector(".dh-close"),
+      titlebar: modal.querySelector("#dh-titlebar"),
+      minBtn: modal.querySelector("#dh-min-btn"),
+      closeBtn: modal.querySelector("#dh-close-btn"),
+      resetPosBtn: modal.querySelector("#dh-reset-pos"),
       tabs: [...modal.querySelectorAll(".dh-tab")],
       tabContents: [...modal.querySelectorAll(".dh-tab-content")],
       status: modal.querySelector("#dh-status"),
@@ -767,6 +893,8 @@
     };
 
     bindEvents();
+    initDrag();
+    applyWinPos();
   }
 
   // ========== Toast ==========
@@ -996,6 +1124,80 @@
     window.addEventListener("popstate", () => setTimeout(onNavigate, 50));
   }
 
+  // ========== Window drag + position ==========
+  function clampWinPos(x, y) {
+    const w = els.modal ? els.modal.offsetWidth || 420 : 420;
+    const h = els.modal ? els.modal.offsetHeight || 300 : 300;
+    const maxX = Math.max(8, window.innerWidth - w - 8);
+    const maxY = Math.max(8, window.innerHeight - h - 8);
+    return {
+      x: Math.min(Math.max(8, x), maxX),
+      y: Math.min(Math.max(8, y), maxY),
+    };
+  }
+
+  function applyWinPos() {
+    if (!els.modal) return;
+    const saved = DATA.settings.winPos;
+    const pos = saved
+      ? clampWinPos(saved.x, saved.y)
+      : clampWinPos(
+          window.innerWidth - 420 - 120,
+          Math.round(window.innerHeight * 0.12),
+        );
+    els.modal.style.left = pos.x + "px";
+    els.modal.style.top = pos.y + "px";
+  }
+
+  function saveWinPos() {
+    if (!els.modal) return;
+    DATA.settings.winPos = {
+      x: parseInt(els.modal.style.left, 10) || 0,
+      y: parseInt(els.modal.style.top, 10) || 0,
+    };
+    saveData();
+  }
+
+  function initDrag() {
+    const bar = els.titlebar;
+    const modal = els.modal;
+    if (!bar || !modal) return;
+
+    let dragging = false;
+    let startX = 0;
+    let startY = 0;
+    let origX = 0;
+    let origY = 0;
+
+    const onMove = (e) => {
+      if (!dragging) return;
+      e.preventDefault();
+      const p = clampWinPos(origX + (e.clientX - startX), origY + (e.clientY - startY));
+      modal.style.left = p.x + "px";
+      modal.style.top = p.y + "px";
+    };
+
+    const onUp = () => {
+      if (!dragging) return;
+      dragging = false;
+      saveWinPos();
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+    };
+
+    bar.addEventListener("pointerdown", (e) => {
+      // не тащить по кнопкам окна
+      if (e.target.closest(".dh-win-btn")) return;
+      dragging = true;
+      startX = e.clientX;
+      startY = e.clientY;
+      origX = parseInt(modal.style.left, 10) || modal.offsetLeft || 0;
+      origY = parseInt(modal.style.top, 10) || modal.offsetTop || 0;
+      window.addEventListener("pointermove", onMove);
+      window.addEventListener("pointerup", onUp);
+    });
+  }
+
   // ========== Events ==========
   function bindEvents() {
     els.fab.addEventListener("click", () => {
@@ -1012,7 +1214,17 @@
       refreshMeInfo();
     });
 
-    els.close.addEventListener("click", () => els.modal.classList.remove("open"));
+    els.closeBtn.addEventListener("click", () => els.modal.classList.remove("open"));
+    els.minBtn.addEventListener("click", () => els.modal.classList.remove("open"));
+
+    if (els.resetPosBtn) {
+      els.resetPosBtn.addEventListener("click", () => {
+        DATA.settings.winPos = null;
+        saveData();
+        applyWinPos();
+        showToast("Позиция окна сброшена");
+      });
+    }
 
     els.tabs.forEach((tab) => {
       tab.addEventListener("click", () => {
