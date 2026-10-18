@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Duolingo Helper
 // @namespace    https://github.com/Vidrimers/Duolingo-helper
-// @version      0.2.7
+// @version      0.2.8
 // @description  Проверка взаимной подписки на профилях Duolingo. Панель, бейджи, кеш.
 // @author       Vidrimers
 // @match        *://*.duolingo.com/*
@@ -1402,10 +1402,8 @@
   }
 
   // ========== ПРОВЕРКА ОБНОВЛЕНИЙ ==========
-  const CURRENT_VERSION = "0.2.7";
-  const REPO_RAW_BASE =
-    "https://raw.githubusercontent.com/Vidrimers/Duolingo-helper";
-  // запасная ссылка установки, если SHA не удалось получить
+  const CURRENT_VERSION = "0.2.8";
+  // запасная ссылка установки, если API не дал download_url
   let installUrl =
     "https://raw.githubusercontent.com/Vidrimers/Duolingo-helper/refs/heads/master/duo-helper.user.js";
 
@@ -1429,9 +1427,11 @@
           );
           const m = decoded.match(/\/\/ @version\s+([^\s]+)/);
           if (!m) return null;
-          // immutable-ссылка на конкретный коммит — без CDN-кеша
-          if (data.sha) {
-            installUrl = `${REPO_RAW_BASE}/${data.sha}/duo-helper.user.js`;
+          // download_url указывает на raw-файл (branch/sha) — рабочая ссылка
+          // для установки. data.sha здесь — blob SHA файла, он НЕ подходит
+          // для raw.githubusercontent.com (нужен commit SHA).
+          if (data.download_url) {
+            installUrl = String(data.download_url).split("#")[0];
           }
           return m[1];
         } catch {
