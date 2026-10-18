@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Duolingo Helper
 // @namespace    https://github.com/Vidrimers/Duolingo-helper
-// @version      0.2.5
+// @version      0.2.6
 // @description  Проверка взаимной подписки на профилях Duolingo. Панель, бейджи, кеш.
 // @author       Vidrimers
 // @match        *://*.duolingo.com/*
@@ -1401,21 +1401,20 @@
   }
 
   // ========== ПРОВЕРКА ОБНОВЛЕНИЙ ==========
-  const CURRENT_VERSION = "0.2.5";
-  // install/update link — открывается в Tampermonkey (jsDelivr отдаёт свежее, чем raw CDN)
-  const INSTALL_URL =
-    "https://cdn.jsdelivr.net/gh/Vidrimers/Duolingo-helper@master/duo-helper.user.js";
-  // Источники для проверки версии. raw.githubusercontent часто отдаёт CDN-кеш,
-  // поэтому первым идёт jsDelivr, потом GitHub API.
+  const CURRENT_VERSION = "0.2.6";
+  const REPO_RAW_BASE =
+    "https://raw.githubusercontent.com/Vidrimers/Duolingo-helper";
+  // запасная ссылка установки, если SHA не удалось получить
+  let installUrl =
+    "https://raw.githubusercontent.com/Vidrimers/Duolingo-helper/refs/heads/master/duo-helper.user.js";
+
+  // Источники версии. GitHub API — всегда свежий (без CDN-кеша).
+  // jsDelivr @master кеширует до ~12 часов, raw CDN — тоже может быть stale.
+  // Поэтому API первый; остальные — только если API недоступен.
   const UPDATE_SOURCES = [
     {
-      url: "https://cdn.jsdelivr.net/gh/Vidrimers/Duolingo-helper@master/duo-helper.user.js",
-      parse: (text) => {
-        const m = text.match(/\/\/ @version\s+([^\s]+)/);
-        return m ? m[1] : null;
-      },
-    },
-    {
+      name: "github-api",
+      // всегда актуальное содержимое из git + sha коммита
       url: "https://api.github.com/repos/Vidrimers/Duolingo-helper/contents/duo-helper.user.js",
       parse: (text) => {
         try {
@@ -1428,13 +1427,27 @@
               .join(""),
           );
           const m = decoded.match(/\/\/ @version\s+([^\s]+)/);
-          return m ? m[1] : null;
+          if (!m) return null;
+          // immutable-ссылка на конкретный коммит — без CDN-кеша
+          if (data.sha) {
+            installUrl = `${REPO_RAW_BASE}/${data.sha}/duo-helper.user.js`;
+          }
+          return m[1];
         } catch {
           return null;
         }
       },
     },
     {
+      name: "jsdelivr",
+      url: "https://cdn.jsdelivr.net/gh/Vidrimers/Duolingo-helper@master/duo-helper.user.js",
+      parse: (text) => {
+        const m = text.match(/\/\/ @version\s+([^\s]+)/);
+        return m ? m[1] : null;
+      },
+    },
+    {
+      name: "raw",
       url: "https://raw.githubusercontent.com/Vidrimers/Duolingo-helper/refs/heads/master/duo-helper.user.js",
       parse: (text) => {
         const m = text.match(/\/\/ @version\s+([^\s]+)/);
@@ -1474,7 +1487,7 @@
 
   /** Открывает установку в Tampermonkey и перезагружает страницу с отсчётом. */
   function startUpdateReload() {
-    window.open(INSTALL_URL, "_blank");
+    window.open(installUrl, "_blank");
     let left = 8;
     showToast(`Установи обновление в Tampermonkey. Перезагрузка через ${left}…`);
     const tick = setInterval(() => {
@@ -1517,17 +1530,29 @@
     const now = Date.now();
     if (!force && now - lastCheck < UPDATE_CHECK_INTERVAL) return "skipped";
 
+    let sawVersion = false;
     for (const source of UPDATE_SOURCES) {
       const res = await gmFetch(source.url);
       if (!res.ok) continue;
       const remoteVersion = source.parse(res.text);
       if (!remoteVersion) continue;
+      sawVersion = true;
 
-      GM_setValue(UPDATE_CHECK_KEY, now);
       if (isNewer(remoteVersion, CURRENT_VERSION)) {
+        GM_setValue(UPDATE_CHECK_KEY, now);
         showUpdateBanner(remoteVersion);
         return "update";
       }
+      // GitHub API всегда свежий — ему верим, fallback-кеш дальше не смотрим
+      if (source.name === "github-api") {
+        GM_setValue(UPDATE_CHECK_KEY, now);
+        return "current";
+      }
+      // кешированный источник: мог быть stale — пробуем следующий
+    }
+
+    if (sawVersion) {
+      GM_setValue(UPDATE_CHECK_KEY, now);
       return "current";
     }
     return "error";
