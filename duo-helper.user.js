@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Duolingo Helper
 // @namespace    https://github.com/Vidrimers/Duolingo-helper
-// @version      0.3.0
+// @version      0.3.1
 // @description  Проверка взаимной подписки на профилях Duolingo. Панель, бейджи, кеш.
 // @author       Vidrimers
 // @match        *://*.duolingo.com/*
@@ -44,6 +44,7 @@
         winPos: null, // { x, y } — позиция окна после drag
         openOnStart: false, // открывать панель при загрузке сайта
         theme: "xp", // xp | vista | win95
+        protectHearts: true, // блокировать списание сердец
       },
       // username -> { followsMe: true/false, checkedAt: ts, theirId, theirName }
       followCache: {},
@@ -1228,12 +1229,23 @@
             </div>
 
             <div class="dh-tab-content" data-tab="tools">
+                <div class="dh-card">
+                    <div class="dh-card-title">Защита сердец</div>
+                    <div class="dh-setting-row" style="border-bottom:none;padding:4px 0">
+                        <div class="dh-setting-label">
+                            Блокировать списание сердец
+                            <small>Не даёт Duolingo уменьшать сердца при ошибках в уроках</small>
+                        </div>
+                        <div class="dh-switch" id="dh-set-hearts"></div>
+                    </div>
+                    <div class="dh-muted" style="margin-top:6px">
+                        Статус: <strong id="dh-hearts-status">…</strong>
+                    </div>
+                </div>
+
                 <div class="dh-placeholder">
-                    🔜 Здесь появятся функции:<br/>
-                    • защита сердец<br/>
-                    • массовое удаление друзей<br/>
-                    • массовая отписка от тех, кто не подписан в ответ<br/>
-                    • и другие инструменты
+                    🔜 Дальше: квесты, shop, streak, авторешение уроков,<br/>
+                    XP / gems / league, Free Max, аккаунты
                 </div>
             </div>
 
@@ -1342,6 +1354,8 @@
       setOpen: modal.querySelector("#dh-set-open"),
       themePicker: modal.querySelector("#dh-theme-picker"),
       themeBtns: [...modal.querySelectorAll(".dh-theme-btn")],
+      setHearts: modal.querySelector("#dh-set-hearts"),
+      heartsStatus: modal.querySelector("#dh-hearts-status"),
       setCache: modal.querySelector("#dh-set-cache"),
       clearCache: modal.querySelector("#dh-clear-cache"),
       refreshPage: modal.querySelector("#dh-refresh-page"),
@@ -1374,6 +1388,90 @@
       });
     }
   }
+
+  // ========== Защита сердец ==========
+  // Страница Duolingo шлёт запрос на списание сердца при ошибке.
+  // Хук ставится в page-context (не в sandbox), чтобы перехватить fetch/XHR React'а.
+  const HEARTS_LS_KEY = "dh_protect_hearts";
+
+  function syncHeartsFlag() {
+    const on = !!DATA.settings.protectHearts;
+    try {
+      localStorage.setItem(HEARTS_LS_KEY, on ? "true" : "false");
+    } catch {}
+    if (els.setHearts) els.setHearts.classList.toggle("on", on);
+    if (els.heartsStatus) {
+      els.heartsStatus.textContent = on
+        ? "включена — сердца не списываются"
+        : "выключена — списание как обычно";
+    }
+  }
+
+  function installHeartsHook() {
+    if (document.getElementById("dh-hearts-hook")) return;
+    const s = document.createElement("script");
+    s.id = "dh-hearts-hook";
+    s.textContent = `(function() {
+      if (window.__dhHeartsHooked) return;
+      window.__dhHeartsHooked = true;
+      var KEY = ${JSON.stringify(HEARTS_LS_KEY)};
+      function active() {
+        try { return localStorage.getItem(KEY) === 'true'; } catch (e) { return true; }
+      }
+      function isHeartLoss(url) {
+        if (!url) return false;
+        var u = String(url).toLowerCase();
+        return (
+          u.indexOf('remove-heart') !== -1 ||
+          u.indexOf('remove_heart') !== -1 ||
+          u.indexOf('removeheart') !== -1 ||
+          u.indexOf('remove-hearts') !== -1
+        );
+      }
+      function fakeOk() {
+        return Promise.resolve(new Response(JSON.stringify({ ok: true }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        }));
+      }
+
+      // fetch
+      var origFetch = window.fetch;
+      window.fetch = function(resource, options) {
+        var url = resource instanceof Request ? resource.url : String(resource || '');
+        if (active() && isHeartLoss(url)) return fakeOk();
+        return origFetch.apply(this, arguments);
+      };
+      window.fetch.__dhHearts = true;
+
+      // XHR fallback
+      var origOpen = XMLHttpRequest.prototype.open;
+      var origSend = XMLHttpRequest.prototype.send;
+      XMLHttpRequest.prototype.open = function(method, url) {
+        this.__dhHeartLoss = active() && isHeartLoss(url);
+        return origOpen.apply(this, arguments);
+      };
+      XMLHttpRequest.prototype.send = function() {
+        if (this.__dhHeartLoss) {
+          try {
+            Object.defineProperty(this, 'readyState', { configurable: true, value: 4 });
+            Object.defineProperty(this, 'status', { configurable: true, value: 200 });
+            Object.defineProperty(this, 'responseText', { configurable: true, value: '{}' });
+            Object.defineProperty(this, 'response', { configurable: true, value: '{}' });
+            if (typeof this.onreadystatechange === 'function') this.onreadystatechange();
+            if (typeof this.onload === 'function') this.onload();
+            return;
+          } catch (e) {}
+        }
+        return origSend.apply(this, arguments);
+      };
+    })();`;
+    (document.documentElement || document.body).appendChild(s);
+    s.remove();
+    syncHeartsFlag();
+  }
+
+  // ========== Theme end ==========
 
   // ========== Toast ==========
   function showToast(msg, isError = false) {
@@ -2222,6 +2320,19 @@
       });
     }
 
+    if (els.setHearts) {
+      els.setHearts.addEventListener("click", () => {
+        DATA.settings.protectHearts = !DATA.settings.protectHearts;
+        saveData();
+        syncHeartsFlag();
+        showToast(
+          DATA.settings.protectHearts
+            ? "Защита сердец включена"
+            : "Защита сердец выключена",
+        );
+      });
+    }
+
     els.setCache.addEventListener("change", () => {
       const v = Math.max(1, Math.min(1440, parseInt(els.setCache.value, 10) || 30));
       DATA.settings.cacheMinutes = v;
@@ -2298,6 +2409,8 @@
   function init() {
     createUI();
     hookHistory();
+    installHeartsHook();
+    syncHeartsFlag();
 
     // открыть панель сразу, если включено в настройках
     if (DATA.settings.openOnStart && els.modal) {
