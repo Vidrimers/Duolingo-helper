@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Duolingo Helper
 // @namespace    https://github.com/Vidrimers/Duolingo-helper
-// @version      0.3.1
+// @version      0.3.2
 // @description  Проверка взаимной подписки на профилях Duolingo. Панель, бейджи, кеш.
 // @author       Vidrimers
 // @match        *://*.duolingo.com/*
@@ -13,6 +13,7 @@
 // @connect      raw.githubusercontent.com
 // @connect      cdn.jsdelivr.net
 // @connect      api.github.com
+// @connect      goals-api.duolingo.com
 // @run-at       document-end
 // @noframes
 // @updateURL    https://raw.githubusercontent.com/Vidrimers/Duolingo-helper/refs/heads/master/duo-helper.user.js
@@ -1243,8 +1244,22 @@
                     </div>
                 </div>
 
+                <div class="dh-card">
+                    <div class="dh-card-title">⚠️ Квесты — на свой страх и риск</div>
+                    <div class="dh-muted" style="margin-bottom:8px">
+                        Инъекция прогресса в daily/monthly квесты. Формально нарушает правила Duolingo — возможна блокировка.
+                    </div>
+                    <div class="dh-row" style="margin-bottom:6px">
+                        <button class="dh-btn dh-btn-primary" id="dh-quest-daily">Daily</button>
+                        <button class="dh-btn" id="dh-quest-load">Monthly</button>
+                        <button class="dh-btn" id="dh-quest-claim-all">Забрать все</button>
+                    </div>
+                    <div class="dh-muted" id="dh-quest-status">Готово</div>
+                    <div id="dh-quest-list" style="margin-top:8px;display:flex;flex-direction:column;gap:6px"></div>
+                </div>
+
                 <div class="dh-placeholder">
-                    🔜 Дальше: квесты, shop, streak, авторешение уроков,<br/>
+                    🔜 Дальше: shop, streak, авторешение уроков,<br/>
                     XP / gems / league, Free Max, аккаунты
                 </div>
             </div>
@@ -1356,6 +1371,11 @@
       themeBtns: [...modal.querySelectorAll(".dh-theme-btn")],
       setHearts: modal.querySelector("#dh-set-hearts"),
       heartsStatus: modal.querySelector("#dh-hearts-status"),
+      questDaily: modal.querySelector("#dh-quest-daily"),
+      questLoad: modal.querySelector("#dh-quest-load"),
+      questClaimAll: modal.querySelector("#dh-quest-claim-all"),
+      questStatus: modal.querySelector("#dh-quest-status"),
+      questList: modal.querySelector("#dh-quest-list"),
       setCache: modal.querySelector("#dh-set-cache"),
       clearCache: modal.querySelector("#dh-clear-cache"),
       refreshPage: modal.querySelector("#dh-refresh-page"),
@@ -1472,6 +1492,310 @@
   }
 
   // ========== Theme end ==========
+
+  // ========== Квесты (goals-api) ==========
+  // ⚠️ Инъекция прогресса — чит, на свой страх и риск.
+  const GOALS_API = "https://goals-api.duolingo.com";
+
+  function goalHeaders() {
+    const jwt = getToken();
+    const myId = getMyId() || "";
+    return {
+      "Content-Type": "application/json",
+      accept: "application/json; charset=UTF-8",
+      "x-requested-with": "XMLHttpRequest",
+      Authorization: "Bearer " + (jwt || ""),
+      cookie: "jwt_token=" + (jwt || ""),
+      origin: "https://www.duolingo.com",
+      "x-amzn-trace-id": "User=" + myId,
+    };
+  }
+
+  function goalsFetch(method, path, data) {
+    return new Promise((resolve) => {
+      GM_xmlhttpRequest({
+        method,
+        url: GOALS_API + path,
+        headers: goalHeaders(),
+        data: data ? JSON.stringify(data) : undefined,
+        timeout: 15000,
+        onload(resp) {
+          let body = null;
+          try {
+            body = JSON.parse(resp.responseText || "null");
+          } catch {}
+          resolve({ status: resp.status, body, raw: resp.responseText });
+        },
+        onerror() {
+          resolve({ status: 0, body: null, raw: "" });
+        },
+        ontimeout() {
+          resolve({ status: 0, body: null, raw: "" });
+        },
+      });
+    });
+  }
+
+  function questTimestamp(goalId) {
+    const m = String(goalId || "").match(/^(\d{4})_(\d{2})_monthly/);
+    if (m) {
+      return new Date(
+        Date.UTC(parseInt(m[1], 10), parseInt(m[2], 10) - 1, 15, 12, 0, 0),
+      ).toISOString();
+    }
+    return new Date().toISOString();
+  }
+
+  function setQuestStatus(text) {
+    if (els.questStatus) els.questStatus.textContent = text;
+  }
+
+  async function fetchQuestData() {
+    const myId = getMyId();
+    if (!myId) throw new Error("Не выполнен вход");
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const [schemaR, progR] = await Promise.all([
+      goalsFetch("GET", `/schema?ui_language=en&_=${Date.now()}`),
+      goalsFetch(
+        "GET",
+        `/users/${myId}/progress?timezone=${encodeURIComponent(tz)}&ui_language=en`,
+      ),
+    ]);
+    if (schemaR.status !== 200 || progR.status !== 200) {
+      throw new Error("goals-api: " + (schemaR.status || progR.status));
+    }
+    return { schema: schemaR.body, progressRes: progR.body, tz, myId };
+  }
+
+  async function postGoalBatch(metricUpdates, timestamp, tz, myId) {
+    return goalsFetch("POST", `/users/${myId}/progress/batch`, {
+      metric_updates: metricUpdates,
+      timezone: tz,
+      timestamp: timestamp || new Date().toISOString(),
+    });
+  }
+
+  /** Daily: закидываем недостающие метрики. */
+  async function runDailyQuests() {
+    const btn = els.questDaily;
+    if (btn) btn.disabled = true;
+    setQuestStatus("Загрузка daily…");
+    try {
+      const { schema, progressRes, tz, myId } = await fetchQuestData();
+      const earned = new Set(
+        (progressRes.badges && progressRes.badges.earned) || [],
+      );
+      const daily = (schema.goals || []).filter(
+        (g) => g.category && g.category.includes("DAILY"),
+      );
+      const metrics = [
+        ...new Set(
+          daily
+            .filter(
+              (g) =>
+                !earned.has(g.badgeId) &&
+                !earned.has(g.goalId) &&
+                g.metric &&
+                g.metric !== "QUESTS",
+            )
+            .map((g) => g.metric),
+        ),
+      ];
+      if (!metrics.length) {
+        setQuestStatus("Daily уже выполнены");
+        showToast("Daily квесты уже выполнены");
+        return;
+      }
+      setQuestStatus("Инъекция " + metrics.length + " метрик…");
+      const updates = metrics.map((m) => ({ metric: m, quantity: 2000 }));
+      updates.push({ metric: "QUESTS", quantity: 1 });
+      const res = await postGoalBatch(updates, new Date().toISOString(), tz, myId);
+      if (res.status === 200) {
+        setQuestStatus("Daily: готово (" + metrics.length + ")");
+        showToast("✓ Daily квесты выполнены");
+      } else {
+        setQuestStatus("Daily: ошибка " + res.status);
+        showToast("Ошибка daily: HTTP " + res.status, true);
+      }
+    } catch (e) {
+      setQuestStatus("Ошибка: " + (e && e.message));
+      showToast(e && e.message ? e.message : "Ошибка квестов", true);
+    } finally {
+      if (btn) btn.disabled = false;
+    }
+  }
+
+  function renderMonthlyList(items) {
+    if (!els.questList) return;
+    els.questList.innerHTML = "";
+    if (!items.length) {
+      els.questList.innerHTML =
+        '<div class="dh-muted">Нет незакрытых monthly-квестов</div>';
+      return;
+    }
+    for (const it of items) {
+      const row = document.createElement("div");
+      row.className = "dh-setting-row";
+      row.style.borderBottom = "none";
+      row.style.padding = "4px 0";
+      row.innerHTML =
+        `<div class="dh-setting-label" style="min-width:0">
+            <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${it.title}</div>
+            <small>${it.progress} / ${it.target} · ${it.metric}</small>
+        </div>
+        <button class="dh-btn" style="padding:4px 10px;font-size:11px">GET</button>`;
+      const b = row.querySelector("button");
+      b.addEventListener("click", async () => {
+        b.disabled = true;
+        b.textContent = "…";
+        const ok = await claimMonthlyOne(it);
+        b.textContent = ok ? "✓" : "ERR";
+        if (ok) {
+          showToast("✓ " + it.title);
+          setTimeout(() => loadMonthlyQuests(), 900);
+        }
+      });
+      els.questList.appendChild(row);
+    }
+  }
+
+  function buildMonthlyItems(schema, progressRes) {
+    const progress = (progressRes.goals && progressRes.goals.progress) || progressRes.progress || {};
+    const earned = new Set((progressRes.badges && progressRes.badges.earned) || []);
+    const schemaMap = new Map();
+    (schema.goals || []).forEach((g) => {
+      const m = (g.goalId || "").match(/^(\d{4}_\d{2})_monthly/);
+      if (!m) return;
+      const key = m[1];
+      const ex = schemaMap.get(key);
+      if (
+        !ex ||
+        (g.category && g.category.includes("CHALLENGE") && !(ex.category && ex.category.includes("CHALLENGE")))
+      ) {
+        schemaMap.set(key, g);
+      }
+    });
+
+    const monthKeys = [];
+    Object.keys(progress).forEach((k) => {
+      const m = k.match(/^(\d{4}_\d{2})_monthly/);
+      if (m) monthKeys.push(m[1]);
+    });
+    schemaMap.forEach((_, key) => {
+      if (!monthKeys.includes(key)) monthKeys.push(key);
+    });
+    const uniq = [...new Set(monthKeys)].sort().reverse();
+    const now = new Date();
+    const curYM =
+      now.getFullYear() +
+      "_" +
+      String(now.getMonth() + 1).padStart(2, "0");
+
+    const items = [];
+    uniq.forEach((ym) => {
+      const schemaGoal = schemaMap.get(ym);
+      const progressKey = Object.keys(progress).find((k) =>
+        k.startsWith(ym + "_monthly"),
+      );
+      const rawProg = progressKey ? progress[progressKey] : undefined;
+      let cur =
+        typeof rawProg === "number"
+          ? rawProg
+          : (rawProg && rawProg.progress) || 0;
+      const tgt = (schemaGoal && schemaGoal.threshold) || 1;
+      const isEarned = schemaGoal
+        ? earned.has(schemaGoal.badgeId) || earned.has(schemaGoal.goalId)
+        : false;
+      if (isEarned) return;
+      const remaining = Math.max(0, tgt - cur);
+      if (remaining <= 0 && ym === curYM) return;
+      const [yr, mo] = ym.split("_");
+      const monthLabel = new Date(parseInt(yr, 10), parseInt(mo, 10) - 1, 1)
+        .toLocaleString("default", { month: "long", year: "numeric" });
+      const title =
+        (schemaGoal && schemaGoal.title && (schemaGoal.title.uiString || schemaGoal.title)) ||
+        "Monthly — " + monthLabel;
+      const metric = (schemaGoal && schemaGoal.metric) || "XP";
+      items.push({
+        ym,
+        progressKey: progressKey || ym + "_monthly_challenge",
+        title: String(title),
+        progress: cur,
+        target: tgt,
+        metric,
+        amount: remaining > 0 ? remaining : tgt,
+        isCurrent: ym === curYM,
+      });
+    });
+    return items;
+  }
+
+  let monthlyCache = null;
+
+  async function loadMonthlyQuests() {
+    const btn = els.questLoad;
+    if (btn) btn.disabled = true;
+    setQuestStatus("Загрузка monthly…");
+    try {
+      const data = await fetchQuestData();
+      const items = buildMonthlyItems(data.schema, data.progressRes);
+      monthlyCache = { ...data, items };
+      renderMonthlyList(items);
+      setQuestStatus("Monthly: " + items.length + " шт.");
+    } catch (e) {
+      setQuestStatus("Ошибка: " + (e && e.message));
+      showToast(e && e.message ? e.message : "Ошибка monthly", true);
+    } finally {
+      if (btn) btn.disabled = false;
+    }
+  }
+
+  async function claimMonthlyOne(item) {
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const myId = getMyId();
+    const ts = questTimestamp(item.progressKey || item.ym);
+    const payload = {
+      metric_updates: [{ metric: item.metric, quantity: item.amount }],
+      timestamp: ts,
+      timezone: tz,
+    };
+    // Duolingo иногда требует второй вызов для выдачи бейджа
+    const r1 = await postGoalBatch(payload.metric_updates, ts, tz, myId);
+    if (r1.status !== 200) return false;
+    await new Promise((r) => setTimeout(r, 800));
+    const r2 = await postGoalBatch(payload.metric_updates, ts, tz, myId);
+    return r2.status === 200;
+  }
+
+  async function claimAllMonthly() {
+    const btn = els.questClaimAll;
+    if (btn) btn.disabled = true;
+    try {
+      if (!monthlyCache || !monthlyCache.items) {
+        await loadMonthlyQuests();
+      }
+      const items = (monthlyCache && monthlyCache.items) || [];
+      if (!items.length) {
+        showToast("Нечего забирать");
+        setQuestStatus("Нечего забирать");
+        return;
+      }
+      let ok = 0;
+      for (let i = 0; i < items.length; i++) {
+        setQuestStatus("Забор " + (i + 1) + "/" + items.length + "…");
+        if (await claimMonthlyOne(items[i])) ok++;
+        await new Promise((r) => setTimeout(r, 400));
+      }
+      setQuestStatus("Забрано: " + ok + "/" + items.length);
+      showToast("✓ Забрано квестов: " + ok);
+      await loadMonthlyQuests();
+    } catch (e) {
+      setQuestStatus("Ошибка: " + (e && e.message));
+      showToast(e && e.message ? e.message : "Ошибка", true);
+    } finally {
+      if (btn) btn.disabled = false;
+    }
+  }
 
   // ========== Toast ==========
   function showToast(msg, isError = false) {
@@ -2331,6 +2655,16 @@
             : "Защита сердец выключена",
         );
       });
+    }
+
+    if (els.questDaily) {
+      els.questDaily.addEventListener("click", () => runDailyQuests());
+    }
+    if (els.questLoad) {
+      els.questLoad.addEventListener("click", () => loadMonthlyQuests());
+    }
+    if (els.questClaimAll) {
+      els.questClaimAll.addEventListener("click", () => claimAllMonthly());
     }
 
     els.setCache.addEventListener("change", () => {
