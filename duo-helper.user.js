@@ -1,0 +1,1166 @@
+// ==UserScript==
+// @name         Duolingo Helper
+// @namespace    https://github.com/Vidrimers/duolingo-ext
+// @version      0.1.0
+// @description  Проверка взаимной подписки на профилях Duolingo. Панель, бейджи, кеш.
+// @author       Vidrimers
+// @match        *://*.duolingo.com/*
+// @grant        GM_setValue
+// @grant        GM_getValue
+// @grant        GM_addStyle
+// @grant        GM_listValues
+// @run-at       document-end
+// @noframes
+// ==/UserScript==
+
+(function () {
+  "use strict";
+
+  // ========== КОНСТАНТЫ ==========
+  const API = {
+    users: "https://www.duolingo.com/2017-06-30/users",
+    friends: "https://www.duolingo.com/2017-06-30/friends",
+  };
+  const STORAGE_KEY = "dh_data";
+  const MARKER_ATTR = "data-dh-marked";
+  const HOST_ID = "dh-root-host";
+
+  // ========== ХРАНИЛИЩЕ ==========
+  function loadData() {
+    const raw = GM_getValue(STORAGE_KEY, null);
+    const def = {
+      settings: {
+        autoCheck: true,
+        cacheMinutes: 30,
+        showBadge: true,
+        badgePos: "top-right",
+        accent: "#58cc02",
+      },
+      // username -> { followsMe: true/false, checkedAt: ts, theirId, theirName }
+      followCache: {},
+      me: null, // { id, username, name }
+    };
+    if (!raw) return def;
+    try {
+      const parsed = JSON.parse(raw);
+      return {
+        settings: { ...def.settings, ...(parsed.settings || {}) },
+        followCache: parsed.followCache || {},
+        me: parsed.me || null,
+      };
+    } catch {
+      return def;
+    }
+  }
+
+  function saveData() {
+    GM_setValue(STORAGE_KEY, JSON.stringify(DATA));
+  }
+
+  let DATA = loadData();
+
+  // ========== API ==========
+  function getToken() {
+    const m = document.cookie.match(/(^| )jwt_token=([^;]+)/);
+    if (m) {
+      try {
+        return decodeURIComponent(m[2]);
+      } catch {
+        return m[2];
+      }
+    }
+    for (const k of ["jwt_token", "jwtToken", "duolingo_jwt"]) {
+      const v = localStorage.getItem(k);
+      if (v) return v;
+    }
+    return null;
+  }
+
+  function readJwt(jwt) {
+    try {
+      if (!jwt || jwt.split(".").length < 2) return null;
+      const b64 = jwt.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+      const pad = b64 + "=".repeat((4 - (b64.length % 4)) % 4);
+      const json = decodeURIComponent(
+        atob(pad)
+          .split("")
+          .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
+          .join(""),
+      );
+      return JSON.parse(json);
+    } catch {
+      return null;
+    }
+  }
+
+  function getMyId() {
+    const t = getToken();
+    if (!t) return null;
+    const p = readJwt(t);
+    return p && p.sub ? String(p.sub) : null;
+  }
+
+  async function apiGet(url) {
+    const res = await fetch(url, {
+      method: "GET",
+      credentials: "include",
+      headers: { accept: "application/json" },
+    });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    return res.json();
+  }
+
+  async function getMe(force = false) {
+    const myId = getMyId();
+    if (!myId) return null;
+    if (!force && DATA.me && String(DATA.me.id) === myId) return DATA.me;
+    try {
+      const u = await apiGet(
+        `${API.users}/${myId}?fields=id,username,name,picture`,
+      );
+      DATA.me = {
+        id: String(u.id ?? myId),
+        username: u.username || "",
+        name: u.name || u.username || "",
+        picture: u.picture || null,
+      };
+      saveData();
+      return DATA.me;
+    } catch (e) {
+      console.warn("[DuoHelper] getMe failed", e);
+      return DATA.me || { id: myId, username: "", name: "" };
+    }
+  }
+
+  /** username -> { id, name, username, picture } */
+  async function resolveUser(username) {
+    const data = await apiGet(
+      `${API.users}?username=${encodeURIComponent(username)}`,
+    );
+    const found = (data.users || [])[0];
+    if (!found) return null;
+    return {
+      id: String(found.id),
+      username: found.username || username,
+      name: found.name || found.displayName || found.username || username,
+      picture: found.picture || null,
+    };
+  }
+
+  /**
+   * Достаёт список followers|following пользователя.
+   * Формат ответа (проверено на DuoXJS):
+   *   { followers: { users: [{ userId, displayName, ... }] } }
+   *   { following: { users: [{ userId, displayName, ... }] } }
+   */
+  async function fetchUserList(userId, kind) {
+    const users = [];
+    let cursor = null;
+    let page = 0;
+    const maxPages = 30;
+
+    while (page < maxPages) {
+      let url = `${API.friends}/users/${userId}/${kind}?viewerId=${userId}&limit=100`;
+      if (cursor) url += `&cursor=${encodeURIComponent(cursor)}`;
+
+      const data = await apiGet(url);
+      const bucket = data[kind] || data;
+      const pageUsers = bucket.users || bucket || [];
+      if (Array.isArray(pageUsers)) {
+        for (const u of pageUsers) users.push(u);
+      }
+
+      cursor =
+        bucket.nextCursor ||
+        bucket.cursor ||
+        data.nextCursor ||
+        data.cursor ||
+        null;
+      const hasMore =
+        bucket.hasMore ??
+        data.hasMore ??
+        (cursor !== null && pageUsers.length > 0);
+
+      if (!hasMore || !cursor || pageUsers.length === 0) break;
+      page++;
+    }
+
+    return users.map((u) => ({
+      userId: String(u.userId ?? u.id ?? ""),
+      username: u.username || "",
+      displayName: u.displayName || u.name || u.username || "",
+      picture: u.picture || u.avatar || null,
+    }));
+  }
+
+  /** Проверяет, подписан ли `target` на меня. */
+  async function checkFollowsMe(targetUsername, targetId) {
+    const me = await getMe();
+    if (!me || !me.id) throw new Error("Не удалось определить ваш аккаунт");
+
+    const meId = String(me.id);
+    const meName = (me.username || "").toLowerCase();
+
+    // 1) Их подписки — есть ли я среди них
+    if (targetId) {
+      try {
+        const theirFollowing = await fetchUserList(targetId, "following");
+        const hit = theirFollowing.find(
+          (u) =>
+            String(u.userId) === meId ||
+            (meName && u.username && u.username.toLowerCase() === meName),
+        );
+        if (hit) return true;
+        // если список реально вернулся, но меня нет — уже ответ
+        if (theirFollowing.length > 0) return false;
+      } catch (e) {
+        console.warn("[DuoHelper] their following failed", e);
+      }
+    }
+
+    // 2) Мои подписчики — есть ли он среди них
+    const myFollowers = await fetchUserList(meId, "followers");
+    const tId = targetId ? String(targetId) : null;
+    const tName = (targetUsername || "").toLowerCase();
+    return myFollowers.some(
+      (u) =>
+        (tId && String(u.userId) === tId) ||
+        (tName && u.username && u.username.toLowerCase() === tName),
+    );
+  }
+
+  function getCached(username) {
+    if (!username) return null;
+    const key = username.toLowerCase();
+    const entry = DATA.followCache[key];
+    if (!entry) return null;
+    const ttl = (DATA.settings.cacheMinutes || 30) * 60 * 1000;
+    if (Date.now() - (entry.checkedAt || 0) > ttl) return null;
+    return entry;
+  }
+
+  function setCached(username, entry) {
+    if (!username) return;
+    DATA.followCache[username.toLowerCase()] = {
+      ...entry,
+      checkedAt: Date.now(),
+    };
+    saveData();
+  }
+
+  // ========== URL / SPA ==========
+  function getProfileUsername() {
+    const m = location.pathname.match(/^\/profile\/([^/]+)/);
+    return m ? decodeURIComponent(m[1]) : null;
+  }
+
+  function isProfilePage() {
+    return /^\/profile\/[^/]+/.test(location.pathname);
+  }
+
+  // ========== UI ==========
+  let shadow = null;
+  let els = {};
+
+  function createUI() {
+    const old = document.getElementById(HOST_ID);
+    if (old) old.remove();
+
+    const host = document.createElement("div");
+    host.id = HOST_ID;
+    host.setAttribute(MARKER_ATTR, "1");
+    host.style.cssText =
+      "all: initial; position: fixed; inset: 0; z-index: 2147483647; pointer-events: none;";
+    document.documentElement.appendChild(host);
+
+    shadow = host.attachShadow({ mode: "open" });
+
+    const style = document.createElement("style");
+    style.textContent = `
+            *, *::before, *::after { box-sizing: border-box; }
+
+            /* ===== Toast ===== */
+            .dh-toast {
+                position: fixed;
+                bottom: 80px;
+                left: 50%;
+                transform: translateX(-50%) translateY(20px);
+                background: linear-gradient(135deg, #1e1e2e, #2a2a3e);
+                color: #fff;
+                border: 1px solid rgba(255,255,255,0.1);
+                border-radius: 12px;
+                padding: 12px 24px;
+                font: 600 14px/1.4 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+                z-index: 2147483647;
+                box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+                opacity: 0;
+                transition: opacity 0.3s, transform 0.3s;
+                backdrop-filter: blur(10px);
+                max-width: 340px;
+                text-align: center;
+                pointer-events: none;
+            }
+            .dh-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+            .dh-toast.error { border-color: #ff4444; }
+            .dh-toast.ok { border-color: #58cc02; }
+
+            /* ===== FAB ===== */
+            .dh-fab {
+                position: fixed;
+                bottom: 24px;
+                left: 24px;
+                width: 34px;
+                height: 24px;
+                border-radius: 12px;
+                background: linear-gradient(135deg, rgba(88,204,2,0.35), rgba(88,204,2,0.65));
+                border: none;
+                color: white;
+                font-size: 15px;
+                cursor: pointer;
+                z-index: 2147483646;
+                box-shadow: 0 4px 24px rgba(88,204,2,0.4);
+                transition: transform 0.25s cubic-bezier(.4,2,.6,1), box-shadow 0.3s;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                padding: 0;
+                animation: dh-fab-pulse 3s ease-in-out infinite;
+                pointer-events: auto;
+            }
+            .dh-fab:hover {
+                transform: scale(1.12) rotate(-5deg);
+                box-shadow: 0 8px 32px rgba(88,204,2,0.6), 0 0 0 6px rgba(88,204,2,0.15);
+            }
+            .dh-fab:active { transform: scale(0.95); }
+            @keyframes dh-fab-pulse {
+                0%, 100% { box-shadow: 0 4px 24px rgba(88,204,2,0.4), 0 0 0 0 rgba(88,204,2,0); }
+                50% { box-shadow: 0 4px 24px rgba(88,204,2,0.4), 0 0 0 8px rgba(88,204,2,0.08); }
+            }
+
+            /* ===== Badge on profile ===== */
+            .dh-badge {
+                position: fixed;
+                top: 88px;
+                right: 24px;
+                z-index: 2147483645;
+                pointer-events: auto;
+                display: none;
+                align-items: center;
+                gap: 8px;
+                padding: 10px 16px;
+                border-radius: 14px;
+                font: 700 13px/1.3 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+                box-shadow: 0 8px 28px rgba(0,0,0,0.35);
+                cursor: pointer;
+                transition: transform 0.2s, filter 0.2s;
+                backdrop-filter: blur(12px);
+                border: 1px solid rgba(255,255,255,0.12);
+                max-width: 280px;
+            }
+            .dh-badge:hover { transform: translateY(-2px); filter: brightness(1.08); }
+            .dh-badge.visible { display: inline-flex; }
+            .dh-badge.yes {
+                background: linear-gradient(135deg, rgba(46,204,113,0.92), rgba(39,174,96,0.92));
+                color: #fff;
+            }
+            .dh-badge.no {
+                background: linear-gradient(135deg, rgba(231,76,60,0.92), rgba(192,57,43,0.92));
+                color: #fff;
+            }
+            .dh-badge.checking {
+                background: linear-gradient(135deg, rgba(52,73,94,0.92), rgba(44,62,80,0.92));
+                color: #ecf0f1;
+            }
+            .dh-badge.error {
+                background: linear-gradient(135deg, rgba(243,156,18,0.92), rgba(211,84,0,0.92));
+                color: #fff;
+            }
+            .dh-badge .dh-badge-icon { font-size: 16px; line-height: 1; }
+            .dh-badge .dh-badge-sub {
+                display: block;
+                font-size: 10px;
+                font-weight: 500;
+                opacity: 0.85;
+                margin-top: 2px;
+            }
+
+            /* ===== Modal ===== */
+            .dh-modal {
+                position: fixed;
+                top: 50%;
+                right: 10%;
+                transform: translate(20%, -50%) scale(0.95);
+                pointer-events: auto;
+                width: 460px;
+                max-width: 92vw;
+                max-height: 75vh;
+                overflow-y: auto;
+                background: linear-gradient(160deg, #1a1a2e, #16213e);
+                border: 1px solid rgba(255,255,255,0.08);
+                border-radius: 20px;
+                padding: 28px;
+                z-index: 2147483645;
+                color: #e0e0e0;
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+                font-size: 14px;
+                line-height: 1.4;
+                box-shadow: 0 24px 80px rgba(0,0,0,0.6);
+                opacity: 0;
+                transition: opacity 0.3s, transform 0.3s;
+                display: none;
+            }
+            .dh-modal.open {
+                display: block;
+                opacity: 1;
+                transform: translate(20%, -50%) scale(1);
+            }
+            .dh-modal h2 {
+                margin: 0 0 18px;
+                font-size: 19px;
+                font-weight: 700;
+                color: #fff;
+                display: flex;
+                align-items: center;
+                gap: 10px;
+            }
+            .dh-chip {
+                font-size: 11px;
+                background: rgba(88,204,2,0.2);
+                color: #9fe070;
+                padding: 3px 10px;
+                border-radius: 20px;
+                font-weight: 600;
+            }
+
+            /* ===== Tabs ===== */
+            .dh-tabs {
+                display: flex;
+                gap: 4px;
+                margin-bottom: 18px;
+                background: rgba(0,0,0,0.3);
+                border-radius: 10px;
+                padding: 4px;
+            }
+            .dh-tab {
+                flex: 1;
+                padding: 7px 4px;
+                border: none;
+                background: transparent;
+                color: #888;
+                font-size: 12px;
+                font-weight: 600;
+                cursor: pointer;
+                border-radius: 8px;
+                transition: all 0.2s;
+                font-family: inherit;
+            }
+            .dh-tab.active {
+                background: rgba(88,204,2,0.18);
+                color: #b8f08a;
+            }
+            .dh-tab:hover:not(.active) { color: #ccc; }
+
+            .dh-tab-content { display: none; flex-direction: column; gap: 12px; }
+            .dh-tab-content.active { display: flex; }
+
+            /* ===== Inputs / Buttons ===== */
+            .dh-input {
+                width: 100%;
+                padding: 10px 14px;
+                background: rgba(0,0,0,0.4);
+                border: 1px solid rgba(255,255,255,0.08);
+                border-radius: 8px;
+                color: #fff;
+                font-size: 13px;
+                outline: none;
+                transition: border-color 0.2s;
+                font-family: inherit;
+            }
+            .dh-input:focus { border-color: rgba(88,204,2,0.5); }
+            .dh-input::placeholder { color: #555; }
+
+            .dh-btn {
+                padding: 10px 16px;
+                border: none;
+                border-radius: 8px;
+                font-size: 13px;
+                font-weight: 600;
+                cursor: pointer;
+                transition: all 0.2s;
+                font-family: inherit;
+                white-space: nowrap;
+            }
+            .dh-btn-primary { background: linear-gradient(135deg, #58cc02, #46a302); color: #fff; }
+            .dh-btn-primary:hover { opacity: 0.9; transform: translateY(-1px); }
+            .dh-btn-ghost {
+                background: rgba(255,255,255,0.05);
+                color: #aaa;
+                border: 1px solid rgba(255,255,255,0.1);
+            }
+            .dh-btn-ghost:hover { background: rgba(255,255,255,0.1); color: #fff; }
+            .dh-btn-danger { background: #e74c3c; color: #fff; }
+            .dh-btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none !important; }
+
+            /* ===== Result card ===== */
+            .dh-card {
+                background: rgba(0,0,0,0.25);
+                border: 1px solid rgba(255,255,255,0.06);
+                border-radius: 12px;
+                padding: 14px 16px;
+            }
+            .dh-card-title {
+                font-size: 11px;
+                text-transform: uppercase;
+                letter-spacing: 0.06em;
+                color: #777;
+                margin: 0 0 8px;
+                font-weight: 600;
+            }
+            .dh-status-line {
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                font-size: 15px;
+                font-weight: 700;
+            }
+            .dh-status-line .icon { font-size: 20px; }
+            .dh-status-yes { color: #2ecc71; }
+            .dh-status-no { color: #e74c3c; }
+            .dh-status-checking { color: #f1c40f; }
+            .dh-status-error { color: #e67e22; }
+            .dh-muted { color: #777; font-size: 12px; font-weight: 500; }
+            .dh-row {
+                display: flex;
+                gap: 8px;
+                align-items: center;
+            }
+            .dh-row .dh-input { flex: 1; }
+
+            /* ===== Setting rows ===== */
+            .dh-setting-row {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                padding: 10px 0;
+                border-bottom: 1px solid rgba(255,255,255,0.05);
+                gap: 12px;
+            }
+            .dh-setting-label { font-size: 13px; color: #aaa; flex: 1; }
+            .dh-setting-label small { display: block; color: #666; font-size: 11px; margin-top: 2px; }
+
+            .dh-switch {
+                position: relative;
+                width: 42px;
+                height: 24px;
+                border-radius: 12px;
+                background: rgba(255,255,255,0.12);
+                cursor: pointer;
+                flex-shrink: 0;
+                transition: background 0.2s;
+            }
+            .dh-switch.on { background: #58cc02; }
+            .dh-switch::after {
+                content: "";
+                position: absolute;
+                top: 3px;
+                left: 3px;
+                width: 18px;
+                height: 18px;
+                border-radius: 50%;
+                background: #fff;
+                transition: transform 0.2s;
+            }
+            .dh-switch.on::after { transform: translateX(18px); }
+
+            .dh-num-input {
+                width: 72px;
+                padding: 6px 8px;
+                background: rgba(0,0,0,0.4);
+                border: 1px solid rgba(255,255,255,0.08);
+                border-radius: 6px;
+                color: #fff;
+                font-size: 12px;
+                outline: none;
+                font-family: inherit;
+                text-align: center;
+            }
+
+            /* ===== Footer ===== */
+            .dh-footer {
+                display: flex;
+                gap: 8px;
+                margin-top: 18px;
+                flex-wrap: wrap;
+            }
+            .dh-footer .dh-btn { flex: 1; min-width: 110px; text-align: center; padding: 8px 10px; }
+
+            .dh-close {
+                position: absolute;
+                top: 12px;
+                right: 14px;
+                background: none;
+                border: none;
+                color: #666;
+                font-size: 22px;
+                cursor: pointer;
+                transition: color 0.2s;
+                line-height: 1;
+                padding: 0;
+                font-family: inherit;
+            }
+            .dh-close:hover { color: #fff; }
+
+            .dh-placeholder {
+                color: #666;
+                font-size: 12px;
+                text-align: center;
+                padding: 18px 8px;
+                border: 1px dashed rgba(255,255,255,0.1);
+                border-radius: 10px;
+            }
+        `;
+    shadow.appendChild(style);
+
+    // FAB
+    const fab = document.createElement("button");
+    fab.className = "dh-fab";
+    fab.textContent = "🦉";
+    fab.title = "Duolingo Helper";
+    shadow.appendChild(fab);
+
+    // Badge
+    const badge = document.createElement("div");
+    badge.className = "dh-badge";
+    badge.innerHTML = `
+        <span class="dh-badge-icon">…</span>
+        <span>
+            <span class="dh-badge-text">Проверка…</span>
+            <span class="dh-badge-sub">нажми, чтобы открыть панель</span>
+        </span>
+    `;
+    shadow.appendChild(badge);
+
+    // Modal
+    const modal = document.createElement("div");
+    modal.className = "dh-modal";
+    modal.innerHTML = `
+        <button class="dh-close" title="Закрыть">×</button>
+        <h2>🦉 Duolingo Helper <span class="dh-chip">v0.1</span></h2>
+
+        <div class="dh-tabs">
+            <button class="dh-tab active" data-tab="check">👤 Проверка</button>
+            <button class="dh-tab" data-tab="tools">🧰 Инструменты</button>
+            <button class="dh-tab" data-tab="settings">⚙️ Настройки</button>
+        </div>
+
+        <div class="dh-tab-content active" data-tab="check">
+            <div class="dh-card">
+                <div class="dh-card-title">Текущий профиль</div>
+                <div class="dh-status-line" id="dh-status">
+                    <span class="icon">…</span>
+                    <span class="text">Открой профиль пользователя</span>
+                </div>
+                <div class="dh-muted" id="dh-status-sub" style="margin-top:6px">
+                    Скрипт покажет, подписан ли он на тебя в ответ.
+                </div>
+            </div>
+
+            <div class="dh-row">
+                <input class="dh-input" id="dh-user-input" placeholder="username для проверки" />
+                <button class="dh-btn dh-btn-primary" id="dh-check-btn">Проверить</button>
+            </div>
+
+            <div class="dh-card" id="dh-manual-card" style="display:none">
+                <div class="dh-card-title">Ручная проверка</div>
+                <div class="dh-status-line" id="dh-manual-status">
+                    <span class="icon">…</span>
+                    <span class="text">—</span>
+                </div>
+                <div class="dh-muted" id="dh-manual-sub" style="margin-top:6px"></div>
+            </div>
+
+            <div class="dh-card" id="dh-me-card">
+                <div class="dh-card-title">Твой аккаунт</div>
+                <div class="dh-muted" id="dh-me-info">Определение…</div>
+            </div>
+
+            <div class="dh-row">
+                <button class="dh-btn dh-btn-ghost" id="dh-recheck-btn">🔄 Перепроверить</button>
+                <button class="dh-btn dh-btn-ghost" id="dh-copy-btn">📋 Копировать результат</button>
+            </div>
+        </div>
+
+        <div class="dh-tab-content" data-tab="tools">
+            <div class="dh-placeholder">
+                🔜 Здесь появятся функции:<br/>
+                • защита сердец<br/>
+                • массовое удаление друзей<br/>
+                • массовая отписка от тех, кто не подписан в ответ<br/>
+                • и другие инструменты
+            </div>
+        </div>
+
+        <div class="dh-tab-content" data-tab="settings">
+            <div class="dh-setting-row">
+                <div class="dh-setting-label">
+                    Автопроверка на профиле
+                    <small>Сам проверять подписку при открытии профиля</small>
+                </div>
+                <div class="dh-switch" id="dh-set-auto"></div>
+            </div>
+            <div class="dh-setting-row">
+                <div class="dh-setting-label">
+                    Показывать бейдж
+                    <small>Плашка поверх страницы профиля</small>
+                </div>
+                <div class="dh-switch" id="dh-set-badge"></div>
+            </div>
+            <div class="dh-setting-row">
+                <div class="dh-setting-label">
+                    Кеш (минут)
+                    <small>Не перезапрашивать API, пока результат свежий</small>
+                </div>
+                <input class="dh-num-input" id="dh-set-cache" type="number" min="1" max="1440" />
+            </div>
+            <div class="dh-setting-row" style="border-bottom:none">
+                <div class="dh-setting-label">
+                    Очистить кеш
+                    <small>Удалить сохранённые результаты проверок</small>
+                </div>
+                <button class="dh-btn dh-btn-danger" id="dh-clear-cache" style="padding:7px 12px;font-size:12px">Очистить</button>
+            </div>
+        </div>
+
+        <div class="dh-footer">
+            <button class="dh-btn dh-btn-ghost" id="dh-refresh-page">🔄 Обновить страницу</button>
+            <button class="dh-btn dh-btn-ghost" id="dh-export">📥 Экспорт JSON</button>
+        </div>
+    `;
+    shadow.appendChild(modal);
+
+    els = {
+      fab,
+      badge,
+      badgeIcon: badge.querySelector(".dh-badge-icon"),
+      badgeText: badge.querySelector(".dh-badge-text"),
+      badgeSub: badge.querySelector(".dh-badge-sub"),
+      modal,
+      close: modal.querySelector(".dh-close"),
+      tabs: [...modal.querySelectorAll(".dh-tab")],
+      tabContents: [...modal.querySelectorAll(".dh-tab-content")],
+      status: modal.querySelector("#dh-status"),
+      statusSub: modal.querySelector("#dh-status-sub"),
+      userInput: modal.querySelector("#dh-user-input"),
+      checkBtn: modal.querySelector("#dh-check-btn"),
+      manualCard: modal.querySelector("#dh-manual-card"),
+      manualStatus: modal.querySelector("#dh-manual-status"),
+      manualSub: modal.querySelector("#dh-manual-sub"),
+      meInfo: modal.querySelector("#dh-me-info"),
+      recheckBtn: modal.querySelector("#dh-recheck-btn"),
+      copyBtn: modal.querySelector("#dh-copy-btn"),
+      setAuto: modal.querySelector("#dh-set-auto"),
+      setBadge: modal.querySelector("#dh-set-badge"),
+      setCache: modal.querySelector("#dh-set-cache"),
+      clearCache: modal.querySelector("#dh-clear-cache"),
+      refreshPage: modal.querySelector("#dh-refresh-page"),
+      exportBtn: modal.querySelector("#dh-export"),
+    };
+
+    bindEvents();
+  }
+
+  // ========== Toast ==========
+  function showToast(msg, isError = false) {
+    if (!shadow) return;
+    const t = document.createElement("div");
+    t.className = "dh-toast" + (isError ? " error" : " ok");
+    t.textContent = msg;
+    shadow.appendChild(t);
+    requestAnimationFrame(() => t.classList.add("show"));
+    setTimeout(() => {
+      t.classList.remove("show");
+      setTimeout(() => t.remove(), 350);
+    }, 2800);
+  }
+
+  // ========== Badge ==========
+  function setBadge(state, title, sub) {
+    if (!els.badge) return;
+    const s = DATA.settings;
+    if (!s.showBadge || !isProfilePage()) {
+      els.badge.classList.remove("visible");
+      return;
+    }
+    els.badge.className = "dh-badge visible " + state;
+    els.badgeIcon.textContent =
+      state === "yes" ? "✅" : state === "no" ? "❌" : state === "checking" ? "⏳" : "⚠️";
+    els.badgeText.textContent = title;
+    els.badgeSub.textContent = sub || "нажми, чтобы открыть панель";
+  }
+
+  function hideBadge() {
+    if (els.badge) els.badge.classList.remove("visible");
+  }
+
+  // ========== Status card ==========
+  function setStatus(kind, title, sub) {
+    if (!els.status) return;
+    const map = {
+      yes: ["✅", "dh-status-yes"],
+      no: ["❌", "dh-status-no"],
+      checking: ["⏳", "dh-status-checking"],
+      error: ["⚠️", "dh-status-error"],
+      idle: ["👤", ""],
+    };
+    const [icon, cls] = map[kind] || map.idle;
+    els.status.className = "dh-status-line " + cls;
+    els.status.innerHTML =
+      `<span class="icon">${icon}</span><span class="text"></span>`;
+    els.status.querySelector(".text").textContent = title;
+    els.statusSub.textContent = sub || "";
+  }
+
+  function setManualStatus(kind, title, sub) {
+    if (!els.manualStatus) return;
+    const map = {
+      yes: ["✅", "dh-status-yes"],
+      no: ["❌", "dh-status-no"],
+      checking: ["⏳", "dh-status-checking"],
+      error: ["⚠️", "dh-status-error"],
+      idle: ["👤", ""],
+    };
+    const [icon, cls] = map[kind] || map.idle;
+    els.manualStatus.className = "dh-status-line " + cls;
+    els.manualStatus.innerHTML =
+      `<span class="icon">${icon}</span><span class="text"></span>`;
+    els.manualStatus.querySelector(".text").textContent = title;
+    els.manualSub.textContent = sub || "";
+  }
+
+  // ========== Core: check ==========
+  let checking = false;
+
+  async function runCheck(username, { manual = false } = {}) {
+    if (!username) {
+      showToast("Укажи username", true);
+      return;
+    }
+    if (checking) return;
+    checking = true;
+
+    const setStatusFn = manual ? setManualStatus : setStatus;
+    const setBadgeState = (state, title, sub) => {
+      if (!manual) setBadge(state, title, sub);
+    };
+
+    setStatusFn("checking", `Проверяем @${username}…`, "Запрос к API Duolingo");
+    setBadgeState("checking", `Проверка @${username}…`);
+
+    try {
+      const cached = getCached(username);
+      if (cached && cached.theirId) {
+        applyResult(username, cached, { manual });
+        checking = false;
+        return;
+      }
+
+      const me = await getMe();
+      if (!me || !me.id) {
+        throw new Error("Не удалось определить твой аккаунт. Выполнен вход?");
+      }
+
+      const target = await resolveUser(username);
+      if (!target) {
+        throw new Error(`Пользователь @${username} не найден`);
+      }
+
+      const followsMe = await checkFollowsMe(target.username, target.id);
+      const entry = {
+        followsMe,
+        theirId: target.id,
+        theirName: target.name,
+        theirUsername: target.username,
+        checkedAt: Date.now(),
+      };
+      setCached(username, entry);
+      applyResult(username, entry, { manual });
+    } catch (e) {
+      console.warn("[DuoHelper] check failed", e);
+      const msg = e && e.message ? e.message : "Ошибка проверки";
+      setStatusFn("error", "Ошибка", msg);
+      setBadgeState("error", "Ошибка проверки", msg);
+      showToast(msg, true);
+    } finally {
+      checking = false;
+    }
+  }
+
+  function applyResult(username, entry, { manual = false } = {}) {
+    const setStatusFn = manual ? setManualStatus : setStatus;
+    const who = entry.theirName || entry.theirUsername || username;
+
+    if (entry.followsMe) {
+      setStatusFn(
+        "yes",
+        `${who} ПОДПИСАН(А) на вас`,
+        `@${username} · проверено ${fmtTime(entry.checkedAt)}`,
+      );
+      if (!manual) {
+        setBadge("yes", "✅ Подписан(а) на вас", `@${username}`);
+      }
+    } else {
+      setStatusFn(
+        "no",
+        `${who} НЕ подписан(а) на вас`,
+        `@${username} · проверено ${fmtTime(entry.checkedAt)}`,
+      );
+      if (!manual) {
+        setBadge("no", "❌ Не подписан(а) на вас", `@${username}`);
+      }
+    }
+  }
+
+  function fmtTime(ts) {
+    if (!ts) return "—";
+    try {
+      return new Date(ts).toLocaleString("ru-RU", {
+        day: "2-digit",
+        month: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+    } catch {
+      return "—";
+    }
+  }
+
+  // ========== Me info ==========
+  async function refreshMeInfo() {
+    if (!els.meInfo) return;
+    const myId = getMyId();
+    if (!myId) {
+      els.meInfo.textContent = "Не выполнен вход (нет jwt_token)";
+      return;
+    }
+    els.meInfo.textContent = "Загрузка…";
+    const me = await getMe();
+    if (me && me.username) {
+      els.meInfo.textContent = `@${me.username} · id ${me.id}`;
+    } else {
+      els.meInfo.textContent = `id ${myId} · username не получен`;
+    }
+  }
+
+  // ========== SPA watcher ==========
+  let lastPath = location.pathname;
+
+  function onNavigate() {
+    const path = location.pathname;
+    if (path === lastPath) return;
+    lastPath = path;
+
+    if (isProfilePage()) {
+      const u = getProfileUsername();
+      els.userInput.value = u || "";
+      if (DATA.settings.autoCheck) {
+        runCheck(u);
+      } else {
+        const cached = getCached(u);
+        if (cached) applyResult(u, cached);
+        else {
+          setStatus("idle", `@${u}`, "Автопроверка выключена — нажми «Проверить»");
+          setBadge("checking", `@${u}`, "автопроверка выключена");
+        }
+      }
+    } else {
+      hideBadge();
+      setStatus(
+        "idle",
+        "Открой профиль пользователя",
+        "Скрипт покажет, подписан ли он на тебя в ответ.",
+      );
+    }
+  }
+
+  function hookHistory() {
+    const origPush = history.pushState;
+    const origReplace = history.replaceState;
+    history.pushState = function () {
+      origPush.apply(this, arguments);
+      setTimeout(onNavigate, 50);
+    };
+    history.replaceState = function () {
+      origReplace.apply(this, arguments);
+      setTimeout(onNavigate, 50);
+    };
+    window.addEventListener("popstate", () => setTimeout(onNavigate, 50));
+  }
+
+  // ========== Events ==========
+  function bindEvents() {
+    els.fab.addEventListener("click", () => {
+      els.modal.classList.toggle("open");
+      if (els.modal.classList.contains("open")) {
+        refreshMeInfo();
+        const u = getProfileUsername() || els.userInput.value;
+        if (u && !els.userInput.value) els.userInput.value = u;
+      }
+    });
+
+    els.badge.addEventListener("click", () => {
+      els.modal.classList.add("open");
+      refreshMeInfo();
+    });
+
+    els.close.addEventListener("click", () => els.modal.classList.remove("open"));
+
+    els.tabs.forEach((tab) => {
+      tab.addEventListener("click", () => {
+        const name = tab.dataset.tab;
+        els.tabs.forEach((t) => t.classList.toggle("active", t === tab));
+        els.tabContents.forEach((c) =>
+          c.classList.toggle("active", c.dataset.tab === name),
+        );
+      });
+    });
+
+    els.checkBtn.addEventListener("click", () => {
+      const u = (els.userInput.value || "").trim().replace(/^@/, "");
+      if (!u) {
+        showToast("Укажи username", true);
+        return;
+      }
+      els.manualCard.style.display = "block";
+      runCheck(u, { manual: true });
+    });
+
+    els.userInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") els.checkBtn.click();
+    });
+
+    els.recheckBtn.addEventListener("click", () => {
+      const u = (
+        getProfileUsername() ||
+        els.userInput.value ||
+        ""
+      )
+        .trim()
+        .replace(/^@/, "");
+      if (!u) {
+        showToast("Нет username для проверки", true);
+        return;
+      }
+      // сброс кеша по этому юзеру
+      delete DATA.followCache[u.toLowerCase()];
+      saveData();
+      els.manualCard.style.display = "none";
+      runCheck(u);
+    });
+
+    els.copyBtn.addEventListener("click", () => {
+      const u = (
+        getProfileUsername() ||
+        els.userInput.value ||
+        ""
+      )
+        .trim()
+        .replace(/^@/, "");
+      const entry = u ? DATA.followCache[u.toLowerCase()] : null;
+      const text = entry
+        ? `@${u}: ${entry.followsMe ? "подписан(а) на вас" : "НЕ подписан(а) на вас"} (проверено ${fmtTime(entry.checkedAt)})`
+        : "Нет данных проверки";
+      navigator.clipboard
+        .writeText(text)
+        .then(() => showToast("Скопировано"))
+        .catch(() => showToast("Не удалось скопировать", true));
+    });
+
+    // settings
+    const syncSwitches = () => {
+      els.setAuto.classList.toggle("on", !!DATA.settings.autoCheck);
+      els.setBadge.classList.toggle("on", !!DATA.settings.showBadge);
+      els.setCache.value = DATA.settings.cacheMinutes;
+    };
+    syncSwitches();
+
+    els.setAuto.addEventListener("click", () => {
+      DATA.settings.autoCheck = !DATA.settings.autoCheck;
+      saveData();
+      syncSwitches();
+    });
+
+    els.setBadge.addEventListener("click", () => {
+      DATA.settings.showBadge = !DATA.settings.showBadge;
+      saveData();
+      syncSwitches();
+      if (!DATA.settings.showBadge) hideBadge();
+      else onNavigate();
+    });
+
+    els.setCache.addEventListener("change", () => {
+      const v = Math.max(1, Math.min(1440, parseInt(els.setCache.value, 10) || 30));
+      DATA.settings.cacheMinutes = v;
+      els.setCache.value = v;
+      saveData();
+    });
+
+    els.clearCache.addEventListener("click", () => {
+      DATA.followCache = {};
+      saveData();
+      showToast("Кеш очищен");
+    });
+
+    els.refreshPage.addEventListener("click", () => location.reload());
+
+    els.exportBtn.addEventListener("click", () => {
+      const blob = new Blob([JSON.stringify(DATA, null, 2)], {
+        type: "application/json",
+      });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "duolingo-helper-data.json";
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    });
+  }
+
+  // ========== FAB recovery (SPA) ==========
+  function ensureUI() {
+    if (!document.getElementById(HOST_ID) && document.documentElement) {
+      createUI();
+    }
+  }
+
+  // ========== ЗАПУСК ==========
+  function init() {
+    createUI();
+    hookHistory();
+
+    // SPA может перерисовать body — следим за host
+    const mo = new MutationObserver(() => ensureUI());
+    mo.observe(document.documentElement, { childList: true });
+
+    if (isProfilePage()) {
+      const u = getProfileUsername();
+      if (u) els.userInput.value = u;
+      if (DATA.settings.autoCheck) {
+        // небольшая задержка — дать странице прогрузиться
+        setTimeout(() => runCheck(u), 600);
+      }
+    } else {
+      setStatus(
+        "idle",
+        "Открой профиль пользователя",
+        "Скрипт покажет, подписан ли он на тебя в ответ.",
+      );
+    }
+
+    refreshMeInfo();
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", init);
+  } else {
+    init();
+  }
+})();
