@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Duolingo Helper
 // @namespace    https://github.com/Vidrimers/Duolingo-helper
-// @version      0.3.7
+// @version      0.3.8
 // @description  Проверка взаимной подписки на профилях Duolingo. Панель, бейджи, кеш.
 // @author       Vidrimers
 // @match        *://*.duolingo.com/*
@@ -14,6 +14,7 @@
 // @connect      cdn.jsdelivr.net
 // @connect      api.github.com
 // @connect      goals-api.duolingo.com
+// @connect      www.duolingo.com
 // @run-at       document-end
 // @noframes
 // @updateURL    https://raw.githubusercontent.com/Vidrimers/Duolingo-helper/refs/heads/master/duo-helper.user.js
@@ -1258,8 +1259,21 @@
                     <div id="dh-quest-list" style="margin-top:8px;display:flex;flex-direction:column;gap:6px"></div>
                 </div>
 
+                <div class="dh-card">
+                    <div class="dh-card-title">⚠️ Магазин — на свой страх и риск</div>
+                    <div class="dh-muted" style="margin-bottom:8px">
+                        Выдача предметов магазина без оплаты/гемов. Нарушает правила Duolingo.
+                    </div>
+                    <div class="dh-row" style="margin-bottom:6px">
+                        <button class="dh-btn dh-btn-primary" id="dh-shop-load">Загрузить</button>
+                        <button class="dh-btn dh-btn-danger" id="dh-shop-super">Super 3 дня</button>
+                    </div>
+                    <div class="dh-muted" id="dh-shop-status">Готово</div>
+                    <div id="dh-shop-list" style="margin-top:8px;display:flex;flex-direction:column;gap:6px;max-height:260px;overflow-y:auto"></div>
+                </div>
+
                 <div class="dh-placeholder">
-                    🔜 Дальше: shop, streak, авторешение уроков,<br/>
+                    🔜 Дальше: streak, авторешение уроков,<br/>
                     XP / gems / league, Free Max, аккаунты
                 </div>
             </div>
@@ -1376,6 +1390,10 @@
       questClaimAll: modal.querySelector("#dh-quest-claim-all"),
       questStatus: modal.querySelector("#dh-quest-status"),
       questList: modal.querySelector("#dh-quest-list"),
+      shopLoad: modal.querySelector("#dh-shop-load"),
+      shopSuper: modal.querySelector("#dh-shop-super"),
+      shopStatus: modal.querySelector("#dh-shop-status"),
+      shopList: modal.querySelector("#dh-shop-list"),
       setCache: modal.querySelector("#dh-set-cache"),
       clearCache: modal.querySelector("#dh-clear-cache"),
       refreshPage: modal.querySelector("#dh-refresh-page"),
@@ -2035,6 +2053,188 @@
     } catch (e) {
       setQuestStatus("Ошибка: " + (e && e.message));
       showToast(e && e.message ? e.message : "Ошибка", true);
+    } finally {
+      if (btn) btn.disabled = false;
+    }
+  }
+
+  // ========== Shop ==========
+  // ⚠️ Выдача предметов isFree — чит, на свой страх и риск.
+  function setShopStatus(text) {
+    if (els.shopStatus) els.shopStatus.textContent = text;
+  }
+
+  async function getMeLanguages() {
+    const myId = getMyId();
+    if (!myId) return { fromLanguage: "en", learningLanguage: "en" };
+    try {
+      const u = await apiGet(
+        `${API.users}/${myId}?fields=fromLanguage,learningLanguage`,
+      );
+      return {
+        fromLanguage: u.fromLanguage || "en",
+        learningLanguage: u.learningLanguage || "en",
+      };
+    } catch {
+      return { fromLanguage: "en", learningLanguage: "en" };
+    }
+  }
+
+  function shopPost(url, payload) {
+    return new Promise((resolve) => {
+      GM_xmlhttpRequest({
+        method: "POST",
+        url,
+        headers: {
+          "Content-Type": "application/json",
+          accept: "application/json",
+          authorization: "Bearer " + (getToken() || ""),
+        },
+        data: JSON.stringify(payload),
+        timeout: 15000,
+        onload(resp) {
+          resolve(resp.status);
+        },
+        onerror() {
+          resolve(0);
+        },
+        ontimeout() {
+          resolve(0);
+        },
+      });
+    });
+  }
+
+  async function buyShopItem(itemName, extra = {}) {
+    const myId = getMyId();
+    if (!myId) return false;
+    const langs = await getMeLanguages();
+    const status = await shopPost(
+      `${API.users}/${myId}/shop-items`,
+      {
+        itemName,
+        isFree: true,
+        consumed: true,
+        fromLanguage: langs.fromLanguage,
+        learningLanguage: langs.learningLanguage,
+        ...extra,
+      },
+    );
+    return status === 200 || status === 201;
+  }
+
+  function renderShopItems(items) {
+    if (!els.shopList) return;
+    els.shopList.innerHTML = "";
+    const valid = items.filter(
+      (i) => (i.currencyType === "XGM" || !i.currencyType) && !(i.id || "").includes("gift"),
+    );
+    if (!valid.length) {
+      els.shopList.innerHTML = '<div class="dh-muted">Нет предметов</div>';
+      return;
+    }
+    const order = [
+      ["Streak", (id) => id.includes("streak_freeze")],
+      ["XP", (id) => id.includes("xp_boost")],
+      ["Hearts", (id) => id.includes("health") || id.includes("heart")],
+      ["Gems", (id) => id.includes("gem")],
+      ["Outfits", (id, i) => i.type === "outfit"],
+      ["Прочее", () => true],
+    ];
+    const used = new Set();
+    for (const [label, pred] of order) {
+      const group = valid.filter((i) => {
+        if (used.has(i.id)) return false;
+        if (!pred((i.id || "").toLowerCase(), i)) return false;
+        used.add(i.id);
+        return true;
+      });
+      if (!group.length) continue;
+      const head = document.createElement("div");
+      head.className = "dh-card-title";
+      head.style.marginTop = "6px";
+      head.textContent = label;
+      els.shopList.appendChild(head);
+      for (const item of group) {
+        const name = item.name || String(item.id).replace(/_/g, " ");
+        const row = document.createElement("div");
+        row.className = "dh-setting-row";
+        row.style.borderBottom = "none";
+        row.style.padding = "3px 0";
+        row.innerHTML = `<div class="dh-setting-label" style="min-width:0">
+            <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${name}</div>
+            <small>${item.id || ""}</small>
+        </div>
+        <button class="dh-btn" style="padding:4px 10px;font-size:11px">GET</button>`;
+        const b = row.querySelector("button");
+        b.addEventListener("click", async () => {
+          b.disabled = true;
+          b.textContent = "…";
+          const ok = await buyShopItem(item.id);
+          b.textContent = ok ? "✓" : "ERR";
+          showToast(ok ? "✓ " + name : "Не удалось: " + name, !ok);
+          setTimeout(() => {
+            b.disabled = false;
+            b.textContent = "GET";
+          }, 2500);
+        });
+        els.shopList.appendChild(row);
+      }
+    }
+  }
+
+  async function loadShop() {
+    const btn = els.shopLoad;
+    if (btn) btn.disabled = true;
+    setShopStatus("Загрузка магазина…");
+    try {
+      const res = await new Promise((resolve) => {
+        GM_xmlhttpRequest({
+          method: "GET",
+          url: "https://www.duolingo.com/2023-05-23/shop-items",
+          headers: { accept: "application/json" },
+          timeout: 15000,
+          onload(resp) {
+            resolve({ status: resp.status, text: resp.responseText });
+          },
+          onerror() {
+            resolve({ status: 0, text: "" });
+          },
+          ontimeout() {
+            resolve({ status: 0, text: "" });
+          },
+        });
+      });
+      if (res.status !== 200) throw new Error("HTTP " + res.status);
+      const items = (JSON.parse(res.text || "{}").shopItems) || [];
+      renderShopItems(items);
+      setShopStatus("Предметов: " + items.length);
+    } catch (e) {
+      setShopStatus("Ошибка: " + (e && e.message));
+      showToast(e && e.message ? e.message : "Ошибка магазина", true);
+    } finally {
+      if (btn) btn.disabled = false;
+    }
+  }
+
+  async function buySuper3Days() {
+    const btn = els.shopSuper;
+    if (btn) btn.disabled = true;
+    setShopStatus("Выдача Super 3 дня…");
+    try {
+      const ok = await buyShopItem("immersive_subscription", {
+        productId: "com.duolingo.immersive_free_trial_subscription",
+      });
+      if (ok) {
+        setShopStatus("Super 3 дня: выдано");
+        showToast("✓ Super 3 дня выдан");
+      } else {
+        setShopStatus("Super: не удалось");
+        showToast("Не удалось выдать Super", true);
+      }
+    } catch (e) {
+      setShopStatus("Ошибка: " + (e && e.message));
+      showToast("Ошибка Super", true);
     } finally {
       if (btn) btn.disabled = false;
     }
@@ -2913,6 +3113,13 @@
     }
     if (els.questClaimAll) {
       els.questClaimAll.addEventListener("click", () => claimAllMonthly());
+    }
+
+    if (els.shopLoad) {
+      els.shopLoad.addEventListener("click", () => loadShop());
+    }
+    if (els.shopSuper) {
+      els.shopSuper.addEventListener("click", () => buySuper3Days());
     }
 
     els.setCache.addEventListener("change", () => {
