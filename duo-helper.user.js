@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Duolingo Helper
 // @namespace    https://github.com/Vidrimers/Duolingo-helper
-// @version      0.3.3
+// @version      0.3.4
 // @description  Проверка взаимной подписки на профилях Duolingo. Панель, бейджи, кеш.
 // @author       Vidrimers
 // @match        *://*.duolingo.com/*
@@ -1452,7 +1452,18 @@
         try {
           document.dispatchEvent(new CustomEvent('dh-heart-blocked'));
         } catch (e) {}
-        return Promise.resolve(new Response(JSON.stringify({ ok: true }), {
+        var expected = null;
+        try { expected = localStorage.getItem('dh_hearts_expected'); } catch (e) {}
+        var body = { ok: true };
+        if (expected != null && expected !== '') {
+          var n = parseInt(expected, 10);
+          if (!isNaN(n)) {
+            body.hearts = n;
+            body.maxHearts = n;
+            body.health = { hearts: n, maxHearts: n };
+          }
+        }
+        return Promise.resolve(new Response(JSON.stringify(body), {
           status: 200,
           headers: { 'content-type': 'application/json' }
         }));
@@ -1505,13 +1516,95 @@
       );
       const h = data && data.health;
       if (!h) return null;
-      return {
+      const server = {
         hearts: Number(h.hearts),
         maxHearts: Number(h.maxHearts != null ? h.maxHearts : 5),
       };
+      if (Number.isFinite(server.hearts)) {
+        try {
+          localStorage.setItem("dh_hearts_expected", String(server.hearts));
+        } catch {}
+      }
+      return server;
     } catch {
       return null;
     }
+  }
+
+  let lastServerHearts = null;
+
+  async function fixHeartsUi({ silent = false, forceFetch = false } = {}) {
+    if (!DATA.settings.protectHearts) return;
+    let server = lastServerHearts;
+    if (!server || forceFetch) {
+      server = await fetchServerHearts();
+      if (server && Number.isFinite(server.hearts)) lastServerHearts = server;
+    }
+    if (!server || !Number.isFinite(server.hearts)) return;
+
+    const elsH = findHeartCountEls();
+    const maxH = Math.max(server.maxHearts, server.hearts, 5);
+    let patched = 0;
+    for (const el of elsH) {
+      const cur = Number((el.textContent || "").trim());
+      if (!Number.isFinite(cur)) continue;
+      if (cur < 0 || cur > maxH + 5) continue;
+      if (cur !== server.hearts) {
+        el.textContent = String(server.hearts);
+        patched++;
+      }
+    }
+    if (patched && !silent) {
+      showToast("Сердца синхронизированы с сервером: " + server.hearts);
+    }
+    return { server: server.hearts, patched };
+  }
+
+  let heartsLessonTimer = null;
+
+  function startHeartsWatch() {
+    stopHeartsWatch();
+    // во время урока UI часто перерисовывает счётчик — держим его равным серверу
+    heartsLessonTimer = setInterval(() => {
+      fixHeartsUi({ silent: true });
+    }, 1200);
+  }
+
+  function stopHeartsWatch() {
+    if (heartsLessonTimer) {
+      clearInterval(heartsLessonTimer);
+      heartsLessonTimer = null;
+    }
+  }
+
+  function watchHeartsUi() {
+    document.addEventListener("dh-heart-blocked", () => {
+      // сразу чиним счётчик (без ожидания конца урока)
+      setTimeout(() => fixHeartsUi({ silent: true }), 80);
+      setTimeout(() => fixHeartsUi({ silent: true }), 400);
+    });
+
+    const sync = () => {
+      const onLesson = /^\/lesson/.test(location.pathname);
+      if (onLesson) {
+        // кеш + частые патчи
+        fetchServerHearts().then((s) => {
+          if (s) lastServerHearts = s;
+          startHeartsWatch();
+          fixHeartsUi({ silent: true });
+        });
+      } else {
+        stopHeartsWatch();
+        setTimeout(() => fixHeartsUi({ silent: true, forceFetch: true }), 400);
+      }
+    };
+    window.addEventListener("popstate", sync);
+    const origPush = history.pushState;
+    history.pushState = function () {
+      origPush.apply(this, arguments);
+      sync();
+    };
+    if (/^\/lesson/.test(location.pathname)) sync();
   }
 
   function findHeartCountEls() {
@@ -1561,48 +1654,6 @@
       });
     });
     return out;
-  }
-
-  async function fixHeartsUi({ silent = false } = {}) {
-    if (!DATA.settings.protectHearts) return;
-    const server = await fetchServerHearts();
-    if (!server || !Number.isFinite(server.hearts)) return;
-
-    const elsH = findHeartCountEls();
-    let patched = 0;
-    for (const el of elsH) {
-      const cur = Number((el.textContent || "").trim());
-      if (!Number.isFinite(cur)) continue;
-      // трогаем только те, кто выглядит как счётчик сердец (0..max)
-      if (cur < 0 || cur > Math.max(server.maxHearts, 5) + 5) continue;
-      if (cur !== server.hearts) {
-        el.textContent = String(server.hearts);
-        patched++;
-      }
-    }
-    if (patched && !silent) {
-      showToast("Сердца синхронизированы с сервером: " + server.hearts);
-    }
-    return { server: server.hearts, patched };
-  }
-
-  function watchHeartsUi() {
-    document.addEventListener("dh-heart-blocked", () => {
-      // UI ещё может дорисовать минус — даём кадр и чиним
-      setTimeout(() => fixHeartsUi({ silent: true }), 350);
-    });
-    // после урока
-    const sync = () => {
-      if (/^\/lesson/.test(location.pathname) === false) {
-        setTimeout(() => fixHeartsUi({ silent: true }), 400);
-      }
-    };
-    window.addEventListener("popstate", sync);
-    const origPush = history.pushState;
-    history.pushState = function () {
-      origPush.apply(this, arguments);
-      sync();
-    };
   }
 
   // ========== Theme end ==========
