@@ -462,6 +462,7 @@
                 font-size: 12px;
                 line-height: 1.35;
                 overflow: hidden;
+                overscroll-behavior: contain;
             }
             .dh-modal.open { display: flex; }
 
@@ -554,6 +555,7 @@
                 display: flex;
                 flex-direction: column;
                 gap: 10px;
+                overscroll-behavior: contain;
             }
             .dh-body::-webkit-scrollbar { width: 14px; }
             .dh-body::-webkit-scrollbar-track {
@@ -604,6 +606,7 @@
                 gap: 10px;
                 flex: 1;
                 min-height: 0;
+                overscroll-behavior: contain;
             }
             .dh-tab-content.active { display: flex; }
             .dh-tab-content[data-tab="friends"].active {
@@ -615,10 +618,12 @@
             .dh-tab-content[data-tab="friends"] #dh-friends-list,
             .dh-tab-content[data-tab="friends"] #dh-history-list,
             .dh-tab-content[data-tab="friends"] #dh-changes-list,
-            .dh-tab-content[data-tab="friends"] #dh-exclude-list {
+            .dh-tab-content[data-tab="friends"] #dh-exclude-list,
+            .dh-tab-content[data-tab="friends"] #dh-blocks-list {
                 flex: 1;
                 min-height: 0;
                 overflow-y: auto;
+                overscroll-behavior: contain;
             }
 
             /* ===== Inputs / Buttons (XP) ===== */
@@ -1046,6 +1051,7 @@
                 border-radius: 10px;
                 background: rgba(0,0,0,0.12);
                 overflow: hidden;
+                flex-shrink: 0;
             }
             .dh-acc-head {
                 width: 100%;
@@ -1770,13 +1776,13 @@
                             <button class="dh-btn dh-btn-primary" id="dh-lb-load">Таблица</button>
                             <button class="dh-btn" id="dh-lb-join">Вступить</button>
                         </div>
-                        <div class="dh-muted dh-op-status" id="dh-lb-status"></div>
-                        <div id="dh-lb-list" style="margin-top:8px;display:flex;flex-direction:column;gap:4px;max-height:240px;overflow-y:auto"></div>
-                        <div class="dh-row" style="margin-top:8px">
+                        <div class="dh-row" style="margin-bottom:6px">
                             <input class="dh-num-input" id="dh-lb-target" type="number" min="1" max="100" value="3" style="width:56px" />
                             <button class="dh-btn dh-btn-danger" id="dh-lb-farm">Фарм до места</button>
                             <button class="dh-btn" id="dh-lb-stop">Стоп</button>
                         </div>
+                        <div class="dh-muted dh-op-status" id="dh-lb-status"></div>
+                        <div id="dh-lb-list" style="margin-top:8px;display:flex;flex-direction:column;gap:4px"></div>
                     </div></div>
                 </div>
 
@@ -3965,7 +3971,7 @@
           : String(gap);
       row.innerHTML = `<div class="dh-setting-label" style="min-width:0">
           <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
-            #${i + 1} ${u.name || u.username || u.user_id}
+            #${i + 1} ${u.display_name || u.name || u.username || u.user_id}
           </div>
           <small>${Number(u.score || 0)} XP · ${gapTxt}${u.is_promoted ? " · ↑" : ""}${u.is_demoted ? " · ↓" : ""}</small>
         </div>`;
@@ -6537,14 +6543,26 @@
 
   // ========== Events ==========
   function bindEvents() {
-    els.fab.addEventListener("click", () => {
-      els.modal.classList.toggle("open");
-      if (els.modal.classList.contains("open")) {
-        refreshMeInfo();
-        const u = getProfileUsername() || els.userInput.value;
-        if (u && !els.userInput.value) els.userInput.value = u;
-      }
-    });
+    // колесо внутри окна не должно прокручивать страницу Duolingo
+    if (els.modal) {
+      els.modal.addEventListener(
+        "wheel",
+        (e) => {
+          e.stopPropagation();
+        },
+        { passive: true },
+      );
+    }
+    if (els.fab) {
+      els.fab.addEventListener("click", () => {
+        els.modal.classList.toggle("open");
+        if (els.modal.classList.contains("open")) {
+          refreshMeInfo();
+          const u = getProfileUsername() || els.userInput.value;
+          if (u && !els.userInput.value) els.userInput.value = u;
+        }
+      });
+    }
 
     els.badge.addEventListener("click", () => {
       els.modal.classList.add("open");
