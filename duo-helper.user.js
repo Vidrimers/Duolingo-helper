@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Duolingo Helper
 // @namespace    https://github.com/Vidrimers/Duolingo-helper
-// @version      0.2.3
+// @version      0.2.4
 // @description  Проверка взаимной подписки на профилях Duolingo. Панель, бейджи, кеш.
 // @author       Vidrimers
 // @match        *://*.duolingo.com/*
@@ -11,10 +11,12 @@
 // @grant        GM_listValues
 // @grant        GM_xmlhttpRequest
 // @connect      raw.githubusercontent.com
+// @connect      cdn.jsdelivr.net
+// @connect      api.github.com
 // @run-at       document-end
 // @noframes
-// @updateURL    https://raw.githubusercontent.com/Vidrimers/Duolingo-helper/refs/heads/master/duo-helper.user.js
-// @downloadURL  https://raw.githubusercontent.com/Vidrimers/Duolingo-helper/refs/heads/master/duo-helper.user.js
+// @updateURL    https://cdn.jsdelivr.net/gh/Vidrimers/Duolingo-helper@master/duo-helper.user.js
+// @downloadURL  https://cdn.jsdelivr.net/gh/Vidrimers/Duolingo-helper@master/duo-helper.user.js
 // ==/UserScript==
 
 (function () {
@@ -1300,9 +1302,47 @@
   }
 
   // ========== ПРОВЕРКА ОБНОВЛЕНИЙ ==========
-  const CURRENT_VERSION = "0.2.3";
-  const UPDATE_URL =
-    "https://raw.githubusercontent.com/Vidrimers/Duolingo-helper/refs/heads/master/duo-helper.user.js";
+  const CURRENT_VERSION = "0.2.4";
+  // install/update link — открывается в Tampermonkey (jsDelivr отдаёт свежее, чем raw CDN)
+  const INSTALL_URL =
+    "https://cdn.jsdelivr.net/gh/Vidrimers/Duolingo-helper@master/duo-helper.user.js";
+  // Источники для проверки версии. raw.githubusercontent часто отдаёт CDN-кеш,
+  // поэтому первым идёт jsDelivr, потом GitHub API.
+  const UPDATE_SOURCES = [
+    {
+      url: "https://cdn.jsdelivr.net/gh/Vidrimers/Duolingo-helper@master/duo-helper.user.js",
+      parse: (text) => {
+        const m = text.match(/\/\/ @version\s+([^\s]+)/);
+        return m ? m[1] : null;
+      },
+    },
+    {
+      url: "https://api.github.com/repos/Vidrimers/Duolingo-helper/contents/duo-helper.user.js",
+      parse: (text) => {
+        try {
+          const data = JSON.parse(text);
+          const b64 = String(data.content || "").replace(/\n/g, "");
+          const decoded = decodeURIComponent(
+            atob(b64)
+              .split("")
+              .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
+              .join(""),
+          );
+          const m = decoded.match(/\/\/ @version\s+([^\s]+)/);
+          return m ? m[1] : null;
+        } catch {
+          return null;
+        }
+      },
+    },
+    {
+      url: "https://raw.githubusercontent.com/Vidrimers/Duolingo-helper/refs/heads/master/duo-helper.user.js",
+      parse: (text) => {
+        const m = text.match(/\/\/ @version\s+([^\s]+)/);
+        return m ? m[1] : null;
+      },
+    },
+  ];
   const UPDATE_CHECK_KEY = "dh_update_last_check";
   const UPDATE_CHECK_INTERVAL = 24 * 60 * 60 * 1000;
 
@@ -1335,7 +1375,7 @@
 
   /** Открывает установку в Tampermonkey и перезагружает страницу с отсчётом. */
   function startUpdateReload() {
-    window.open(UPDATE_URL, "_blank");
+    window.open(INSTALL_URL, "_blank");
     let left = 8;
     showToast(`Установи обновление в Tampermonkey. Перезагрузка через ${left}…`);
     const tick = setInterval(() => {
@@ -1349,49 +1389,75 @@
     }, 1000);
   }
 
-  function checkForUpdates(force = false) {
+  function gmFetch(url) {
+    return new Promise((resolve) => {
+      GM_xmlhttpRequest({
+        method: "GET",
+        url: url + (url.includes("?") ? "&" : "?") + "_=" + Date.now(),
+        timeout: 8000,
+        headers: { accept: "application/json,text/plain,*/*" },
+        onload(resp) {
+          resolve({ ok: resp.status === 200, text: resp.responseText || "" });
+        },
+        onerror() {
+          resolve({ ok: false, text: "" });
+        },
+        ontimeout() {
+          resolve({ ok: false, text: "" });
+        },
+      });
+    });
+  }
+
+  /**
+   * Проверка обновлений.
+   * @returns {Promise<"update"|"current"|"error">}
+   */
+  async function checkForUpdates(force = false) {
     const lastCheck = GM_getValue(UPDATE_CHECK_KEY, 0);
     const now = Date.now();
-    if (!force && now - lastCheck < UPDATE_CHECK_INTERVAL) return;
-    GM_xmlhttpRequest({
-      method: "GET",
-      url: UPDATE_URL + "?_=" + now,
-      timeout: 8000,
-      onload(resp) {
-        if (resp.status !== 200) return;
-        const match = resp.responseText.match(/\/\/ @version\s+([^\s]+)/);
-        if (!match) return;
-        const remoteVersion = match[1];
-        GM_setValue(UPDATE_CHECK_KEY, now);
-        if (isNewer(remoteVersion, CURRENT_VERSION)) {
-          showUpdateBanner(remoteVersion);
-        }
-      },
-      onerror() {},
-      ontimeout() {},
-    });
+    if (!force && now - lastCheck < UPDATE_CHECK_INTERVAL) return "skipped";
+
+    for (const source of UPDATE_SOURCES) {
+      const res = await gmFetch(source.url);
+      if (!res.ok) continue;
+      const remoteVersion = source.parse(res.text);
+      if (!remoteVersion) continue;
+
+      GM_setValue(UPDATE_CHECK_KEY, now);
+      if (isNewer(remoteVersion, CURRENT_VERSION)) {
+        showUpdateBanner(remoteVersion);
+        return "update";
+      }
+      return "current";
+    }
+    return "error";
   }
 
   function initUpdateCheck() {
     if (els.currentVersion) els.currentVersion.textContent = "v" + CURRENT_VERSION;
     if (els.checkUpdateBtn) {
-      els.checkUpdateBtn.addEventListener("click", () => {
+      els.checkUpdateBtn.addEventListener("click", async () => {
         const btn = els.checkUpdateBtn;
         btn.textContent = "⏳ Проверяем...";
         btn.disabled = true;
         GM_setValue(UPDATE_CHECK_KEY, 0);
-        checkForUpdates(true);
-        setTimeout(() => {
+        try {
+          const result = await checkForUpdates(true);
+          if (result === "update") {
+            showToast("Найдено обновление — см. плашку вверху панели");
+          } else if (result === "current") {
+            showToast("✓ Обновлений нет, версия актуальна");
+          } else {
+            showToast("Не удалось проверить обновления", true);
+          }
+        } finally {
           btn.textContent = "🔍 Проверить обновления";
           btn.disabled = false;
-          const banner = els.updateBanner;
-          if (banner && banner.style.display === "none") {
-            showToast("✓ Обновлений нет, версия актуальна");
-          }
-        }, 3000);
+        }
       });
     }
-    // тихая проверка при открытии панели — не чаще раза в сутки
+    // тихая проверка при старте — не чаще раза в сутки
     checkForUpdates(false);
   }
 
