@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Duolingo Helper
 // @namespace    https://github.com/Vidrimers/Duolingo-helper
-// @version      0.2.2
+// @version      0.2.3
 // @description  Проверка взаимной подписки на профилях Duolingo. Панель, бейджи, кеш.
 // @author       Vidrimers
 // @match        *://*.duolingo.com/*
@@ -40,6 +40,7 @@
         badgePos: "top-right",
         accent: "#58cc02",
         winPos: null, // { x, y } — позиция окна после drag
+        openOnStart: false, // открывать панель при загрузке сайта
       },
       // username -> { followsMe: true/false, checkedAt: ts, theirId, theirName }
       followCache: {},
@@ -866,9 +867,16 @@
                 <div class="dh-setting-row">
                     <div class="dh-setting-label">
                         Показывать бейдж
-                        <small>Плашка поверх страницы профиля</small>
+                        <small>Плашка рядом с именем на профиле</small>
                     </div>
                     <div class="dh-switch" id="dh-set-badge"></div>
+                </div>
+                <div class="dh-setting-row">
+                    <div class="dh-setting-label">
+                        Открывать панель при загрузке
+                        <small>UI будет раскрыт сразу при заходе на Duolingo</small>
+                    </div>
+                    <div class="dh-switch" id="dh-set-open"></div>
                 </div>
                 <div class="dh-setting-row">
                     <div class="dh-setting-label">
@@ -904,7 +912,9 @@
         <div class="dh-footer">
             <button class="dh-btn dh-btn-ghost" id="dh-refresh-page">🔄 Обновить страницу</button>
             <button class="dh-btn dh-btn-ghost" id="dh-export">📥 Экспорт JSON</button>
+            <button class="dh-btn dh-btn-ghost" id="dh-import">📤 Импорт JSON</button>
         </div>
+        <input type="file" id="dh-import-file" accept="application/json,.json" style="display:none" />
     `;
     shadow.appendChild(modal);
 
@@ -933,10 +943,13 @@
       copyBtn: modal.querySelector("#dh-copy-btn"),
       setAuto: modal.querySelector("#dh-set-auto"),
       setBadge: modal.querySelector("#dh-set-badge"),
+      setOpen: modal.querySelector("#dh-set-open"),
       setCache: modal.querySelector("#dh-set-cache"),
       clearCache: modal.querySelector("#dh-clear-cache"),
       refreshPage: modal.querySelector("#dh-refresh-page"),
       exportBtn: modal.querySelector("#dh-export"),
+      importBtn: modal.querySelector("#dh-import"),
+      importFile: modal.querySelector("#dh-import-file"),
       updateBanner: modal.querySelector("#dh-update-banner"),
       updateText: modal.querySelector("#dh-update-text"),
       updateBtn: modal.querySelector("#dh-update-btn"),
@@ -1287,7 +1300,7 @@
   }
 
   // ========== ПРОВЕРКА ОБНОВЛЕНИЙ ==========
-  const CURRENT_VERSION = "0.2.2";
+  const CURRENT_VERSION = "0.2.3";
   const UPDATE_URL =
     "https://raw.githubusercontent.com/Vidrimers/Duolingo-helper/refs/heads/master/duo-helper.user.js";
   const UPDATE_CHECK_KEY = "dh_update_last_check";
@@ -1314,10 +1327,26 @@
       if (!els.updateBanner || !els.updateText || !els.updateBtn) return;
       els.updateText.textContent = `🆕 Доступно обновление: v${CURRENT_VERSION} → v${remoteVersion}`;
       els.updateBanner.style.display = "flex";
-      els.updateBtn.onclick = () => window.open(UPDATE_URL, "_blank");
+      els.updateBtn.onclick = () => startUpdateReload();
     } catch (e) {
       console.warn("[DuoHelper] update banner error", e);
     }
+  }
+
+  /** Открывает установку в Tampermonkey и перезагружает страницу с отсчётом. */
+  function startUpdateReload() {
+    window.open(UPDATE_URL, "_blank");
+    let left = 8;
+    showToast(`Установи обновление в Tampermonkey. Перезагрузка через ${left}…`);
+    const tick = setInterval(() => {
+      left -= 1;
+      if (left <= 0) {
+        clearInterval(tick);
+        location.reload();
+        return;
+      }
+      showToast(`Перезагрузка через ${left}… (установи обновление в Tampermonkey)`);
+    }, 1000);
   }
 
   function checkForUpdates(force = false) {
@@ -1533,6 +1562,7 @@
     const syncSwitches = () => {
       els.setAuto.classList.toggle("on", !!DATA.settings.autoCheck);
       els.setBadge.classList.toggle("on", !!DATA.settings.showBadge);
+      if (els.setOpen) els.setOpen.classList.toggle("on", !!DATA.settings.openOnStart);
       els.setCache.value = DATA.settings.cacheMinutes;
     };
     syncSwitches();
@@ -1550,6 +1580,19 @@
       if (!DATA.settings.showBadge) hideBadge();
       else onNavigate();
     });
+
+    if (els.setOpen) {
+      els.setOpen.addEventListener("click", () => {
+        DATA.settings.openOnStart = !DATA.settings.openOnStart;
+        saveData();
+        syncSwitches();
+        showToast(
+          DATA.settings.openOnStart
+            ? "Панель будет открываться при загрузке"
+            : "Панель будет закрытой при загрузке",
+        );
+      });
+    }
 
     els.setCache.addEventListener("change", () => {
       const v = Math.max(1, Math.min(1440, parseInt(els.setCache.value, 10) || 30));
@@ -1576,6 +1619,43 @@
       a.click();
       setTimeout(() => URL.revokeObjectURL(a.href), 1000);
     });
+
+    // ===== Import =====
+    if (els.importBtn && els.importFile) {
+      els.importBtn.addEventListener("click", () => els.importFile.click());
+      els.importFile.addEventListener("change", () => {
+        const file = els.importFile.files && els.importFile.files[0];
+        els.importFile.value = "";
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = () => {
+          try {
+            const parsed = JSON.parse(String(reader.result || ""));
+            if (!parsed || typeof parsed !== "object") {
+              throw new Error("bad format");
+            }
+            // мержим: настройки поверх текущих, кеш — заменой
+            if (parsed.settings && typeof parsed.settings === "object") {
+              DATA.settings = { ...DATA.settings, ...parsed.settings };
+            }
+            if (parsed.followCache && typeof parsed.followCache === "object") {
+              DATA.followCache = parsed.followCache;
+            }
+            if (parsed.me && typeof parsed.me === "object") {
+              DATA.me = parsed.me;
+            }
+            saveData();
+            syncSwitches();
+            showToast("✓ Данные импортированы");
+          } catch (e) {
+            console.warn("[DuoHelper] import failed", e);
+            showToast("Ошибка импорта: неверный JSON", true);
+          }
+        };
+        reader.onerror = () => showToast("Не удалось прочитать файл", true);
+        reader.readAsText(file);
+      });
+    }
   }
 
   // ========== FAB recovery (SPA) ==========
@@ -1590,6 +1670,11 @@
   function init() {
     createUI();
     hookHistory();
+
+    // открыть панель сразу, если включено в настройках
+    if (DATA.settings.openOnStart && els.modal) {
+      els.modal.classList.add("open");
+    }
 
     // SPA может перерисовать body — следим за host и плашкой (с дебаунсом)
     let ensureTimer = null;
