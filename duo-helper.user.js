@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Duolingo Helper
 // @namespace    https://github.com/Vidrimers/Duolingo-helper
-// @version      0.2.9
+// @version      0.3.0
 // @description  Проверка взаимной подписки на профилях Duolingo. Панель, бейджи, кеш.
 // @author       Vidrimers
 // @match        *://*.duolingo.com/*
@@ -43,6 +43,7 @@
         accent: "#58cc02",
         winPos: null, // { x, y } — позиция окна после drag
         openOnStart: false, // открывать панель при загрузке сайта
+        theme: "xp", // xp | vista | win95
       },
       // username -> { followsMe: true/false, checkedAt: ts, theirId, theirName }
       followCache: {},
@@ -264,6 +265,16 @@
 
   function isProfilePage() {
     return /^\/profile\/[^/]+/.test(location.pathname);
+  }
+
+  /** Свой профиль? Тогда проверка подписки не нужна. */
+  function isOwnProfile(username) {
+    if (!username) return false;
+    const u = String(username).toLowerCase().replace(/^@/, "");
+    const meName = (DATA.me && DATA.me.username ? String(DATA.me.username) : "")
+      .toLowerCase()
+      .replace(/^@/, "");
+    return !!meName && meName === u;
   }
 
   // ========== UI ==========
@@ -763,6 +774,373 @@
                 white-space: nowrap;
             }
             .dh-update-btn:hover { filter: brightness(1.1); }
+
+            /* ===== Theme picker ===== */
+            .dh-theme-picker { display: flex; gap: 6px; flex-wrap: wrap; }
+            .dh-theme-btn {
+                padding: 5px 10px;
+                border: 1px solid #003C74;
+                border-radius: 3px;
+                background: linear-gradient(to bottom, #F5F4EA 0%, #E5E1D0 45%, #D2CEB8 100%);
+                color: #000;
+                font-size: 11px;
+                font-weight: 700;
+                cursor: pointer;
+                font-family: Tahoma, sans-serif;
+            }
+            .dh-theme-btn.active {
+                background: linear-gradient(to bottom, #6EC27A, #3D8F4A);
+                border-color: #2D6B36;
+                color: #fff;
+            }
+
+            /* ======================= THEME: Windows Vista ======================= */
+            .dh-modal.dh-theme-vista {
+                background: #E8EEF5;
+                border: 1px solid rgba(40, 70, 110, 0.55);
+                border-radius: 10px;
+                box-shadow:
+                    0 12px 40px rgba(0, 0, 0, 0.45),
+                    0 0 0 1px rgba(255, 255, 255, 0.35) inset;
+                font-family: "Segoe UI", Tahoma, sans-serif;
+            }
+            .dh-modal.dh-theme-vista .dh-titlebar {
+                height: 32px;
+                border-radius: 9px 9px 0 0;
+                background:
+                    linear-gradient(to bottom,
+                        rgba(255,255,255,0.45) 0%,
+                        rgba(255,255,255,0.12) 45%,
+                        rgba(120,170,220,0.15) 50%,
+                        rgba(20,50,100,0.35) 100%),
+                    linear-gradient(to right, #1B3A5F 0%, #2E6DA8 45%, #1B3A5F 100%);
+                box-shadow:
+                    inset 0 1px 0 rgba(255,255,255,0.45),
+                    0 1px 2px rgba(0,0,0,0.2);
+            }
+            .dh-modal.dh-theme-vista .dh-titlebar .dh-title-text {
+                font-family: "Segoe UI", sans-serif;
+                font-weight: 600;
+                letter-spacing: 0.3px;
+                text-shadow: 0 1px 2px rgba(0,0,0,0.55);
+            }
+            .dh-modal.dh-theme-vista .dh-titlebar .dh-chip {
+                background: rgba(255,255,255,0.22);
+                border: 1px solid rgba(255,255,255,0.28);
+            }
+            .dh-modal.dh-theme-vista .dh-win-btn {
+                width: 26px;
+                height: 20px;
+                border-radius: 4px;
+                border: 1px solid rgba(255,255,255,0.55);
+                font-family: "Segoe UI", sans-serif;
+                font-size: 12px;
+            }
+            .dh-modal.dh-theme-vista .dh-win-btn.min {
+                background: linear-gradient(to bottom, rgba(220,235,255,0.95), rgba(90,140,200,0.95));
+                color: #fff;
+            }
+            .dh-modal.dh-theme-vista .dh-win-btn.close {
+                background: linear-gradient(to bottom, #F5A08C, #D63A1F);
+            }
+            .dh-modal.dh-theme-vista .dh-body {
+                background: #E8EEF5;
+            }
+            .dh-modal.dh-theme-vista .dh-tabs {
+                background: rgba(255,255,255,0.35);
+                border: 1px solid rgba(255,255,255,0.55);
+                border-radius: 6px;
+                padding: 3px;
+            }
+            .dh-modal.dh-theme-vista .dh-tab {
+                border: 1px solid transparent;
+                border-radius: 4px;
+                background: transparent;
+                color: #27476A;
+                top: 0;
+                font-family: "Segoe UI", sans-serif;
+            }
+            .dh-modal.dh-theme-vista .dh-tab.active {
+                background: linear-gradient(to bottom, #FFFFFF, #DCE8F5);
+                border-color: rgba(90,140,200,0.55);
+                box-shadow: 0 1px 2px rgba(0,0,0,0.12);
+                color: #1B3A5F;
+                top: 0;
+            }
+            .dh-modal.dh-theme-vista .dh-btn {
+                border-radius: 4px;
+                border: 1px solid rgba(70,110,160,0.55);
+                background: linear-gradient(to bottom, #F7FAFD 0%, #DCE8F5 50%, #C2D4E8 100%);
+                font-family: "Segoe UI", sans-serif;
+            }
+            .dh-modal.dh-theme-vista .dh-btn-primary {
+                background: linear-gradient(to bottom, #7EC27E 0%, #3F9A4C 50%, #2F7D3B 100%);
+                border-color: #2A6B33;
+            }
+            .dh-modal.dh-theme-vista .dh-btn-danger {
+                background: linear-gradient(to bottom, #F09A8C 0%, #D64A38 50%, #B93A2A 100%);
+                border-color: #8B2A20;
+            }
+            .dh-modal.dh-theme-vista .dh-card {
+                background: rgba(255,255,255,0.72);
+                border: 1px solid rgba(120,160,210,0.35);
+                border-radius: 6px;
+                box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+            }
+            .dh-modal.dh-theme-vista .dh-input,
+            .dh-modal.dh-theme-vista .dh-num-input {
+                border-radius: 3px;
+                border: 1px solid #7F9DB9;
+                box-shadow: inset 0 1px 2px rgba(0,0,0,0.08);
+            }
+            .dh-modal.dh-theme-vista .dh-footer {
+                background: rgba(232,238,245,0.95);
+                border-top: 1px solid rgba(120,160,210,0.35);
+            }
+            .dh-modal.dh-theme-vista .dh-update-banner {
+                background: linear-gradient(to bottom, #E5F3D8, #C8E4A8);
+                border-radius: 5px;
+            }
+            .dh-modal.dh-theme-vista .dh-theme-btn {
+                border-radius: 4px;
+                border-color: rgba(70,110,160,0.55);
+                background: linear-gradient(to bottom, #F7FAFD 0%, #DCE8F5 50%, #C2D4E8 100%);
+                font-family: "Segoe UI", sans-serif;
+            }
+            .dh-modal.dh-theme-vista .dh-theme-btn.active {
+                background: linear-gradient(to bottom, #7EC27E, #2F7D3B);
+                border-color: #2A6B33;
+            }
+
+            /* ======================= THEME: Windows 95 ======================= */
+            .dh-modal.dh-theme-win95 {
+                background: #C0C0C0;
+                border: 2px solid;
+                border-color: #DFDFDF #000000 #000000 #DFDFDF;
+                border-radius: 0;
+                box-shadow:
+                    2px 2px 0 rgba(0,0,0,0.35),
+                    inset 1px 1px 0 #FFFFFF,
+                    inset -1px -1px 0 #808080;
+                color: #000;
+                font-family: "MS Sans Serif", "Microsoft Sans Serif", Tahoma, sans-serif;
+                font-size: 12px;
+            }
+            .dh-modal.dh-theme-win95 .dh-titlebar {
+                height: 22px;
+                border-radius: 0;
+                padding: 0 2px 0 4px;
+                gap: 4px;
+                background: linear-gradient(to right, #000080, #1084D0);
+                box-shadow: none;
+            }
+            .dh-modal.dh-theme-win95 .dh-titlebar .dh-title-icon { font-size: 13px; }
+            .dh-modal.dh-theme-win95 .dh-titlebar .dh-title-text {
+                font-family: "MS Sans Serif", "Microsoft Sans Serif", Tahoma, sans-serif;
+                font-size: 12px;
+                font-weight: 700;
+                letter-spacing: 0;
+                text-shadow: none;
+            }
+            .dh-modal.dh-theme-win95 .dh-titlebar .dh-chip {
+                background: #C0C0C0;
+                color: #000;
+                border: 1px solid;
+                border-color: #FFF #808080 #808080 #FFF;
+                border-radius: 0;
+                padding: 0 5px;
+                font-size: 10px;
+            }
+            .dh-modal.dh-theme-win95 .dh-win-btns { gap: 2px; }
+            .dh-modal.dh-theme-win95 .dh-win-btn {
+                width: 18px;
+                height: 16px;
+                border-radius: 0;
+                border: 2px solid;
+                border-color: #FFF #000 #000 #FFF;
+                background: #C0C0C0;
+                color: #000;
+                font-size: 11px;
+                font-weight: 700;
+                text-shadow: none;
+                padding: 0;
+                line-height: 1;
+            }
+            .dh-modal.dh-theme-win95 .dh-win-btn.min,
+            .dh-modal.dh-theme-win95 .dh-win-btn.close {
+                background: #C0C0C0;
+                color: #000;
+            }
+            .dh-modal.dh-theme-win95 .dh-win-btn:hover { filter: brightness(1.06); }
+            .dh-modal.dh-theme-win95 .dh-win-btn:active {
+                border-color: #000 #FFF #FFF #000;
+                filter: none;
+            }
+            .dh-modal.dh-theme-win95 .dh-body {
+                background: #C0C0C0;
+            }
+            .dh-modal.dh-theme-win95 .dh-body::-webkit-scrollbar-track {
+                background: #C0C0C0;
+                border-left: 1px solid #808080;
+            }
+            .dh-modal.dh-theme-win95 .dh-body::-webkit-scrollbar-thumb {
+                background: #C0C0C0;
+                border: 2px solid;
+                border-color: #FFF #000 #000 #FFF;
+                border-radius: 0;
+            }
+            .dh-modal.dh-theme-win95 .dh-tabs {
+                background: #C0C0C0;
+                gap: 0;
+                padding: 0;
+                margin-bottom: 8px;
+                border-bottom: 1px solid #808080;
+            }
+            .dh-modal.dh-theme-win95 .dh-tab {
+                border: 2px solid;
+                border-color: #FFF #808080 #C0C0C0 #FFF;
+                border-bottom: none;
+                border-radius: 0;
+                background: #C0C0C0;
+                color: #000;
+                top: 0;
+                padding: 3px 10px;
+                font-family: "MS Sans Serif", "Microsoft Sans Serif", Tahoma, sans-serif;
+                font-size: 11px;
+            }
+            .dh-modal.dh-theme-win95 .dh-tab.active {
+                background: #C0C0C0;
+                color: #000;
+                border-color: #FFF #808080 #C0C0C0 #FFF;
+                box-shadow: none;
+                top: 1px;
+                margin-bottom: -1px;
+                padding-top: 4px;
+            }
+            .dh-modal.dh-theme-win95 .dh-btn {
+                border-radius: 0;
+                border: 2px solid;
+                border-color: #FFF #000 #000 #FFF;
+                background: #C0C0C0;
+                color: #000;
+                box-shadow: none;
+                font-family: "MS Sans Serif", "Microsoft Sans Serif", Tahoma, sans-serif;
+                padding: 4px 10px;
+            }
+            .dh-modal.dh-theme-win95 .dh-btn:active {
+                border-color: #000 #FFF #FFF #000;
+                background: #C0C0C0;
+                box-shadow: none;
+                filter: none;
+            }
+            .dh-modal.dh-theme-win95 .dh-btn-primary {
+                background: #C0C0C0;
+                color: #000;
+                border-color: #FFF #000 #000 #FFF;
+                font-weight: 700;
+                text-shadow: none;
+            }
+            .dh-modal.dh-theme-win95 .dh-btn-danger {
+                background: #C0C0C0;
+                color: #000;
+                border-color: #FFF #000 #000 #FFF;
+                font-weight: 700;
+                text-shadow: none;
+            }
+            .dh-modal.dh-theme-win95 .dh-btn:disabled {
+                color: #808080;
+                background: #C0C0C0;
+                border-color: #FFF #808080 #808080 #FFF;
+                text-shadow: none;
+            }
+            .dh-modal.dh-theme-win95 .dh-card {
+                background: #C0C0C0;
+                border: 2px solid;
+                border-color: #808080 #FFF #FFF #808080;
+                border-radius: 0;
+                box-shadow: none;
+            }
+            .dh-modal.dh-theme-win95 .dh-card-title {
+                color: #000;
+                text-transform: none;
+                letter-spacing: 0;
+                font-family: inherit;
+            }
+            .dh-modal.dh-theme-win95 .dh-muted { color: #444; }
+            .dh-modal.dh-theme-win95 .dh-input,
+            .dh-modal.dh-theme-win95 .dh-num-input {
+                border-radius: 0;
+                border: 2px solid;
+                border-color: #808080 #FFF #FFF #808080;
+                background: #FFF;
+                font-family: "MS Sans Serif", "Microsoft Sans Serif", Tahoma, sans-serif;
+            }
+            .dh-modal.dh-theme-win95 .dh-setting-row {
+                border-bottom: 1px solid #808080;
+            }
+            .dh-modal.dh-theme-win95 .dh-setting-label { color: #000; }
+            .dh-modal.dh-theme-win95 .dh-setting-label small { color: #444; }
+            .dh-modal.dh-theme-win95 .dh-switch {
+                border-radius: 0;
+                border: 2px solid;
+                border-color: #808080 #FFF #FFF #808080;
+                background: #C0C0C0;
+            }
+            .dh-modal.dh-theme-win95 .dh-switch.on {
+                background: #000080;
+                border-color: #808080 #FFF #FFF #808080;
+            }
+            .dh-modal.dh-theme-win95 .dh-switch::after {
+                border-radius: 0;
+                border: 2px solid;
+                border-color: #FFF #000 #000 #FFF;
+                background: #C0C0C0;
+            }
+            .dh-modal.dh-theme-win95 .dh-footer {
+                background: #C0C0C0;
+                border-top: 1px solid #808080;
+            }
+            .dh-modal.dh-theme-win95 .dh-placeholder {
+                background: #C0C0C0;
+                border: 2px solid;
+                border-color: #808080 #FFF #FFF #808080;
+                border-radius: 0;
+                color: #000;
+                font-family: inherit;
+            }
+            .dh-modal.dh-theme-win95 .dh-update-banner {
+                background: #C0C0C0;
+                border: 2px solid;
+                border-color: #FFF #000 #000 #FFF;
+                border-radius: 0;
+                color: #000;
+            }
+            .dh-modal.dh-theme-win95 .dh-update-btn {
+                border-radius: 0;
+                border: 2px solid;
+                border-color: #FFF #000 #000 #FFF;
+                background: #C0C0C0;
+                color: #000;
+                font-family: inherit;
+                font-weight: 700;
+            }
+            .dh-modal.dh-theme-win95 .dh-theme-btn {
+                border-radius: 0;
+                border: 2px solid;
+                border-color: #FFF #000 #000 #FFF;
+                background: #C0C0C0;
+                color: #000;
+                font-family: inherit;
+            }
+            .dh-modal.dh-theme-win95 .dh-theme-btn.active {
+                background: #000080;
+                color: #fff;
+                border-color: #FFF #000 #000 #FFF;
+            }
+            .dh-modal.dh-theme-win95 .dh-status-yes { color: #006000; }
+            .dh-modal.dh-theme-win95 .dh-status-no { color: #800000; }
+            .dh-modal.dh-theme-win95 .dh-status-checking { color: #804000; }
+            .dh-modal.dh-theme-win95 .dh-status-error { color: #804000; }
         `;
     shadow.appendChild(style);
 
@@ -883,6 +1261,17 @@
                 </div>
                 <div class="dh-setting-row">
                     <div class="dh-setting-label">
+                        Тема окна
+                        <small>WinXP / Vista / Win95</small>
+                    </div>
+                    <div class="dh-theme-picker" id="dh-theme-picker">
+                        <button class="dh-theme-btn" data-theme="xp">WinXP</button>
+                        <button class="dh-theme-btn" data-theme="vista">Vista</button>
+                        <button class="dh-theme-btn" data-theme="win95">Win95</button>
+                    </div>
+                </div>
+                <div class="dh-setting-row">
+                    <div class="dh-setting-label">
                         Кеш (минут)
                         <small>Не перезапрашивать API, пока результат свежий</small>
                     </div>
@@ -951,6 +1340,8 @@
       setAuto: modal.querySelector("#dh-set-auto"),
       setBadge: modal.querySelector("#dh-set-badge"),
       setOpen: modal.querySelector("#dh-set-open"),
+      themePicker: modal.querySelector("#dh-theme-picker"),
+      themeBtns: [...modal.querySelectorAll(".dh-theme-btn")],
       setCache: modal.querySelector("#dh-set-cache"),
       clearCache: modal.querySelector("#dh-clear-cache"),
       refreshPage: modal.querySelector("#dh-refresh-page"),
@@ -965,9 +1356,23 @@
     };
 
     bindEvents();
+    applyTheme();
     initDrag();
     applyWinPos();
     initUpdateCheck();
+  }
+
+  // ========== Theme ==========
+  function applyTheme() {
+    if (!els.modal) return;
+    const theme = DATA.settings.theme || "xp";
+    els.modal.classList.remove("dh-theme-xp", "dh-theme-vista", "dh-theme-win95");
+    els.modal.classList.add("dh-theme-" + theme);
+    if (els.themeBtns) {
+      els.themeBtns.forEach((b) => {
+        b.classList.toggle("active", b.dataset.theme === theme);
+      });
+    }
   }
 
   // ========== Toast ==========
@@ -1168,7 +1573,7 @@
   function ensureBadge() {
     if (!DATA.settings.showBadge || !isProfilePage()) return;
     const u = getProfileUsername();
-    if (!u) return;
+    if (!u || isOwnProfile(u)) return;
 
     const existing = document.getElementById(INLINE_BADGE_ID);
     const nameEl = findNameEl(u);
@@ -1261,6 +1666,19 @@
     setBadgeState("checking", `Проверка @${username}…`);
 
     try {
+      // свой профиль — не проверяем
+      const me0 = await getMe();
+      if (me0 && me0.username && isOwnProfile(username)) {
+        hideBadge();
+        setStatus(
+          "idle",
+          "Это твой профиль",
+          "Нельзя быть подписанным на самого себя — проверка не нужна.",
+        );
+        showToast("Это твой профиль");
+        return;
+      }
+
       const cached = getCached(username);
       if (cached && cached.theirId) {
         applyResult(username, cached, { manual });
@@ -1367,6 +1785,15 @@
     if (isProfilePage()) {
       const u = getProfileUsername();
       els.userInput.value = u || "";
+      if (u && isOwnProfile(u)) {
+        hideBadge();
+        setStatus(
+          "idle",
+          "Это твой профиль",
+          "Нельзя быть подписанным на самого себя — проверка не нужна.",
+        );
+        return;
+      }
       if (DATA.settings.autoCheck) {
         runCheck(u);
       } else {
@@ -1402,7 +1829,7 @@
   }
 
   // ========== ПРОВЕРКА ОБНОВЛЕНИЙ ==========
-  const CURRENT_VERSION = "0.2.9";
+  const CURRENT_VERSION = "0.3.0";
   // запасная ссылка установки, если API не дал download_url
   let installUrl =
     "https://raw.githubusercontent.com/Vidrimers/Duolingo-helper/refs/heads/master/duo-helper.user.js";
@@ -1785,6 +2212,16 @@
       });
     }
 
+    if (els.themeBtns && els.themeBtns.length) {
+      els.themeBtns.forEach((btn) => {
+        btn.addEventListener("click", () => {
+          DATA.settings.theme = btn.dataset.theme || "xp";
+          saveData();
+          applyTheme();
+        });
+      });
+    }
+
     els.setCache.addEventListener("change", () => {
       const v = Math.max(1, Math.min(1440, parseInt(els.setCache.value, 10) || 30));
       DATA.settings.cacheMinutes = v;
@@ -1884,7 +2321,14 @@
     if (isProfilePage()) {
       const u = getProfileUsername();
       if (u) els.userInput.value = u;
-      if (DATA.settings.autoCheck) {
+      if (u && isOwnProfile(u)) {
+        hideBadge();
+        setStatus(
+          "idle",
+          "Это твой профиль",
+          "Нельзя быть подписанным на самого себя — проверка не нужна.",
+        );
+      } else if (DATA.settings.autoCheck) {
         // небольшая задержка — дать странице прогрузиться
         setTimeout(() => runCheck(u), 600);
       }
