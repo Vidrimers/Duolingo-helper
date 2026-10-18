@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Duolingo Helper
 // @namespace    https://github.com/Vidrimers/Duolingo-helper
-// @version      0.4.2
+// @version      0.5.0
 // @description  Проверка взаимной подписки на профилях Duolingo. Панель, бейджи, кеш.
 // @author       Vidrimers
 // @match        *://*.duolingo.com/*
@@ -10,6 +10,7 @@
 // @grant        GM_addStyle
 // @grant        GM_listValues
 // @grant        GM_xmlhttpRequest
+// @grant        unsafeWindow
 // @connect      raw.githubusercontent.com
 // @connect      cdn.jsdelivr.net
 // @connect      api.github.com
@@ -47,6 +48,8 @@
         openOnStart: false, // открывать панель при загрузке сайта
         theme: "xp", // xp | vista | win95
         protectHearts: true, // блокировать списание сердец
+        lessonShortener: true, // укорачивать урок до 1-2 заданий
+        autoSolver: true, // автосолвер в уроках
       },
       // username -> { followsMe: true/false, checkedAt: ts, theirId, theirName }
       followCache: {},
@@ -1246,6 +1249,28 @@
                 </div>
 
                 <div class="dh-card">
+                    <div class="dh-card-title">⚠️ Уроки — на свой страх и риск</div>
+                    <div class="dh-setting-row" style="border-bottom:none;padding:4px 0">
+                        <div class="dh-setting-label">
+                            Короткие уроки
+                            <small>Вместо полного урока 1–2 простых задания</small>
+                        </div>
+                        <div class="dh-switch" id="dh-set-short"></div>
+                    </div>
+                    <div class="dh-setting-row" style="border-bottom:none;padding:4px 0">
+                        <div class="dh-setting-label">
+                            Автосолвер
+                            <small>Сам подставляет ответы в уроках</small>
+                        </div>
+                        <div class="dh-switch" id="dh-set-solver"></div>
+                    </div>
+                    <div class="dh-row" style="margin-top:6px">
+                        <button class="dh-btn dh-btn-primary" id="dh-solve-now">Решить сейчас</button>
+                    </div>
+                    <div class="dh-muted" id="dh-lesson-status" style="margin-top:6px">Готово</div>
+                </div>
+
+                <div class="dh-card">
                     <div class="dh-card-title">⚠️ Квесты — на свой страх и риск</div>
                     <div class="dh-muted" style="margin-bottom:8px">
                         Инъекция прогресса в daily/monthly квесты. Формально нарушает правила Duolingo — возможна блокировка.
@@ -1398,6 +1423,10 @@
       themeBtns: [...modal.querySelectorAll(".dh-theme-btn")],
       setHearts: modal.querySelector("#dh-set-hearts"),
       heartsStatus: modal.querySelector("#dh-hearts-status"),
+      setShort: modal.querySelector("#dh-set-short"),
+      setSolver: modal.querySelector("#dh-set-solver"),
+      solveNow: modal.querySelector("#dh-solve-now"),
+      lessonStatus: modal.querySelector("#dh-lesson-status"),
       questDaily: modal.querySelector("#dh-quest-daily"),
       questLoad: modal.querySelector("#dh-quest-load"),
       questClaimAll: modal.querySelector("#dh-quest-claim-all"),
@@ -1461,6 +1490,240 @@
         ? "включена — сердца не списываются"
         : "выключена — списание как обычно";
     }
+  }
+
+  // ========== Уроки: shortener + aut solver ==========
+  // ⚠️ Читы, на свой страх и риск.
+  const LESSON_LS_SHORT = "dh_lesson_short";
+  const LESSON_LS_SOLVER = "dh_lesson_solver";
+
+  function syncLessonFlags() {
+    const shortOn = !!DATA.settings.lessonShortener;
+    const solveOn = !!DATA.settings.autoSolver;
+    try {
+      localStorage.setItem(LESSON_LS_SHORT, shortOn ? "true" : "false");
+      localStorage.setItem(LESSON_LS_SOLVER, solveOn ? "true" : "false");
+    } catch {}
+    if (els.setShort) els.setShort.classList.toggle("on", shortOn);
+    if (els.setSolver) els.setSolver.classList.toggle("on", solveOn);
+    if (els.lessonStatus) {
+      els.lessonStatus.textContent =
+        "короткие уроки: " +
+        (shortOn ? "вкл" : "выкл") +
+        " · автосолвер: " +
+        (solveOn ? "вкл" : "выкл");
+    }
+  }
+
+  function setLessonStatus(t) {
+    if (els.lessonStatus) els.lessonStatus.textContent = t;
+  }
+
+  function installLessonTools() {
+    if (document.getElementById("dh-lesson-hook")) return;
+    const s = document.createElement("script");
+    s.id = "dh-lesson-hook";
+    s.textContent = `(function() {
+      if (window.__dhLessonHooked) return;
+      window.__dhLessonHooked = true;
+
+      var SHORT_KEY = ${JSON.stringify(LESSON_LS_SHORT)};
+      var SOLVER_KEY = ${JSON.stringify(LESSON_LS_SOLVER)};
+
+      function flag(k) {
+        try { return localStorage.getItem(k) === 'true'; } catch (e) { return false; }
+      }
+
+      // ===== Lesson Shortener: подмена challenges в POST /sessions =====
+      function trivialChallenge(n) {
+        return {
+          type: 'assist',
+          id: 'dh_short',
+          prompt: 'Lesson Shortener',
+          correctIndex: 0,
+          choices: ['OK'],
+          options: [{ text: 'OK' }],
+          newWords: [],
+          progressUpdates: [],
+          canBeSkipped: true,
+          metadata: { type: 'assist', specific_type: 'assist' }
+        };
+      }
+      function shortenLessonData(data) {
+        try {
+          var n = (data && data.type && data.type.indexOf('LEGENDARY') === 0) ? 2 : 1;
+          data.challenges = Array.from({ length: n }, function(_, i) { return trivialChallenge(i); });
+          if (data.adaptiveChallenges) data.adaptiveChallenges = [];
+          if (data.adaptiveInterleavedChallenges) {
+            data.adaptiveInterleavedChallenges = { challenges: [], speakOrListenReplacementIndices: [] };
+          }
+        } catch (e) {}
+        return data;
+      }
+
+      var origFetch = window.fetch;
+      window.fetch = function(resource, options) {
+        var url = resource instanceof Request ? resource.url : String(resource || '');
+        var method = options && options.method ? options.method : (resource instanceof Request ? resource.method : 'GET');
+        method = String(method || 'GET').toUpperCase();
+        var isSessionCreate =
+          method === 'POST' &&
+          (url.indexOf('/2023-05-23/sessions') !== -1 || url.indexOf('/2017-06-30/sessions') !== -1);
+
+        if (isSessionCreate && flag(SHORT_KEY)) {
+          return origFetch.apply(this, arguments).then(function(res) {
+            return res.clone().json().then(function(data) {
+              return new Response(JSON.stringify(shortenLessonData(data)), {
+                status: res.status,
+                statusText: res.statusText,
+                headers: { 'content-type': 'application/json' }
+              });
+            }).catch(function() { return res; });
+          });
+        }
+        return origFetch.apply(this, arguments);
+      };
+      window.fetch.__dhLesson = true;
+
+      // ===== Auto Solver =====
+      function findFiber(el) {
+        if (!el) return null;
+        for (var key in el) {
+          if (key.indexOf('__reactFiber$') === 0 || key.indexOf('__reactInternalInstance$') === 0) {
+            var fiber = el[key];
+            var hops = 0;
+            while (fiber && hops < 80) {
+              var props = fiber.memoizedProps || fiber.pendingProps;
+              if (props && props.currentChallenge) return props.currentChallenge;
+              fiber = fiber.return;
+              hops++;
+            }
+          }
+        }
+        return null;
+      }
+
+      function findChallengeRoot() {
+        return document.querySelector('[data-test="challenge"]') ||
+          document.querySelector('[data-test="challenge-choice"]') &&
+            document.querySelector('[data-test="challenge-choice"]').closest('div[class]') ||
+          document.querySelector('main');
+      }
+
+      function getSol() {
+        var root = findChallengeRoot();
+        return findFiber(root);
+      }
+
+      function clickText(txt) {
+        if (!txt) return false;
+        var t = String(txt).trim().toLowerCase();
+        var nodes = document.querySelectorAll('[data-test="challenge-choice"], [role="button"], button, span');
+        for (var i = 0; i < nodes.length; i++) {
+          var n = nodes[i];
+          var v = (n.textContent || '').trim().toLowerCase();
+          if (v === t) { n.click(); return true; }
+        }
+        return false;
+      }
+
+      function typeInto(el, value) {
+        if (!el) return false;
+        try {
+          el.focus();
+          var proto = Object.getPrototypeOf(el);
+          var setter = Object.getOwnPropertyDescriptor(proto, 'value');
+          if (setter && setter.set) setter.set.call(el, value);
+          else el.value = value;
+          el.dispatchEvent(new Event('input', { bubbles: true }));
+          el.dispatchEvent(new Event('change', { bubbles: true }));
+          return true;
+        } catch (e) { return false; }
+      }
+
+      function solveOnce() {
+        if (!flag(SOLVER_KEY) && !window.__dhSolveForce) return false;
+        var sol = getSol();
+        if (!sol) return false;
+
+        // choice
+        if (typeof sol.correctIndex === 'number' && sol.choices && sol.choices[sol.correctIndex] != null) {
+          if (clickText(sol.choices[sol.correctIndex])) return true;
+          var btns = document.querySelectorAll('[data-test="challenge-choice"]');
+          if (btns[sol.correctIndex]) { btns[sol.correctIndex].click(); return true; }
+        }
+
+        // translate / write
+        if (sol.correctSolutions && sol.correctSolutions[0]) {
+          var input = document.querySelector('[data-test="challenge-translate-input"]') ||
+            document.querySelector('textarea') ||
+            document.querySelector('input[type="text"]');
+          if (input) return typeInto(input, sol.correctSolutions[0]);
+          return clickText(sol.correctSolutions[0]);
+        }
+
+        // match pairs
+        if (sol.pairs && sol.pairs.length) {
+          for (var p = 0; p < sol.pairs.length; p++) {
+            clickText(sol.pairs[p][0] != null ? sol.pairs[p][0] : sol.pairs[p].from);
+            clickText(sol.pairs[p][1] != null ? sol.pairs[p][1] : sol.pairs[p].to);
+          }
+          return true;
+        }
+
+        // tap tokens
+        if (sol.correctTokens && sol.correctTokens.length) {
+          for (var i = 0; i < sol.correctTokens.length; i++) {
+            clickText(sol.correctTokens[i]);
+          }
+          return true;
+        }
+
+        // listen choice fallback
+        if (typeof sol.correctIndex === 'number') {
+          var choices = document.querySelectorAll('[data-test="challenge-choice"]');
+          if (choices[sol.correctIndex]) { choices[sol.correctIndex].click(); return true; }
+        }
+        return false;
+      }
+
+      window.__dhSolveOnce = function(force) {
+        window.__dhSolveForce = !!force;
+        try { return solveOnce(); } finally { window.__dhSolveForce = false; }
+      };
+
+      // фоновый цикл, пока включён автосолвер
+      setInterval(function() {
+        if (!flag(SOLVER_KEY)) return;
+        if (!location.pathname.startsWith('/lesson') && !location.pathname.startsWith('/practice')) return;
+        try { solveOnce(); } catch (e) {}
+      }, 700);
+
+      document.addEventListener('dh-solve-now', function() {
+        try { window.__dhSolveOnce(true); } catch (e) {}
+      });
+    })();`;
+    (document.documentElement || document.body).appendChild(s);
+    s.remove();
+    syncLessonFlags();
+  }
+
+  function solveNow() {
+    // вызов в page-context
+    try {
+      const s = document.createElement("script");
+      s.textContent = "try { window.__dhSolveOnce && window.__dhSolveOnce(true); } catch(e){}";
+      document.documentElement.appendChild(s);
+      s.remove();
+    } catch {}
+    // и напрямую, если видим page window
+    try {
+      if (typeof unsafeWindow !== "undefined" && unsafeWindow.__dhSolveOnce) {
+        unsafeWindow.__dhSolveOnce(true);
+      }
+    } catch {}
+    setLessonStatus("Отправлен solve…");
+    showToast("Автосолвер: пробую решить");
   }
 
   function installHeartsHook() {
@@ -3360,6 +3623,34 @@
       });
     }
 
+    if (els.setShort) {
+      els.setShort.addEventListener("click", () => {
+        DATA.settings.lessonShortener = !DATA.settings.lessonShortener;
+        saveData();
+        syncLessonFlags();
+        showToast(
+          DATA.settings.lessonShortener
+            ? "Короткие уроки включены"
+            : "Короткие уроки выключены",
+        );
+      });
+    }
+    if (els.setSolver) {
+      els.setSolver.addEventListener("click", () => {
+        DATA.settings.autoSolver = !DATA.settings.autoSolver;
+        saveData();
+        syncLessonFlags();
+        showToast(
+          DATA.settings.autoSolver
+            ? "Автосолвер включён"
+            : "Автосолвер выключен",
+        );
+      });
+    }
+    if (els.solveNow) {
+      els.solveNow.addEventListener("click", () => solveNow());
+    }
+
     if (els.questDaily) {
       els.questDaily.addEventListener("click", () => runDailyQuests());
     }
@@ -3465,6 +3756,8 @@
     hookHistory();
     installHeartsHook();
     syncHeartsFlag();
+    installLessonTools();
+    syncLessonFlags();
     watchHeartsUi();
 
     // открыть панель сразу, если включено в настройках
