@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Duolingo Helper
 // @namespace    https://github.com/Vidrimers/Duolingo-helper
-// @version      0.2.4
+// @version      0.2.5
 // @description  Проверка взаимной подписки на профилях Duolingo. Панель, бейджи, кеш.
 // @author       Vidrimers
 // @match        *://*.duolingo.com/*
@@ -844,7 +844,8 @@
 
                 <div class="dh-row">
                     <button class="dh-btn dh-btn-ghost" id="dh-recheck-btn">🔄 Перепроверить</button>
-                    <button class="dh-btn dh-btn-ghost" id="dh-copy-btn">📋 Копировать результат</button>
+                    <button class="dh-btn dh-btn-ghost" id="dh-copy-btn">📋 Копировать</button>
+                    <button class="dh-btn dh-btn-ghost" id="dh-refresh-page">🔄 Обновить</button>
                 </div>
             </div>
 
@@ -901,20 +902,24 @@
                     </div>
                     <button class="dh-btn" id="dh-reset-pos" style="padding:5px 10px;font-size:11px">Сброс</button>
                 </div>
-                <div class="dh-setting-row" style="border-bottom:none">
+                <div class="dh-setting-row">
                     <div class="dh-setting-label">
                         Очистить кеш
                         <small>Удалить сохранённые результаты проверок</small>
                     </div>
                     <button class="dh-btn dh-btn-danger" id="dh-clear-cache" style="padding:5px 10px;font-size:11px">Очистить</button>
                 </div>
+                <div class="dh-setting-row" style="border-bottom:none">
+                    <div class="dh-setting-label">
+                        Данные
+                        <small>Экспорт / импорт локальных данных скрипта</small>
+                    </div>
+                    <div class="dh-row" style="gap:6px">
+                        <button class="dh-btn" id="dh-export" style="padding:5px 10px;font-size:11px">📥 Экспорт</button>
+                        <button class="dh-btn" id="dh-import" style="padding:5px 10px;font-size:11px">📤 Импорт</button>
+                    </div>
+                </div>
             </div>
-        </div>
-
-        <div class="dh-footer">
-            <button class="dh-btn dh-btn-ghost" id="dh-refresh-page">🔄 Обновить страницу</button>
-            <button class="dh-btn dh-btn-ghost" id="dh-export">📥 Экспорт JSON</button>
-            <button class="dh-btn dh-btn-ghost" id="dh-import">📤 Импорт JSON</button>
         </div>
         <input type="file" id="dh-import-file" accept="application/json,.json" style="display:none" />
     `;
@@ -979,7 +984,67 @@
     }, 2800);
   }
 
-  // ========== Badge (fixed on screen, anchored to username) ==========
+  // ========== Badge (inline, glued to the username element) ==========
+  const INLINE_BADGE_ID = "dh-inline-badge";
+  const INLINE_STYLE_ID = "dh-inline-style";
+
+  function ensureInlineStyle() {
+    if (document.getElementById(INLINE_STYLE_ID)) return;
+    const st = document.createElement("style");
+    st.id = INLINE_STYLE_ID;
+    st.textContent = `
+      #${INLINE_BADGE_ID} {
+        display: inline-flex !important;
+        align-items: center !important;
+        gap: 5px !important;
+        vertical-align: middle !important;
+        margin-left: 8px !important;
+        padding: 2px 9px !important;
+        border-radius: 999px !important;
+        font: 700 11px/1.3 Tahoma, "Segoe UI", sans-serif !important;
+        cursor: pointer !important;
+        border: 1px solid rgba(0,0,0,0.12) !important;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.12) !important;
+        white-space: nowrap !important;
+        max-width: 220px !important;
+        position: static !important;
+        box-sizing: border-box !important;
+        text-transform: none !important;
+        letter-spacing: normal !important;
+      }
+      #${INLINE_BADGE_ID}:hover { filter: brightness(1.06); }
+      #${INLINE_BADGE_ID}.yes {
+        background: linear-gradient(to bottom, #6EC27A, #3D8F4A) !important;
+        color: #fff !important;
+        border-color: #2D6B36 !important;
+      }
+      #${INLINE_BADGE_ID}.no {
+        background: linear-gradient(to bottom, #E9847A, #D6483A) !important;
+        color: #fff !important;
+        border-color: #8B2A20 !important;
+      }
+      #${INLINE_BADGE_ID}.checking {
+        background: linear-gradient(to bottom, #E8E4D4, #C8C4A8) !important;
+        color: #333 !important;
+        border-color: #919B9C !important;
+      }
+      #${INLINE_BADGE_ID}.error {
+        background: linear-gradient(to bottom, #F0C48A, #D08A2A) !important;
+        color: #fff !important;
+        border-color: #A06A1A !important;
+      }
+      #${INLINE_BADGE_ID} .dh-inline-icon {
+        font-size: 12px !important;
+        line-height: 1 !important;
+        font-style: normal !important;
+      }
+      #${INLINE_BADGE_ID} .dh-inline-text {
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+      }
+    `;
+    (document.head || document.documentElement).appendChild(st);
+  }
 
   /** Ищем в DOM элемент с именем пользователя (то, что в URL профиля). */
   function findNameEl(username) {
@@ -997,7 +1062,10 @@
     let node;
     while ((node = walk.nextNode())) {
       if (skip.has(node.tagName)) continue;
-      if (node.closest && node.closest("#" + HOST_ID)) continue;
+      if (node.id === INLINE_BADGE_ID) continue;
+      if (node.closest && (node.closest("#" + HOST_ID) || node.closest("#" + INLINE_BADGE_ID))) {
+        continue;
+      }
       if (node.childElementCount > 3) continue;
       if (!isMatch(node.textContent)) continue;
 
@@ -1019,32 +1087,50 @@
     return candidates[0].el;
   }
 
+  function removeInlineBadge() {
+    const old = document.getElementById(INLINE_BADGE_ID);
+    if (old) old.remove();
+  }
+
   /**
-   * Ставит fixed-плашку рядом с именем на экране.
-   * Не привязана к скроллу — координаты берём один раз при показе.
+   * Вставляет плашку прямо в DOM рядом с именем.
+   * Она живёт в вёрстке профиля — едет вместе с именем, как его часть.
    */
-  function positionBadgeNearName() {
-    if (!els.badge) return false;
-    const uname = getProfileUsername();
-    const nameEl = findNameEl(uname);
-    if (!nameEl) return false;
+  function mountInlineBadge(username, state, title) {
+    ensureInlineStyle();
+    const nameEl = findNameEl(username);
+    if (!nameEl || !nameEl.parentNode) return false;
 
-    const r = nameEl.getBoundingClientRect();
-    const bw = els.badge.offsetWidth || 180;
-    const bh = els.badge.offsetHeight || 40;
+    // уже стоит рядом с нужным именем — только обновляем контент
+    let badge = document.getElementById(INLINE_BADGE_ID);
+    if (badge && badge.dataset.for === String(username).toLowerCase()) {
+      // ok
+    } else {
+      removeInlineBadge();
+      badge = document.createElement("span");
+      badge.id = INLINE_BADGE_ID;
+      badge.dataset.for = String(username).toLowerCase();
+      badge.innerHTML =
+        `<span class="dh-inline-icon"></span><span class="dh-inline-text"></span>`;
+      // сразу после элемента имени
+      nameEl.insertAdjacentElement("afterend", badge);
+    }
 
-    // справа от имени, по центру; если не влезает — слева
-    let x = r.right + 10;
-    if (x + bw > window.innerWidth - 12) x = r.left - bw - 10;
-    if (x < 8) x = 8;
+    badge.className = state;
+    badge.title = "Duolingo Helper — нажми, чтобы открыть панель";
+    badge.querySelector(".dh-inline-icon").textContent =
+      state === "yes" ? "✅" : state === "no" ? "❌" : state === "checking" ? "⏳" : "⚠️";
+    badge.querySelector(".dh-inline-text").textContent = title;
 
-    let y = r.top + r.height / 2 - bh / 2;
-    if (y < 8) y = 8;
-    if (y + bh > window.innerHeight - 8) y = Math.max(8, window.innerHeight - bh - 8);
-
-    els.badge.style.left = Math.round(x) + "px";
-    els.badge.style.top = Math.round(y) + "px";
-    els.badge.style.right = "auto";
+    if (!badge.dataset.bound) {
+      badge.dataset.bound = "1";
+      badge.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (els.modal) els.modal.classList.add("open");
+        if (typeof refreshMeInfo === "function") refreshMeInfo();
+      });
+    }
     return true;
   }
 
@@ -1053,42 +1139,57 @@
   function setBadge(state, title, sub) {
     const s = DATA.settings;
     if (!s.showBadge || !isProfilePage()) {
+      removeInlineBadge();
       if (els.badge) els.badge.classList.remove("visible");
       return;
     }
-    if (!els.badge) return;
 
     const uname = getProfileUsername();
     lastBadge = { state, title, sub, username: uname };
 
+    const inlined = mountInlineBadge(uname, state, title);
+    if (inlined) {
+      // плашка в вёрстке — угловой слой скрываем
+      if (els.badge) els.badge.classList.remove("visible");
+      return;
+    }
+
+    // имя ещё не найдено — временный fallback в углу
+    removeInlineBadge();
+    if (!els.badge) return;
     els.badge.className = "dh-badge visible " + state;
     els.badgeIcon.textContent =
       state === "yes" ? "✅" : state === "no" ? "❌" : state === "checking" ? "⏳" : "⚠️";
     els.badgeText.textContent = title;
     els.badgeSub.textContent = sub || "нажми, чтобы открыть панель";
-
-    // если имя уже на экране — садимся рядом; иначе остаёмся в дефолт-позиции
-    delete els.badge.dataset.anchored;
-    if (positionBadgeNearName()) els.badge.dataset.anchored = "1";
   }
 
-  /** Если SPA перерисовала профиль или имя появилось позже — вернуть плашку. */
+  /** SPA может убрать/перерисовать шапку — вернуть плашку к имени. */
   function ensureBadge() {
     if (!DATA.settings.showBadge || !isProfilePage()) return;
     const u = getProfileUsername();
     if (!u) return;
 
-    // имя ещё не в DOM — ничего не делаем, подождём мутации
+    const existing = document.getElementById(INLINE_BADGE_ID);
     const nameEl = findNameEl(u);
 
-    if (els.badge && els.badge.classList.contains("visible")) {
-      // плашка есть, но её место ещё не привязали к имени
-      if (nameEl && !els.badge.dataset.anchored) {
-        positionBadgeNearName();
-        els.badge.dataset.anchored = "1";
+    if (existing && nameEl) {
+      // если имя перерисовали и плашка осталась не рядом — вставляем заново
+      const isNextToName =
+        nameEl.nextElementSibling === existing ||
+        nameEl.parentNode === existing.parentNode;
+      if (!isNextToName) {
+        existing.remove();
+        const cached = getCached(u);
+        if (cached && cached.theirId !== undefined) applyResult(u, cached);
+        else if (lastBadge && lastBadge.username === u) {
+          setBadge(lastBadge.state, lastBadge.title, lastBadge.sub);
+        }
       }
       return;
     }
+
+    if (existing) return; // есть плашка, имя пока не нашли — не трогаем
 
     const cached = getCached(u);
     if (cached && cached.theirId !== undefined) {
@@ -1101,10 +1202,8 @@
   }
 
   function hideBadge() {
-    if (els.badge) {
-      els.badge.classList.remove("visible");
-      delete els.badge.dataset.anchored;
-    }
+    removeInlineBadge();
+    if (els.badge) els.badge.classList.remove("visible");
   }
 
   // ========== Status card ==========
@@ -1302,7 +1401,7 @@
   }
 
   // ========== ПРОВЕРКА ОБНОВЛЕНИЙ ==========
-  const CURRENT_VERSION = "0.2.4";
+  const CURRENT_VERSION = "0.2.5";
   // install/update link — открывается в Tampermonkey (jsDelivr отдаёт свежее, чем raw CDN)
   const INSTALL_URL =
     "https://cdn.jsdelivr.net/gh/Vidrimers/Duolingo-helper@master/duo-helper.user.js";
