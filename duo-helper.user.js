@@ -1466,6 +1466,7 @@
                 <div class="dh-row" id="dh-inactive-tools" style="display:none;margin:0 0 8px">
                     <button class="dh-btn dh-btn-primary" id="dh-scan-activity" style="padding:5px 10px;font-size:11px">Проверить активность</button>
                     <button class="dh-btn" id="dh-scan-stop" style="padding:5px 10px;font-size:11px">Стоп</button>
+                    <button class="dh-btn dh-btn-danger" id="dh-unfollow-inactive" style="padding:5px 10px;font-size:11px">Отписаться от неактивных</button>
                 </div>
                 <div class="dh-muted dh-op-status" id="dh-friends-status"></div>
                 <div id="dh-friends-list" style="display:flex;flex-direction:column;gap:4px;max-height:52vh;overflow-y:auto"></div>
@@ -1833,6 +1834,7 @@
       scanActivity: modal.querySelector("#dh-scan-activity"),
       scanStop: modal.querySelector("#dh-scan-stop"),
       inactiveTools: modal.querySelector("#dh-inactive-tools"),
+      unfollowInactive: modal.querySelector("#dh-unfollow-inactive"),
       clearCache: modal.querySelector("#dh-clear-cache"),
       refreshPage: modal.querySelector("#dh-refresh-page"),
       exportBtn: modal.querySelector("#dh-export"),
@@ -4394,6 +4396,54 @@
     showToast("✓ Отписка завершена: " + ok);
   }
 
+  /** Отписка от неактивных среди моих подписок (не подписчиков). */
+  async function massUnfollowInactive() {
+    const rows = (friendsCache && friendsCache.rows) || [];
+    const daysLimit = DATA.settings.inactiveDays || 3;
+    const targets = rows.filter(
+      (r) => r.inactive === true || (r.inactiveDays || 0) >= daysLimit,
+    );
+    if (!targets.length) {
+      showToast("Сначала проверь активность");
+      return;
+    }
+    const okGo = await showConfirm(
+      `Отписаться от ${targets.length} неактивных подписок (порог ${daysLimit} дн.)?`,
+      "Отписка от неактивных",
+    );
+    if (!okGo) return;
+
+    const delay = Math.max(0, DATA.settings.requestDelay || 350);
+    const ids = [];
+    let ok = 0;
+    for (let i = 0; i < targets.length; i++) {
+      setFriendsStatus(`Отписка от неактивных ${i + 1}/${targets.length}…`);
+      const success = await unfollowUser(targets[i].userId);
+      if (success) {
+        ok++;
+        ids.push(targets[i].userId);
+      }
+      if (delay) await new Promise((r) => setTimeout(r, delay));
+    }
+    logAction({
+      type: "unfollow_mass",
+      ids,
+      name: `отписка от ${ok} неактивных`,
+    });
+    if (friendsCache) {
+      const idSet = new Set(ids.map(String));
+      friendsCache.rows = friendsCache.rows.filter((r) => !idSet.has(String(r.userId)));
+      if (friendsCache.scanUsers) {
+        friendsCache.scanUsers = friendsCache.scanUsers.map((u) =>
+          idSet.has(String(u.userId)) ? { ...u, iFollow: false } : u,
+        );
+      }
+    }
+    renderFriends();
+    setFriendsStatus(`Отписался от неактивных: ${ok} / ${targets.length}`);
+    showToast("✓ Отписка от неактивных: " + ok);
+  }
+
   function friendsCountLabel(shown) {
     const cache = friendsCache || {};
     const following = cache.followingCount != null ? cache.followingCount : (cache.rows || []).length;
@@ -4554,7 +4604,9 @@
         scanUsers,
         followingCount: following.length,
         followersCount: followers.length,
+        scannedAt: null,
       };
+      syncUnfollowInactiveButton();
       diffFriendSnapshots(following, followers);
       updateChangesBadge();
       renderFriends();
@@ -4567,6 +4619,12 @@
   }
 
   let scanRunning = false;
+
+  function syncUnfollowInactiveButton() {
+    if (!els.unfollowInactive) return;
+    const scanned = !!(friendsCache && friendsCache.scannedAt);
+    els.unfollowInactive.disabled = !scanned;
+  }
 
   /** Опрашивает друзей и помечает неактивных. */
   async function scanFriendActivity() {
@@ -4644,6 +4702,7 @@
       friendsCache.scanUsers = targets;
       friendsCache.scannedAt = Date.now();
     }
+    syncUnfollowInactiveButton();
     renderFriends();
     const dead = targets.filter((r) => r.inactive).length;
     setFriendsStatus(
@@ -5978,6 +6037,9 @@
 
     if (els.unfollowAll) {
       els.unfollowAll.addEventListener("click", () => massUnfollowNonFollowers());
+    if (els.unfollowInactive) {
+      els.unfollowInactive.addEventListener("click", () => massUnfollowInactive());
+    }
     }
     if (els.historyOpen) {
       els.historyOpen.addEventListener("click", () => showHistoryView());
