@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Duolingo Helper
 // @namespace    https://github.com/Vidrimers/Duolingo-helper
-// @version      0.5.1
+// @version      0.5.2
 // @description  Проверка взаимной подписки на профилях Duolingo. Панель, бейджи, кеш.
 // @author       Vidrimers
 // @match        *://*.duolingo.com/*
@@ -1310,9 +1310,22 @@
                     <div class="dh-muted" id="dh-gems-status">Баланс: —</div>
                 </div>
 
+                <div class="dh-card">
+                    <div class="dh-card-title">⚠️ Streak — на свой страх и риск</div>
+                    <div class="dh-muted" style="margin-bottom:8px">
+                        Восстановление/накрутка дней серии через подмену дат в sessions. Нарушает правила Duolingo.
+                    </div>
+                    <div class="dh-row" style="margin-bottom:6px">
+                        <input class="dh-num-input" id="dh-streak-days" type="number" min="1" max="365" value="7" style="width:64px" />
+                        <button class="dh-btn dh-btn-primary" id="dh-streak-run">Накрутить дни</button>
+                        <button class="dh-btn" id="dh-streak-stop">Стоп</button>
+                    </div>
+                    <div class="dh-muted" id="dh-streak-status">Готово</div>
+                </div>
+
                 <div class="dh-placeholder">
-                    🔜 Дальше: streak, авторешение уроков,<br/>
-                    XP / league, Free Max, аккаунты
+                    🔜 Дальше: league, Free Max,<br/>
+                    аккаунты, privacy
                 </div>
             </div>
 
@@ -1440,6 +1453,10 @@
       gemsFarm: modal.querySelector("#dh-gems-farm"),
       gemsStop: modal.querySelector("#dh-gems-stop"),
       gemsStatus: modal.querySelector("#dh-gems-status"),
+      streakDays: modal.querySelector("#dh-streak-days"),
+      streakRun: modal.querySelector("#dh-streak-run"),
+      streakStop: modal.querySelector("#dh-streak-stop"),
+      streakStatus: modal.querySelector("#dh-streak-status"),
       setCache: modal.querySelector("#dh-set-cache"),
       clearCache: modal.querySelector("#dh-clear-cache"),
       refreshPage: modal.querySelector("#dh-refresh-page"),
@@ -3136,6 +3153,195 @@
     showToast("Фарм гемов остановлен");
   }
 
+  // ========== Streak ==========
+  // ⚠️ Накрутка дней серии — чит, на свой страх и риск.
+  let streakRunning = false;
+
+  function setStreakStatus(t) {
+    if (els.streakStatus) els.streakStatus.textContent = t;
+  }
+
+  const CHALLENGE_TYPES = [
+    "assist","characterIntro","characterMatch","characterPuzzle","characterSelect",
+    "characterTrace","characterWrite","completeReverseTranslation","definition",
+    "dialogue","extendedMatch","extendedListenMatch","form","freeResponse","gapFill",
+    "judge","listen","listenComplete","listenMatch","match","name","listenComprehension",
+    "listenIsolation","listenSpeak","listenTap","orderTapComplete","partialListen",
+    "partialReverseTranslate","patternTapComplete","radioBinary","radioImageSelect",
+    "radioListenMatch","radioListenRecognize","radioSelect","readComprehension",
+    "reverseAssist","sameDifferent","select","selectPronunciation","selectTranscription",
+    "svgPuzzle","syllableTap","syllableListenTap","speak","tapCloze","tapClozeTable",
+    "tapComplete","tapCompleteTable","tapDescribe","translate","transliterate",
+    "transliterationAssist","typeCloze","typeClozeTable","typeComplete","typeCompleteTable",
+    "writeComprehension",
+  ];
+
+  function tzParts(timeZone, date) {
+    const dtf = new Intl.DateTimeFormat("en-US", {
+      timeZone,
+      hourCycle: "h23",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    });
+    const out = {};
+    dtf.formatToParts(date).forEach((p) => {
+      if (p.type !== "literal") out[p.type] = p.value;
+    });
+    return out;
+  }
+
+  function wallClockToSeconds(timeZone, year, month, day, hour, minute, second) {
+    const guess = Date.UTC(year, month - 1, day, hour, minute, second);
+    const parts = tzParts(timeZone, new Date(guess));
+    const localAsUtc = Date.UTC(
+      +parts.year,
+      +parts.month - 1,
+      +parts.day,
+      +parts.hour,
+      +parts.minute,
+      +parts.second,
+    );
+    return Math.floor((guess - (localAsUtc - guess)) / 1000);
+  }
+
+  async function getUserStreakInfo() {
+    const myId = getMyId();
+    if (!myId) throw new Error("Не выполнен вход");
+    const u = await apiGet(
+      `${API.users}/${myId}?fields=timezone,streakData,fromLanguage,learningLanguage`,
+    );
+    return {
+      myId,
+      timezone: u.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone,
+      startDate:
+        u.streakData && u.streakData.currentStreak
+          ? u.streakData.currentStreak.startDate
+          : null,
+      fromLanguage: u.fromLanguage || "en",
+      learningLanguage: u.learningLanguage || "en",
+    };
+  }
+
+  function sessionRequest(method, url, payload) {
+    return new Promise((resolve) => {
+      GM_xmlhttpRequest({
+        method,
+        url,
+        headers: {
+          "Content-Type": "application/json",
+          accept: "application/json",
+          authorization: "Bearer " + (getToken() || ""),
+        },
+        data: payload ? JSON.stringify(payload) : undefined,
+        timeout: 20000,
+        onload(resp) {
+          let body = null;
+          try {
+            body = JSON.parse(resp.responseText || "null");
+          } catch {}
+          resolve({ status: resp.status, body });
+        },
+        onerror() {
+          resolve({ status: 0, body: null });
+        },
+        ontimeout() {
+          resolve({ status: 0, body: null });
+        },
+      });
+    });
+  }
+
+  async function runStreakFarm() {
+    if (streakRunning) return;
+    const days = Math.max(
+      1,
+      Math.min(365, parseInt(els.streakDays && els.streakDays.value, 10) || 7),
+    );
+    streakRunning = true;
+    if (els.streakRun) els.streakRun.disabled = true;
+    setStreakStatus("Подготовка…");
+
+    try {
+      const info = await getUserStreakInfo();
+      const tz = info.timezone;
+      let base;
+      if (info.startDate && /^\d{4}-\d{2}-\d{2}$/.test(info.startDate)) {
+        const [y, m, d] = info.startDate.split("-").map(Number);
+        base = { year: y, month: m, day: d };
+      } else {
+        const p = tzParts(tz, new Date());
+        base = { year: +p.year, month: +p.month, day: +p.day };
+      }
+
+      let saved = 0;
+      for (let i = 0; i < days && streakRunning; i++) {
+        setStreakStatus(`День ${i + 1}/${days}… (+${saved})`);
+
+        const sr = await sessionRequest("POST", `https://www.duolingo.com/2017-06-30/sessions`, {
+          challengeTypes: CHALLENGE_TYPES,
+          fromLanguage: info.fromLanguage,
+          isFinalLevel: false,
+          isV2: true,
+          juicy: true,
+          learningLanguage: info.learningLanguage,
+          smartTipsVersion: 2,
+          type: "GLOBAL_PRACTICE",
+        });
+        if (sr.status !== 200 || !sr.body || !sr.body.id) {
+          setStreakStatus(`Ошибка создания сессии (HTTP ${sr.status}), пауза…`);
+          await new Promise((r) => setTimeout(r, 2500));
+          continue;
+        }
+
+        const endSecs = wallClockToSeconds(
+          tz,
+          base.year,
+          base.month,
+          base.day - 1 - i,
+          12,
+          0,
+          0,
+        );
+        const pr = await sessionRequest(
+          "PUT",
+          `https://www.duolingo.com/2017-06-30/sessions/${sr.body.id}`,
+          {
+            ...sr.body,
+            heartsLeft: 5,
+            startTime: endSecs - 1,
+            endTime: endSecs,
+            enableBonusPoints: false,
+            failed: false,
+            maxInLessonStreak: 9,
+            shouldLearnThings: true,
+          },
+        );
+        if (pr.status === 200) {
+          saved++;
+          setStreakStatus(`+${saved} дн. (из ${days})`);
+        }
+        await new Promise((r) => setTimeout(r, 400 + Math.floor(Math.random() * 400)));
+      }
+      setStreakStatus(`Готово: +${saved} дн.`);
+      showToast(saved ? "✓ Streak накручен на " + saved : "Не удалось накрутить");
+    } catch (e) {
+      setStreakStatus("Ошибка: " + (e && e.message));
+      showToast("Ошибка streak", true);
+    } finally {
+      streakRunning = false;
+      if (els.streakRun) els.streakRun.disabled = false;
+    }
+  }
+
+  function stopStreakFarm() {
+    streakRunning = false;
+    showToast("Накрутка streak остановлена");
+  }
+
   // ========== Toast ==========
   function showToast(msg, isError = false) {
     if (!shadow) return;
@@ -4054,6 +4260,13 @@
     }
     if (els.gemsStop) {
       els.gemsStop.addEventListener("click", () => stopGemsFarm());
+    }
+
+    if (els.streakRun) {
+      els.streakRun.addEventListener("click", () => runStreakFarm());
+    }
+    if (els.streakStop) {
+      els.streakStop.addEventListener("click", () => stopStreakFarm());
     }
 
     els.setCache.addEventListener("change", () => {
