@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Duolingo Helper
 // @namespace    https://github.com/Vidrimers/Duolingo-helper
-// @version      0.5.0
+// @version      0.5.1
 // @description  Проверка взаимной подписки на профилях Duolingo. Панель, бейджи, кеш.
 // @author       Vidrimers
 // @match        *://*.duolingo.com/*
@@ -1585,14 +1585,19 @@
       };
       window.fetch.__dhLesson = true;
 
-      // ===== Auto Solver =====
-      function findFiber(el) {
-        if (!el) return null;
-        for (var key in el) {
+      // ===== Auto Solver (полный) =====
+      function delay(ms) { return new Promise(function(r) { setTimeout(r, ms); }); }
+      function safeWait(ms) { return ms + Math.floor(Math.random() * 120); }
+
+      function findReactProps(dom) {
+        if (!dom) return null;
+        var keys = Object.keys(dom);
+        for (var i = 0; i < keys.length; i++) {
+          var key = keys[i];
           if (key.indexOf('__reactFiber$') === 0 || key.indexOf('__reactInternalInstance$') === 0) {
-            var fiber = el[key];
+            var fiber = dom[key];
             var hops = 0;
-            while (fiber && hops < 80) {
+            while (fiber && hops < 100) {
               var props = fiber.memoizedProps || fiber.pendingProps;
               if (props && props.currentChallenge) return props.currentChallenge;
               fiber = fiber.return;
@@ -1605,99 +1610,472 @@
 
       function findChallengeRoot() {
         return document.querySelector('[data-test="challenge"]') ||
-          document.querySelector('[data-test="challenge-choice"]') &&
-            document.querySelector('[data-test="challenge-choice"]').closest('div[class]') ||
+          document.querySelector('._3yE3H') ||
+          document.querySelector('[class*="challenge"]') ||
           document.querySelector('main');
       }
 
       function getSol() {
-        var root = findChallengeRoot();
-        return findFiber(root);
+        return findReactProps(findChallengeRoot()) || window.sol;
       }
 
-      function clickText(txt) {
-        if (!txt) return false;
-        var t = String(txt).trim().toLowerCase();
-        var nodes = document.querySelectorAll('[data-test="challenge-choice"], [role="button"], button, span');
-        for (var i = 0; i < nodes.length; i++) {
-          var n = nodes[i];
-          var v = (n.textContent || '').trim().toLowerCase();
-          if (v === t) { n.click(); return true; }
-        }
-        return false;
-      }
-
-      function typeInto(el, value) {
+      function setInputValue(el, value) {
         if (!el) return false;
         try {
-          el.focus();
-          var proto = Object.getPrototypeOf(el);
-          var setter = Object.getOwnPropertyDescriptor(proto, 'value');
-          if (setter && setter.set) setter.set.call(el, value);
-          else el.value = value;
+          var isTa = el.tagName === 'TEXTAREA';
+          var proto = isTa ? window.HTMLTextAreaElement : window.HTMLInputElement;
+          var setter = Object.getOwnPropertyDescriptor(proto.prototype, 'value').set;
+          setter.call(el, value);
           el.dispatchEvent(new Event('input', { bubbles: true }));
           el.dispatchEvent(new Event('change', { bubbles: true }));
           return true;
-        } catch (e) { return false; }
+        } catch (e) {
+          el.value = value;
+          el.dispatchEvent(new Event('input', { bubbles: true }));
+          return true;
+        }
       }
 
-      function solveOnce() {
-        if (!flag(SOLVER_KEY) && !window.__dhSolveForce) return false;
-        var sol = getSol();
-        if (!sol) return false;
-
-        // choice
-        if (typeof sol.correctIndex === 'number' && sol.choices && sol.choices[sol.correctIndex] != null) {
-          if (clickText(sol.choices[sol.correctIndex])) return true;
-          var btns = document.querySelectorAll('[data-test="challenge-choice"]');
-          if (btns[sol.correctIndex]) { btns[sol.correctIndex].click(); return true; }
+      function typeCE(el, value) {
+        try {
+          var setter = Object.getOwnPropertyDescriptor(Node.prototype, 'textContent').set;
+          setter.call(el, value);
+          el.dispatchEvent(new Event('input', { bubbles: true }));
+        } catch (e) {
+          if (el) { el.textContent = value; el.dispatchEvent(new Event('input', { bubbles: true })); }
         }
+      }
 
-        // translate / write
-        if (sol.correctSolutions && sol.correctSolutions[0]) {
-          var input = document.querySelector('[data-test="challenge-translate-input"]') ||
-            document.querySelector('textarea') ||
-            document.querySelector('input[type="text"]');
-          if (input) return typeInto(input, sol.correctSolutions[0]);
-          return clickText(sol.correctSolutions[0]);
-        }
-
-        // match pairs
-        if (sol.pairs && sol.pairs.length) {
-          for (var p = 0; p < sol.pairs.length; p++) {
-            clickText(sol.pairs[p][0] != null ? sol.pairs[p][0] : sol.pairs[p].from);
-            clickText(sol.pairs[p][1] != null ? sol.pairs[p][1] : sol.pairs[p].to);
-          }
-          return true;
-        }
-
-        // tap tokens
-        if (sol.correctTokens && sol.correctTokens.length) {
-          for (var i = 0; i < sol.correctTokens.length; i++) {
-            clickText(sol.correctTokens[i]);
-          }
-          return true;
-        }
-
-        // listen choice fallback
-        if (typeof sol.correctIndex === 'number') {
-          var choices = document.querySelectorAll('[data-test="challenge-choice"]');
-          if (choices[sol.correctIndex]) { choices[sol.correctIndex].click(); return true; }
+      function clickBySolText(text) {
+        if (text == null) return false;
+        var t = String(text).trim().toLowerCase();
+        var nodes = document.querySelectorAll('[data-test="challenge-choice"], [data-test*="challenge-tap-token"], [role="button"], button, span');
+        for (var i = 0; i < nodes.length; i++) {
+          var v = (nodes[i].textContent || '').trim().toLowerCase();
+          if (v === t) { nodes[i].click(); return true; }
         }
         return false;
       }
 
+      function clickNext() {
+        var inStory = location.hostname.indexOf('stories.duolingo.com') !== -1 ||
+          location.pathname.indexOf('/stories') !== -1 ||
+          !!document.querySelector('[data-test="stories-choice"]') ||
+          !!document.querySelector('[data-test="story-start"]') ||
+          !!document.querySelector('[data-test="stories-player-continue"]') ||
+          !!document.querySelector('[data-test="stories-player-done"]');
+        if (inStory) {
+          try {
+            var node = document.getElementsByClassName('_2neC7')[0];
+            if (node) {
+              var keys = Object.keys(node);
+              for (var i = 0; i < keys.length; i++) {
+                if (keys[i].indexOf('__reactFiber$') === 0) {
+                  var fn = node[keys[i]] && node[keys[i]].return && node[keys[i]].return.memoizedProps && node[keys[i]].return.memoizedProps.continueStory;
+                  if (typeof fn === 'function') { fn(); return; }
+                }
+              }
+            }
+          } catch (e) {}
+        }
+        var next = document.querySelector('[data-test="player-next"]') ||
+          document.querySelector('[data-test="stories-player-continue"]') ||
+          document.querySelector('[data-test="stories-player-done"]');
+        if (!next) return;
+        var disabled = next.getAttribute('aria-disabled') === 'true' || next.disabled;
+        if (!disabled) next.click();
+      }
+
+      function determineType(sol) {
+        try {
+          var t = sol && sol.type;
+          if (!t) return null;
+          if (t === 'speak' || t === 'listenSpeak') return 'Speak';
+          if (t === 'listenMatch') return 'ListenMatch';
+
+          var isStory = location.hostname.indexOf('stories.duolingo.com') !== -1 ||
+            location.pathname.indexOf('/stories') !== -1 ||
+            !!document.querySelector('[data-test="stories-choice"]') ||
+            !!document.querySelector('[data-test="story-start"]');
+          var tl = String(t).toLowerCase();
+          if (isStory || tl === 'arrange' || tl === 'multiple-choice' || tl === 'multiple_choice' ||
+              tl === 'point-to-phrase' || tl === 'point_to_phrase' || tl === 'gap-fill' || tl === 'gap_fill') {
+            if (tl === 'arrange') return 'StoryArrange';
+            if (tl === 'multiple-choice' || tl === 'multiple_choice' || tl === 'select-phrases') return 'StoryMulti';
+            if (tl === 'point-to-phrase' || tl === 'point_to_phrase') return 'StoryPoint';
+            if (tl === 'gap-fill' || tl === 'gap_fill') return 'StoryGap';
+            if (tl === 'match') return 'Pairs';
+          }
+
+          if (t === 'typeCloze') return 'TypeCloze';
+          if (t === 'typeClozeTable') return 'TypeClozeTable';
+          if (t === 'tapClozeTable') return 'TapClozeTable';
+          if (t === 'typeCompleteTable') return 'TypeCompleteTable';
+          if (t === 'tapCompleteTable') return 'TapCompleteTable';
+          if (t === 'patternTapComplete') return 'PatternTap';
+          if (t === 'syllableTap') return 'SyllableTap';
+          if (t === 'syllableListenTap') return 'SyllableTap';
+          if (t === 'listenTap') return 'ListenTap';
+          if (t === 'listen') return 'ListenType';
+          if (t === 'translate') return 'Translate';
+          if (t === 'completeReverseTranslation') return 'CompleteReverse';
+          if (t === 'judge') return 'Judge';
+          if (t === 'dialogue' || t === 'characterIntro' || t === 'selectTranscription') return 'Dialogue';
+          if (t === 'characterMatch' || t === 'match') return 'Pairs';
+          if (t === 'select' || t === 'characterSelect' || t === 'form' ||
+              t === 'readComprehension' || t === 'listenComprehension' || t === 'selectPronunciation') {
+            return 'SelectCard';
+          }
+          if (t === 'orderTapComplete') return 'OrderTap';
+          if (t === 'assist' || t === 'characterSelect') return 'Choice';
+          if (document.querySelectorAll('[data-test*="challenge-partialReverseTranslate"]').length) return 'PartialReverse';
+          if (document.querySelectorAll('[data-test="challenge challenge-characterWrite"]').length) return 'CharWrite';
+          if (document.querySelectorAll('[data-test*="challenge-name"]').length &&
+              document.querySelectorAll('[data-test="challenge-choice"]').length) return 'Name';
+          if (document.querySelectorAll('[data-test="challenge-choice"]').length) {
+            if (document.querySelectorAll('[data-test="challenge-text-input"]').length) return 'ChoiceInput';
+            return 'Choice';
+          }
+          if (document.querySelectorAll('[data-test*="challenge-tap-token"]').length) {
+            if (sol.pairs) return 'Pairs';
+            if (sol.correctTokens) return 'TokensRun';
+            if (sol.correctIndices) return 'IndicesRun';
+          }
+          if (document.querySelectorAll('[data-test="challenge-tap-token-text"]').length) return 'FillGap';
+          if (document.querySelector('textarea[data-test="challenge-translate-input"]')) return 'Translate';
+          if (document.querySelectorAll('[data-test="challenge-text-input"]').length) return 'TextInput';
+          if (document.querySelector('[data-test="daily-quest-progress-slide"]') ||
+              document.querySelector('[data-test="streak-slide"]') ||
+              document.querySelector('[data-test="leaderboard-slide"]')) return 'Slide';
+          return null;
+        } catch (e) { return null; }
+      }
+
+      async function handleType(type, sol) {
+        var ch = sol || {};
+        switch (type) {
+          case 'Slide':
+            clickNext();
+            return;
+
+          case 'Choice':
+          case 'SelectCard':
+          case 'Judge':
+          case 'Dialogue': {
+            if (typeof ch.correctIndex === 'number') {
+              var btns = document.querySelectorAll('[data-test="challenge-choice"]');
+              if (btns[ch.correctIndex]) { btns[ch.correctIndex].click(); return; }
+              if (ch.choices && ch.choices[ch.correctIndex] != null) clickBySolText(ch.choices[ch.correctIndex]);
+            }
+            if (ch.correctSolutions && ch.correctSolutions[0]) clickBySolText(ch.correctSolutions[0]);
+            return;
+          }
+
+          case 'Name': {
+            if (ch.articles && ch.correctSolutions && ch.correctSolutions[0]) {
+              var solStr = ch.correctSolutions[0];
+              var art = ch.articles.find(function(a) { return solStr.indexOf(a) === 0; });
+              if (art !== undefined) {
+                var idx = ch.articles.indexOf(art);
+                var rest = solStr.substring(art.length).trim();
+                var el = document.querySelector('[data-test="challenge-choice"]:nth-child(' + (idx + 1) + ')');
+                if (el) el.click();
+                var input = document.querySelector('[data-test="challenge-text-input"]');
+                if (input) setInputValue(input, rest);
+              }
+            }
+            return;
+          }
+
+          case 'ChoiceInput': {
+            if (typeof ch.correctIndex === 'number') {
+              var cb = document.querySelectorAll('[data-test="challenge-choice"]');
+              if (cb[ch.correctIndex]) cb[ch.correctIndex].click();
+            }
+            if (ch.correctSolutions && ch.correctSolutions[0]) {
+              var ti = document.querySelector('[data-test="challenge-text-input"]');
+              if (ti) setInputValue(ti, ch.correctSolutions[0]);
+            }
+            return;
+          }
+
+          case 'Translate':
+          case 'ListenType':
+          case 'TextInput': {
+            var answer = (ch.correctSolutions && ch.correctSolutions[0]) || ch.prompt || '';
+            var ta = document.querySelector('textarea[data-test="challenge-translate-input"]') ||
+              document.querySelector('[data-test="challenge-translate-input"]') ||
+              document.querySelector('textarea') ||
+              document.querySelector('[data-test="challenge-text-input"]') ||
+              document.querySelector('input[type="text"]');
+            if (ta) setInputValue(ta, answer);
+            else clickBySolText(answer);
+            return;
+          }
+
+          case 'CompleteReverse': {
+            if (ch.correctSolutions && ch.correctSolutions[0]) {
+              var ce = document.querySelector('[contenteditable="true"]');
+              if (ce) typeCE(ce, ch.correctSolutions[0]);
+              else {
+                var inp = document.querySelector('[data-test="challenge-text-input"]') || document.querySelector('textarea');
+                if (inp) setInputValue(inp, ch.correctSolutions[0]);
+              }
+            }
+            return;
+          }
+
+          case 'PartialReverse': {
+            var ce2 = document.querySelector('[contenteditable="true"]');
+            var text = '';
+            if (ch.displayTokens) {
+              text = ch.displayTokens.filter(function(t) { return t.isBlank; }).map(function(t) { return t.text; }).join('').trim();
+            }
+            if (!text && ch.correctSolutions) text = ch.correctSolutions[0];
+            if (ce2) typeCE(ce2, text);
+            return;
+          }
+
+          case 'Pairs': {
+            var buttons = document.querySelectorAll('[data-test*="challenge-tap-token"]:not(span)');
+            var texts = document.querySelectorAll('[data-test="challenge-tap-token-text"]');
+            if (!buttons.length) return;
+            var pairs = ch.pairs || [];
+            for (var p = 0; p < pairs.length; p++) {
+              var pair = pairs[p];
+              for (var i = 0; i < buttons.length; i++) {
+                if (buttons[i].disabled) continue;
+                var txt = (texts[i] ? texts[i].innerText : buttons[i].textContent || '').toLowerCase().trim();
+                var ok = txt === String(pair.transliteration || '').toLowerCase().trim() ||
+                  txt === String(pair.character || '').toLowerCase().trim() ||
+                  txt === String(pair.learningToken || '').toLowerCase().trim() ||
+                  txt === String(pair.fromToken || '').toLowerCase().trim() ||
+                  txt === String(pair[0] || '').toLowerCase().trim() ||
+                  txt === String(pair[1] || '').toLowerCase().trim() ||
+                  txt === String(pair.from || '').toLowerCase().trim() ||
+                  txt === String(pair.to || '').toLowerCase().trim();
+                if (ok) {
+                  buttons[i].click();
+                  await delay(safeWait(40));
+                  break;
+                }
+              }
+            }
+            return;
+          }
+
+          case 'TokensRun': {
+            var all = document.querySelectorAll('[data-test$="challenge-tap-token"]');
+            var used = [];
+            var toClick = [];
+            var cts = ch.correctTokens || [];
+            for (var c = 0; c < cts.length; c++) {
+              var token = cts[c];
+              var matches = Array.prototype.filter.call(all, function(el) {
+                return el.textContent.trim() === String(token).trim();
+              });
+              if (matches.length) {
+                var n = used.filter(function(u) { return u.textContent.trim() === String(token).trim(); }).length;
+                var el2 = matches[n] || matches[0];
+                if (!el2.disabled) { toClick.push(el2); used.push(el2); }
+              }
+            }
+            for (var k = 0; k < toClick.length; k++) {
+              toClick[k].click();
+              await delay(safeWait(35));
+            }
+            return;
+          }
+
+          case 'IndicesRun': {
+            if (!ch.correctIndices) return;
+            var bank = document.querySelector('div[data-test="word-bank"]') || document.querySelector('.eSgkc');
+            if (!bank) return;
+            var bb = Array.prototype.slice.call(bank.querySelectorAll('button[data-test*="challenge-tap-token"]:not(span)'));
+            for (var ii = 0; ii < ch.correctIndices.length; ii++) {
+              var ix = ch.correctIndices[ii];
+              if (ix >= 0 && ix < bb.length && !bb[ix].disabled) {
+                bb[ix].click();
+                await delay(safeWait(35));
+              }
+            }
+            return;
+          }
+
+          case 'OrderTap': {
+            var blanks = (ch.displayTokens || []).filter(function(t) { return t.isBlank; });
+            if (!blanks.length) return;
+            var choicesData = ch.choices || [];
+            var usedIdx = {};
+            for (var b = 0; b < blanks.length; b++) {
+              var want = blanks[b].text;
+              for (var ci = 0; ci < choicesData.length; ci++) {
+                if (usedIdx[ci]) continue;
+                var ct = typeof choicesData[ci] === 'object' ? choicesData[ci].text : choicesData[ci];
+                if (String(ct).trim() === String(want).trim()) {
+                  usedIdx[ci] = true;
+                  clickBySolText(want);
+                  await delay(safeWait(35));
+                  break;
+                }
+              }
+            }
+            return;
+          }
+
+          case 'TapCompleteTable':
+          case 'TypeCompleteTable':
+          case 'TapClozeTable':
+          case 'TypeClozeTable': {
+            var rows = (ch.displayTableTokens || []).slice(1);
+            var trs = document.querySelectorAll('tbody tr');
+            var wordBank = document.querySelector('div[data-test="word-bank"]');
+            var wbBtns = wordBank ? wordBank.querySelectorAll('button[data-test*="challenge-tap-token"]') : [];
+            var usedWb = {};
+            for (var r = 0; r < rows.length && r < trs.length; r++) {
+              var cell = rows[r][1] || [];
+              var blankTok = cell.find ? cell.find(function(t) { return t.isBlank; }) : null;
+              if (!blankTok) continue;
+              var answerText = blankTok.text;
+              if (type === 'TypeCompleteTable' || type === 'TypeClozeTable') {
+                var tin = trs[r].querySelector('input, textarea');
+                if (tin) { setInputValue(tin, answerText); continue; }
+              }
+              var clicked = false;
+              var rowBtns = trs[r].querySelectorAll('button[data-test*="challenge-tap-token"]');
+              for (var rb = 0; rb < rowBtns.length; rb++) {
+                var te = rowBtns[rb].querySelector('[data-test="challenge-tap-token-text"]');
+                if (te && te.innerText.trim() === answerText && !rowBtns[rb].disabled) {
+                  rowBtns[rb].click(); clicked = true;
+                  await delay(safeWait(35));
+                  break;
+                }
+              }
+              if (!clicked && wbBtns.length) {
+                for (var w = 0; w < wbBtns.length; w++) {
+                  if (usedWb[w]) continue;
+                  var te2 = wbBtns[w].querySelector('[data-test="challenge-tap-token-text"]');
+                  if (te2 && te2.innerText.trim() === answerText && !wbBtns[w].disabled) {
+                    wbBtns[w].click(); usedWb[w] = true;
+                    await delay(safeWait(35));
+                    break;
+                  }
+                }
+              }
+            }
+            return;
+          }
+
+          case 'TypeCloze': {
+            if (ch.correctSolutions && ch.correctSolutions[0]) {
+              var tin2 = document.querySelector('[data-test="challenge-text-input"]') || document.querySelector('input[type="text"]') || document.querySelector('textarea');
+              if (tin2) setInputValue(tin2, ch.correctSolutions[0]);
+            }
+            return;
+          }
+
+          case 'PatternTap':
+          case 'SyllableTap':
+          case 'ListenTap':
+          case 'FillGap': {
+            if (ch.correctTokens && ch.correctTokens.length) {
+              for (var s = 0; s < ch.correctTokens.length; s++) clickBySolText(ch.correctTokens[s]);
+              return;
+            }
+            if (ch.displayTokens) {
+              var isb = ch.displayTokens.filter(function(t) { return t.isBlank; });
+              for (var d = 0; d < isb.length; d++) clickBySolText(isb[d].text);
+            }
+            return;
+          }
+
+          case 'StoryArrange': {
+            if (ch.phraseOrder) {
+              var chs = document.querySelectorAll('[data-test="stories-choice"], [data-test="challenge-choice"]');
+              for (var ph = 0; ph < ch.phraseOrder.length; ph++) {
+                if (chs[ch.phraseOrder[ph]]) chs[ch.phraseOrder[ph]].click();
+              }
+            }
+            return;
+          }
+
+          case 'StoryMulti':
+          case 'StoryPoint':
+          case 'StoryGap': {
+            if (typeof ch.correctAnswerIndex === 'number') {
+              var sc = document.querySelectorAll('[data-test="stories-choice"], [data-test="challenge-choice"]');
+              if (sc[ch.correctAnswerIndex]) sc[ch.correctAnswerIndex].click();
+            } else if (ch.correctSolutions && ch.correctSolutions[0]) {
+              clickBySolText(ch.correctSolutions[0]);
+            } else if (typeof ch.correctIndex === 'number') {
+              var sc2 = document.querySelectorAll('[data-test="challenge-choice"]');
+              if (sc2[ch.correctIndex]) sc2[ch.correctIndex].click();
+            }
+            return;
+          }
+
+          case 'CharWrite': {
+            clickNext();
+            return;
+          }
+
+          case 'Speak':
+          case 'ListenMatch': {
+            // пропускаем голосовые
+            clickNext();
+            return;
+          }
+        }
+      }
+
+      async function solveOnce(force) {
+        if (!flag(SOLVER_KEY) && !force) return false;
+
+        // пропуск модалок / слайдов
+        var skips = [
+          '[data-test="practice-hub-ad-no-thanks-button"]',
+          '[data-test="plus-no-thanks"]',
+          '[data-test="story-start"]',
+          '[data-test="player-next"]'
+        ];
+        for (var si = 0; si < skips.length; si++) {
+          var sk = document.querySelector(skips[si]);
+          if (sk && skips[si] !== '[data-test="player-next"]') sk.click();
+        }
+
+        var root = findChallengeRoot();
+        if (!root) {
+          clickNext();
+          return false;
+        }
+        window.sol = findReactProps(root);
+        if (!window.sol) {
+          clickNext();
+          return false;
+        }
+        var type = determineType(window.sol);
+        if (!type) {
+          clickNext();
+          return false;
+        }
+        try {
+          await handleType(type, window.sol);
+          return true;
+        } catch (e) {
+          return false;
+        }
+      }
+
       window.__dhSolveOnce = function(force) {
-        window.__dhSolveForce = !!force;
-        try { return solveOnce(); } finally { window.__dhSolveForce = false; }
+        return solveOnce(!!force);
       };
 
-      // фоновый цикл, пока включён автосолвер
       setInterval(function() {
         if (!flag(SOLVER_KEY)) return;
-        if (!location.pathname.startsWith('/lesson') && !location.pathname.startsWith('/practice')) return;
-        try { solveOnce(); } catch (e) {}
-      }, 700);
+        var p = location.pathname;
+        if (p.indexOf('/lesson') !== 0 && p.indexOf('/practice') !== 0 && p.indexOf('/stories') !== 0) return;
+        solveOnce(false);
+      }, 650);
 
       document.addEventListener('dh-solve-now', function() {
         try { window.__dhSolveOnce(true); } catch (e) {}

@@ -2,7 +2,7 @@
 
 Userscript для Tampermonkey — расширение для Duolingo с проверкой взаимных подписок, разметкой пользователей и инструментами для работы с друзьями. Окно в стиле Windows XP, плашки на профилях, свои метки.
 
-> Версия: 0.5.0 | Работает на `*.duolingo.com`
+> Версия: 0.5.1 | Работает на `*.duolingo.com`
 
 ---
 
@@ -141,7 +141,7 @@ Userscript для Tampermonkey — расширение для Duolingo с пр�
 | Параметр | Описание |
 | --- | --- |
 | Короткие уроки | `POST /sessions` отдаёт 1–2 простых задания вместо полного урока |
-| Автосолвер | Подставляет ответы из React `currentChallenge` (choice / translate / match / tap) |
+| Автосолвер | Полный: choice, translate, match, tap, cloze, tables, stories, reverse translate, name+article |
 | Решить сейчас | Принудительно решить текущее задание |
 
 Автосолвер сам крутится в фоне на `/lesson` и `/practice`, если включён.
