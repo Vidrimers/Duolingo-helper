@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Duolingo Helper
 // @namespace    https://github.com/Vidrimers/Duolingo-helper
-// @version      0.5.13
+// @version      0.5.15
 // @description  Проверка взаимной подписки на профилях Duolingo. Панель, бейджи, кеш.
 // @author       Vidrimers
 // @match        *://*.duolingo.com/*
@@ -45,6 +45,7 @@
         cacheMinutes: 30,
         requestDelay: 350, // мс между запросами (rate limit)
         inactiveDays: 3, // порог «неактивных» друзей
+        activitySort: "xp_desc", // сортировка в «Активности»
         showBadge: true,
         badgePos: "top-right",
         accent: "#58cc02",
@@ -801,6 +802,86 @@
 
             .dh-op-status:empty { display: none; }
 
+            /* ===== Custom select ===== */
+            .dh-select {
+                position: relative;
+                display: flex;
+                align-items: center;
+                gap: 6px;
+                padding: 5px 10px;
+                border: 1px solid rgba(255,255,255,0.1);
+                border-radius: 8px;
+                background: rgba(0,0,0,0.18);
+                color: #ccc;
+                font: 600 11px/1.2 Tahoma, "Segoe UI", sans-serif;
+                cursor: pointer;
+                user-select: none;
+                min-width: 0;
+            }
+            .dh-select-text {
+                flex: 1;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+            }
+            .dh-select-arrow {
+                opacity: 0.6;
+                transition: transform 0.2s;
+            }
+            .dh-select.open .dh-select-arrow { transform: rotate(180deg); }
+            .dh-select-options {
+                display: none;
+                position: absolute;
+                left: 0;
+                right: 0;
+                top: calc(100% + 4px);
+                z-index: 20;
+                background: #1e1e2e;
+                border: 1px solid rgba(102,126,234,0.35);
+                border-radius: 8px;
+                overflow: hidden;
+                box-shadow: 0 8px 24px rgba(0,0,0,0.45);
+            }
+            .dh-select.open .dh-select-options { display: block; }
+            .dh-select-option {
+                padding: 7px 10px;
+                color: #ddd;
+                font-size: 11px;
+                cursor: pointer;
+            }
+            .dh-select-option:hover {
+                background: rgba(102,126,234,0.2);
+            }
+            .dh-modal.dh-theme-vista .dh-select {
+                background: rgba(255,255,255,0.4);
+                border-color: rgba(120,160,210,0.35);
+                color: #1b3a5f;
+                font-family: "Segoe UI", Tahoma, sans-serif;
+            }
+            .dh-modal.dh-theme-vista .dh-select-options {
+                background: #fff;
+                border-color: rgba(120,160,210,0.45);
+            }
+            .dh-modal.dh-theme-vista .dh-select-option {
+                color: #1b3a5f;
+            }
+            .dh-modal.dh-theme-win95 .dh-select {
+                background: #C0C0C0;
+                border: 2px solid;
+                border-color: #808080 #FFF #FFF #808080;
+                border-radius: 0;
+                color: #000;
+            }
+            .dh-modal.dh-theme-win95 .dh-select-options {
+                background: #C0C0C0;
+                border: 2px solid;
+                border-color: #808080 #FFF #FFF #808080;
+                border-radius: 0;
+            }
+            .dh-modal.dh-theme-win95 .dh-select-option {
+                color: #000;
+            }
+
             /* New change rows — highlight until hover */
             .dh-change-new {
                 background: rgba(88,204,2,0.14);
@@ -1489,7 +1570,7 @@
                     <button class="dh-tab active" data-friend-filter="all">Все</button>
                     <button class="dh-tab" data-friend-filter="nobody">❌ Не подписаны</button>
                     <button class="dh-tab" data-friend-filter="mutual">✅ Взаимно</button>
-                    <button class="dh-tab" data-friend-filter="inactive">💤 Неактивные</button>
+                    <button class="dh-tab" data-friend-filter="activity">📊 Активность</button>
                 </div>
                 <div class="dh-row" id="dh-all-tools" style="display:none;margin:0 0 8px">
                     <button type="button" id="dh-unfollow-anyone" style="background:none;border:none;color:#c0392b;cursor:pointer;font:inherit;font-size:11px;padding:0;text-decoration:underline">Отписаться от всех</button>
@@ -1501,10 +1582,21 @@
                     <div class="dh-row">
                         <button class="dh-btn dh-btn-primary" id="dh-scan-activity" style="padding:5px 10px;font-size:11px">Проверить активность</button>
                         <button class="dh-btn" id="dh-scan-stop" style="padding:5px 10px;font-size:11px">Стоп</button>
+                        <div class="dh-select" id="dh-activity-sort" style="flex:1;min-width:0">
+                            <span class="dh-select-text">Больше XP</span><span class="dh-select-arrow">▾</span>
+                            <div class="dh-select-options">
+                                <div class="dh-select-option" data-sort="xp_desc">Больше XP</div>
+                                <div class="dh-select-option" data-sort="xp_asc">Меньше XP</div>
+                                <div class="dh-select-option" data-sort="streak_desc">Больше дней</div>
+                                <div class="dh-select-option" data-sort="streak_asc">Меньше дней</div>
+                                <div class="dh-select-option" data-sort="name_asc">По имени A→Z</div>
+                                <div class="dh-select-option" data-sort="name_desc">По имени Z→A</div>
+                            </div>
+                        </div>
                     </div>
-                    <div class="dh-row">
-                        <button class="dh-btn dh-btn-danger" id="dh-unfollow-inactive" style="padding:5px 8px;font-size:11px">Отписаться от неактивных</button>
-                        <button class="dh-btn dh-btn-danger" id="dh-block-inactive" style="padding:5px 8px;font-size:11px">Заблокировать неактивных</button>
+                    <div class="dh-row" id="dh-inactive-mass" style="display:none">
+                        <button class="dh-btn dh-btn-danger" id="dh-unfollow-inactive" title="Сначала пройди «Проверить активность»" style="padding:5px 8px;font-size:11px">Отписаться от неактивных</button>
+                        <button class="dh-btn dh-btn-danger" id="dh-block-inactive" title="Сначала пройди «Проверить активность»" style="padding:5px 8px;font-size:11px">Заблокировать неактивных</button>
                     </div>
                 </div>
                 <div class="dh-muted dh-op-status" id="dh-friends-status"></div>
@@ -1860,6 +1952,9 @@
       friendsStatus: modal.querySelector("#dh-friends-status"),
       friendsList: modal.querySelector("#dh-friends-list"),
       friendFilters: [...modal.querySelectorAll("[data-friend-filter]")],
+      activitySort: modal.querySelector("#dh-activity-sort"),
+      activitySortText: modal.querySelector("#dh-activity-sort .dh-select-text"),
+      activitySortOpts: [...modal.querySelectorAll("#dh-activity-sort .dh-select-option")],
       friendsFiltersWrap: modal.querySelector("#dh-friends-filters"),
       unfollowAll: modal.querySelector("#dh-unfollow-all"),
       nobodyTools: modal.querySelector("#dh-nobody-tools"),
@@ -1877,6 +1972,7 @@
       scanActivity: modal.querySelector("#dh-scan-activity"),
       scanStop: modal.querySelector("#dh-scan-stop"),
       inactiveTools: modal.querySelector("#dh-inactive-tools"),
+      inactiveMass: modal.querySelector("#dh-inactive-mass"),
       unfollowInactive: modal.querySelector("#dh-unfollow-inactive"),
       blockInactive: modal.querySelector("#dh-block-inactive"),
       excludeOpen: modal.querySelector("#dh-exclude-open"),
@@ -4329,6 +4425,7 @@
     if (els.inactiveTools) els.inactiveTools.style.display = "none";
     if (els.nobodyTools) els.nobodyTools.style.display = "none";
     if (els.allTools) els.allTools.style.display = "none";
+    if (els.activitySort) els.activitySort.style.display = "none";
     if (els.historyBack) els.historyBack.style.display = "";
     updateListBadges();
   }
@@ -4461,13 +4558,22 @@
     if (els.blocksOpen) els.blocksOpen.style.display = "";
     if (els.historyBack) els.historyBack.style.display = "none";
     if (els.inactiveTools) {
-      els.inactiveTools.style.display = friendFilter === "inactive" ? "flex" : "none";
+      els.inactiveTools.style.display =
+        friendFilter === "activity" ? "flex" : "none";
+    }
+    if (els.inactiveMass) {
+      els.inactiveMass.style.display =
+        friendFilter === "activity" ? "flex" : "none";
     }
     if (els.nobodyTools) {
       els.nobodyTools.style.display = friendFilter === "nobody" ? "flex" : "none";
     }
     if (els.allTools) {
       els.allTools.style.display = friendFilter === "all" ? "flex" : "none";
+    }
+    if (els.activitySort) {
+      els.activitySort.style.display = friendFilter === "activity" ? "flex" : "none";
+    if (friendFilter === "activity") syncActivitySortState();
     }
     updateListBadges();
     renderFriends();
@@ -4487,6 +4593,7 @@
     if (els.inactiveTools) els.inactiveTools.style.display = "none";
     if (els.nobodyTools) els.nobodyTools.style.display = "none";
     if (els.allTools) els.allTools.style.display = "none";
+    if (els.activitySort) els.activitySort.style.display = "none";
     if (els.historyBack) els.historyBack.style.display = "";
     updateListBadges();
     renderHistory();
@@ -4575,6 +4682,7 @@
     if (els.inactiveTools) els.inactiveTools.style.display = "none";
     if (els.nobodyTools) els.nobodyTools.style.display = "none";
     if (els.allTools) els.allTools.style.display = "none";
+    if (els.activitySort) els.activitySort.style.display = "none";
     if (els.historyBack) els.historyBack.style.display = "";
     // счётчик гасим по клику
     DATA.friendChangesUnread = 0;
@@ -4925,6 +5033,26 @@
     return `Показано: ${shown} · всего: ${following} подписок`;
   }
 
+  function sortActivityRows(rows) {
+    const mode = DATA.settings.activitySort || "xp_desc";
+    const out = rows.slice();
+    const nameOf = (r) => (r.name || r.username || "").toLowerCase();
+    if (mode === "xp_desc") {
+      out.sort((a, b) => Number(b.lastXp || 0) - Number(a.lastXp || 0));
+    } else if (mode === "xp_asc") {
+      out.sort((a, b) => Number(a.lastXp || 0) - Number(b.lastXp || 0));
+    } else if (mode === "streak_desc") {
+      out.sort((a, b) => Number(b.streakDays || 0) - Number(a.streakDays || 0));
+    } else if (mode === "streak_asc") {
+      out.sort((a, b) => Number(a.streakDays || 0) - Number(b.streakDays || 0));
+    } else if (mode === "name_asc") {
+      out.sort((a, b) => nameOf(a).localeCompare(nameOf(b)));
+    } else if (mode === "name_desc") {
+      out.sort((a, b) => nameOf(b).localeCompare(nameOf(a)));
+    }
+    return out;
+  }
+
   function renderFriends() {
     if (!els.friendsList) return;
     const q = (els.friendsSearch && els.friendsSearch.value || "")
@@ -4934,21 +5062,28 @@
 
     if (friendFilter === "mutual") rows = rows.filter((r) => r.followsMe);
     if (friendFilter === "nobody") rows = rows.filter((r) => !r.followsMe);
-    if (friendFilter === "inactive") {
-      const days = DATA.settings.inactiveDays || 3;
-      const inRows = rows.filter((r) => r.inactive === true || r.inactiveDays >= days);
-      const extras = ((friendsCache && friendsCache.scanUsers) || []).filter((u) => {
-        const id = String(u.userId);
-        const inList = rows.some((r) => String(r.userId) === id);
-        return (
-          !inList &&
-          (u.inactive === true || (u.inactiveDays || 0) >= days)
-        );
-      });
-      rows = inRows.concat(extras);
+    if (friendFilter === "activity") {
+      // все, кого проверяли (rows + scanUsers)
+      const seen = new Set();
+      const all = [];
+      for (const r of (friendsCache && friendsCache.rows) || []) {
+        seen.add(String(r.userId));
+        all.push(r);
+      }
+      for (const u of (friendsCache && friendsCache.scanUsers) || []) {
+        if (!seen.has(String(u.userId))) all.push(u);
+      }
+      rows = all;
       if (els.inactiveTools) els.inactiveTools.style.display = "flex";
-    } else if (els.inactiveTools) {
-      els.inactiveTools.style.display = "none";
+      if (els.inactiveMass) els.inactiveMass.style.display = "flex";
+      if (els.activitySort) {
+        els.activitySort.style.display = "flex";
+        syncActivitySortState();
+      }
+    } else {
+      if (els.inactiveTools) els.inactiveTools.style.display = "none";
+      if (els.inactiveMass) els.inactiveMass.style.display = "none";
+      if (els.activitySort) els.activitySort.style.display = "none";
     }
     if (els.nobodyTools) {
       els.nobodyTools.style.display = friendFilter === "nobody" ? "flex" : "none";
@@ -4965,6 +5100,10 @@
       });
     }
 
+    if (friendFilter === "activity") {
+      rows = sortActivityRows(rows);
+    }
+
     els.friendsList.innerHTML = "";
     if (!rows.length) {
       els.friendsList.innerHTML = '<div class="dh-muted">Пусто</div>';
@@ -4978,10 +5117,31 @@
       row.style.borderBottom = "none";
       row.style.padding = "5px 2px";
       row.style.cursor = "pointer";
+      const sub = r.username ? "@" + r.username : String(r.userId || "");
+
+      if (friendFilter === "activity") {
+        const streak = Number(r.streakDays || 0);
+        const xp = Number(r.lastXp || 0);
+        const idle = Number(r.inactiveDays || 0);
+        const streakTxt = streak > 0 ? `🔥 ${streak} дн.` : "💤 0";
+        const idleTxt = idle > 0 && idle < 999 ? `${idle} дн.` : idle >= 999 ? "∞" : "0 дн.";
+        row.innerHTML = `<div class="dh-setting-label" style="min-width:0">
+            <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+              ${r.name || sub}
+            </div>
+            <small>${streakTxt} · XP ${xp} · без активности ${idleTxt}</small>
+          </div>`;
+        row.addEventListener("click", () => {
+          const u = r.username || r.name;
+          if (u) window.open("https://www.duolingo.com/profile/" + encodeURIComponent(u), "_blank");
+        });
+        els.friendsList.appendChild(row);
+        continue;
+      }
+
       const icon = r.followsMe ? "✅" : "❌";
       const deadIcon = r.inactive ? " · 💤" : "";
       const excludedIcon = isExcluded(r.userId) ? " · 🛡" : "";
-      const sub = r.username ? "@" + r.username : String(r.userId || "");
       row.innerHTML = `<div class="dh-setting-label" style="min-width:0">
           <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
             ${icon} ${r.name || sub}${deadIcon}${excludedIcon}
@@ -5149,8 +5309,28 @@
 
   function syncUnfollowInactiveButton() {
     const scanned = !!(friendsCache && friendsCache.scannedAt);
-    if (els.unfollowInactive) els.unfollowInactive.disabled = !scanned;
-    if (els.blockInactive) els.blockInactive.disabled = !scanned;
+    const tip = scanned
+      ? ""
+      : "Кнопка заработает после полной проверки активности";
+    if (els.unfollowInactive) {
+      els.unfollowInactive.disabled = !scanned;
+      els.unfollowInactive.title = tip;
+    }
+    if (els.blockInactive) {
+      els.blockInactive.disabled = !scanned;
+      els.blockInactive.title = tip;
+    }
+    syncActivitySortState();
+  }
+
+  function syncActivitySortState() {
+    if (!els.activitySort) return;
+    const scanned = !!(friendsCache && friendsCache.scannedAt);
+    els.activitySort.style.opacity = scanned ? "1" : "0.45";
+    els.activitySort.dataset.ready = scanned ? "1" : "0";
+    els.activitySort.title = scanned
+      ? ""
+      : "Сортировка заработает после полной проверки активности";
   }
 
   /** Опрашивает друзей и помечает неактивных. */
@@ -5204,7 +5384,9 @@
 
         r.inactive = inactive;
         r.inactiveDays = inactiveDays;
-        r.lastXp = data.totalXp != null ? data.totalXp : r.lastXp;
+        r.lastXp = data.totalXp != null ? Number(data.totalXp) : r.lastXp || 0;
+        r.streakDays = data.streak != null ? Number(data.streak) : r.streakDays || 0;
+        r.scannedAt = Date.now();
       } catch {
         // не помечаем при ошибке
       }
@@ -5223,7 +5405,14 @@
       friendsCache.rows = (friendsCache.rows || []).map((r) => {
         const t = byId.get(String(r.userId));
         return t
-          ? { ...r, inactive: t.inactive, inactiveDays: t.inactiveDays, lastXp: t.lastXp }
+          ? {
+              ...r,
+              inactive: t.inactive,
+              inactiveDays: t.inactiveDays,
+              lastXp: t.lastXp,
+              streakDays: t.streakDays,
+              scannedAt: t.scannedAt,
+            }
           : r;
       });
       friendsCache.scanUsers = targets;
@@ -6650,13 +6839,52 @@
       });
     }
 
+    // кастомный селект сортировки «Активность»
+    if (els.activitySort && els.activitySortOpts) {
+      const sortLabels = {
+        xp_desc: "Больше XP",
+        xp_asc: "Меньше XP",
+        streak_desc: "Больше дней",
+        streak_asc: "Меньше дней",
+        name_asc: "По имени A→Z",
+        name_desc: "По имени Z→A",
+      };
+      if (els.activitySortText) {
+        els.activitySortText.textContent =
+          sortLabels[DATA.settings.activitySort] || "Больше XP";
+      }
+      els.activitySort.addEventListener("click", (e) => {
+        if (els.activitySort.dataset.ready !== "1") return;
+        e.stopPropagation();
+        els.activitySort.classList.toggle("open");
+      });
+      els.activitySortOpts.forEach((opt) => {
+        opt.addEventListener("click", (e) => {
+          e.stopPropagation();
+          const mode = opt.dataset.sort || "xp_desc";
+          DATA.settings.activitySort = mode;
+          saveData();
+          if (els.activitySortText) {
+            els.activitySortText.textContent = sortLabels[mode] || mode;
+          }
+          els.activitySort.classList.remove("open");
+          if (friendFilter === "activity") renderFriends();
+        });
+      });
+      document.addEventListener("click", () => {
+        if (els.activitySort) els.activitySort.classList.remove("open");
+      });
+    }
+
     if (els.unfollowAll) {
       els.unfollowAll.addEventListener("click", () => massUnfollowNonFollowers());
+    }
     if (els.unfollowAnyone) {
       els.unfollowAnyone.addEventListener("click", () => massUnfollowAnyone());
     }
     if (els.unfollowInactive) {
       els.unfollowInactive.addEventListener("click", () => massUnfollowInactive());
+    }
     if (els.blockInactive) {
       els.blockInactive.addEventListener("click", () => massBlockInactive());
     }
@@ -6665,8 +6893,6 @@
     }
     if (els.blocksOpen) {
       els.blocksOpen.addEventListener("click", () => showBlocksView());
-    }
-    }
     }
     if (els.historyOpen) {
       els.historyOpen.addEventListener("click", () => showHistoryView());
