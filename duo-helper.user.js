@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Duolingo Helper
 // @namespace    https://github.com/Vidrimers/Duolingo-helper
-// @version      0.3.2
+// @version      0.3.3
 // @description  Проверка взаимной подписки на профилях Duolingo. Панель, бейджи, кеш.
 // @author       Vidrimers
 // @match        *://*.duolingo.com/*
@@ -1449,6 +1449,9 @@
         );
       }
       function fakeOk() {
+        try {
+          document.dispatchEvent(new CustomEvent('dh-heart-blocked'));
+        } catch (e) {}
         return Promise.resolve(new Response(JSON.stringify({ ok: true }), {
           status: 200,
           headers: { 'content-type': 'application/json' }
@@ -1474,6 +1477,7 @@
       XMLHttpRequest.prototype.send = function() {
         if (this.__dhHeartLoss) {
           try {
+            document.dispatchEvent(new CustomEvent('dh-heart-blocked'));
             Object.defineProperty(this, 'readyState', { configurable: true, value: 4 });
             Object.defineProperty(this, 'status', { configurable: true, value: 200 });
             Object.defineProperty(this, 'responseText', { configurable: true, value: '{}' });
@@ -1489,6 +1493,116 @@
     (document.documentElement || document.body).appendChild(s);
     s.remove();
     syncHeartsFlag();
+  }
+
+  /** Сервер vs экран: подтягиваем реальные сердца в UI после блокировки/урока. */
+  async function fetchServerHearts() {
+    const myId = getMyId();
+    if (!myId) return null;
+    try {
+      const data = await apiGet(
+        `${API.users}/${myId}?fields=health&_=${Date.now()}`,
+      );
+      const h = data && data.health;
+      if (!h) return null;
+      return {
+        hearts: Number(h.hearts),
+        maxHearts: Number(h.maxHearts != null ? h.maxHearts : 5),
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  function findHeartCountEls() {
+    const out = [];
+    const seen = new Set();
+    const push = (el) => {
+      if (el && !seen.has(el)) {
+        seen.add(el);
+        out.push(el);
+      }
+    };
+    // 1) data-test / aria / class с heart
+    document
+      .querySelectorAll(
+        '[data-test*="heart" i],[data-testid*="heart" i],[aria-label*="heart" i],[class*="heart" i]',
+      )
+      .forEach((el) => {
+        // у самого контейнера может быть цифра или сосед-цифра
+        if (/^\d+$/.test((el.textContent || "").trim())) push(el);
+        const sib = el.querySelector("span,div,strong,b");
+        if (sib && /^\d+$/.test((sib.textContent || "").trim())) push(sib);
+        const next = el.nextElementSibling;
+        if (next && /^\d+$/.test((next.textContent || "").trim())) push(next);
+        const prev = el.previousElementSibling;
+        if (prev && /^\d+$/.test((prev.textContent || "").trim())) push(prev);
+      });
+    // 2) svg-heart и соседняя цифра
+    document.querySelectorAll("svg").forEach((svg) => {
+      const label = (
+        (svg.getAttribute("aria-label") || "") +
+        " " +
+        (svg.getAttribute("class") || "")
+      ).toLowerCase();
+      const isHeart =
+        label.includes("heart") ||
+        (svg.innerHTML || "").toLowerCase().includes("heart");
+      if (!isHeart) return;
+      const parent = svg.parentElement;
+      if (!parent) return;
+      [parent, parent.parentElement].forEach((box) => {
+        if (!box) return;
+        box.querySelectorAll("span,div,strong,b,p").forEach((n) => {
+          if (/^\d+$/.test((n.textContent || "").trim()) && n.childElementCount === 0) {
+            push(n);
+          }
+        });
+      });
+    });
+    return out;
+  }
+
+  async function fixHeartsUi({ silent = false } = {}) {
+    if (!DATA.settings.protectHearts) return;
+    const server = await fetchServerHearts();
+    if (!server || !Number.isFinite(server.hearts)) return;
+
+    const elsH = findHeartCountEls();
+    let patched = 0;
+    for (const el of elsH) {
+      const cur = Number((el.textContent || "").trim());
+      if (!Number.isFinite(cur)) continue;
+      // трогаем только те, кто выглядит как счётчик сердец (0..max)
+      if (cur < 0 || cur > Math.max(server.maxHearts, 5) + 5) continue;
+      if (cur !== server.hearts) {
+        el.textContent = String(server.hearts);
+        patched++;
+      }
+    }
+    if (patched && !silent) {
+      showToast("Сердца синхронизированы с сервером: " + server.hearts);
+    }
+    return { server: server.hearts, patched };
+  }
+
+  function watchHeartsUi() {
+    document.addEventListener("dh-heart-blocked", () => {
+      // UI ещё может дорисовать минус — даём кадр и чиним
+      setTimeout(() => fixHeartsUi({ silent: true }), 350);
+    });
+    // после урока
+    const sync = () => {
+      if (/^\/lesson/.test(location.pathname) === false) {
+        setTimeout(() => fixHeartsUi({ silent: true }), 400);
+      }
+    };
+    window.addEventListener("popstate", sync);
+    const origPush = history.pushState;
+    history.pushState = function () {
+      origPush.apply(this, arguments);
+      sync();
+    };
   }
 
   // ========== Theme end ==========
@@ -2745,6 +2859,7 @@
     hookHistory();
     installHeartsHook();
     syncHeartsFlag();
+    watchHeartsUi();
 
     // открыть панель сразу, если включено в настройках
     if (DATA.settings.openOnStart && els.modal) {
