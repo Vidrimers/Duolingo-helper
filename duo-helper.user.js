@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Duolingo Helper
 // @namespace    https://github.com/Vidrimers/Duolingo-helper
-// @version      0.5.5
+// @version      0.5.6
 // @description  Проверка взаимной подписки на профилях Duolingo. Панель, бейджи, кеш.
 // @author       Vidrimers
 // @match        *://*.duolingo.com/*
@@ -16,6 +16,8 @@
 // @connect      api.github.com
 // @connect      goals-api.duolingo.com
 // @connect      www.duolingo.com
+// @connect      stories.duolingo.com
+// @connect      duolingo-leaderboards-prod.duolingo.com
 // @run-at       document-end
 // @noframes
 // @updateURL    https://raw.githubusercontent.com/Vidrimers/Duolingo-helper/refs/heads/master/duo-helper.user.js
@@ -1299,7 +1301,7 @@
             </div>
 
             <div class="dh-tab-content" data-tab="tools">
-                <div class="dh-acc open" data-acc>
+                <div class="dh-acc" data-acc>
                     <button type="button" class="dh-acc-head">
                         <span class="dh-acc-title">Защита сердец</span>
                         <span class="dh-acc-arrow">▾</span>
@@ -1448,8 +1450,31 @@
                     </div></div>
                 </div>
 
+                <div class="dh-acc" data-acc>
+                    <button type="button" class="dh-acc-head">
+                        <span class="dh-acc-title">⚠️ Лига — на свой страх и риск</span>
+                        <span class="dh-acc-arrow">▾</span>
+                    </button>
+                    <div class="dh-acc-body"><div class="dh-acc-inner">
+                        <div class="dh-muted" style="margin-bottom:8px">
+                            Таблица лиги, вступление, накрутка до целевого места и реакции.
+                        </div>
+                        <div class="dh-row" style="margin-bottom:6px">
+                            <button class="dh-btn dh-btn-primary" id="dh-lb-load">Таблица</button>
+                            <button class="dh-btn" id="dh-lb-join">Вступить</button>
+                        </div>
+                        <div class="dh-muted dh-op-status" id="dh-lb-status"></div>
+                        <div id="dh-lb-list" style="margin-top:8px;display:flex;flex-direction:column;gap:4px;max-height:240px;overflow-y:auto"></div>
+                        <div class="dh-row" style="margin-top:8px">
+                            <input class="dh-num-input" id="dh-lb-target" type="number" min="1" max="100" value="3" style="width:56px" />
+                            <button class="dh-btn dh-btn-danger" id="dh-lb-farm">Фарм до места</button>
+                            <button class="dh-btn" id="dh-lb-stop">Стоп</button>
+                        </div>
+                    </div></div>
+                </div>
+
                 <div class="dh-placeholder">
-                    🔜 Дальше: league, Free Max,<br/>
+                    🔜 Дальше: Free Max,<br/>
                     аккаунты, privacy
                 </div>
             </div>
@@ -1591,6 +1616,13 @@
       streakRun: modal.querySelector("#dh-streak-run"),
       streakStop: modal.querySelector("#dh-streak-stop"),
       streakStatus: modal.querySelector("#dh-streak-status"),
+      lbLoad: modal.querySelector("#dh-lb-load"),
+      lbJoin: modal.querySelector("#dh-lb-join"),
+      lbStatus: modal.querySelector("#dh-lb-status"),
+      lbList: modal.querySelector("#dh-lb-list"),
+      lbTarget: modal.querySelector("#dh-lb-target"),
+      lbFarm: modal.querySelector("#dh-lb-farm"),
+      lbStop: modal.querySelector("#dh-lb-stop"),
       setCache: modal.querySelector("#dh-set-cache"),
       clearCache: modal.querySelector("#dh-clear-cache"),
       refreshPage: modal.querySelector("#dh-refresh-page"),
@@ -3476,6 +3508,295 @@
     showToast("Накрутка streak остановлена");
   }
 
+  // ========== League ==========
+  // ⚠️ Автофарм до места — чит.
+  const LB_BASE =
+    "https://duolingo-leaderboards-prod.duolingo.com/leaderboards/7d9f5dd1-8423-491a-91f2-2532052038ce";
+  const LEAGUE_TIERS = [
+    "Bronze","Silver","Gold","Sapphire","Ruby",
+    "Emerald","Amethyst","Pearl","Obsidian","Diamond",
+  ];
+  let lbRunning = false;
+  let lbCohortId = null;
+
+  function setLbStatus(t) {
+    if (els.lbStatus) els.lbStatus.textContent = t;
+  }
+
+  function lbFetch(method, url, data) {
+    return new Promise((resolve) => {
+      GM_xmlhttpRequest({
+        method,
+        url,
+        headers: {
+          accept: "application/json",
+          "content-type": "application/json",
+          authorization: "Bearer " + (getToken() || ""),
+        },
+        data: data ? JSON.stringify(data) : undefined,
+        timeout: 15000,
+        onload(resp) {
+          let body = null;
+          try {
+            body = JSON.parse(resp.responseText || "null");
+          } catch {}
+          resolve({ status: resp.status, body });
+        },
+        onerror() {
+          resolve({ status: 0, body: null });
+        },
+        ontimeout() {
+          resolve({ status: 0, body: null });
+        },
+      });
+    });
+  }
+
+  async function fetchLeaderboard() {
+    const myId = getMyId();
+    if (!myId) throw new Error("Не выполнен вход");
+    const res = await lbFetch(
+      "GET",
+      `${LB_BASE}/users/${myId}?client_unlocked=true&get_reactions=true&_=${Date.now()}`,
+    );
+    if (res.status !== 200 || !res.body) return null;
+    const raw = Array.isArray(res.body) ? res.body[0] : res.body;
+    if (!raw || !raw.active || !raw.active.cohort || !raw.active.cohort.rankings) {
+      return null;
+    }
+    const merged = Object.assign({}, raw.active);
+    if (raw.user_id != null) merged.user_id = raw.user_id;
+    if (raw.score != null) merged.score = raw.score;
+    if (raw.tier != null) merged.tier = raw.tier;
+    if (raw.is_demoted != null) merged.is_demoted = raw.is_demoted;
+    if (raw.is_promoted != null) merged.is_promoted = raw.is_promoted;
+    if (merged.cohort && merged.cohort.cohort_id) lbCohortId = merged.cohort.cohort_id;
+    return merged;
+  }
+
+  function renderLeaderboard(data) {
+    if (!els.lbList) return;
+    els.lbList.innerHTML = "";
+    const rankings = ((data && data.cohort && data.cohort.rankings) || []).slice();
+    if (!rankings.length) {
+      els.lbList.innerHTML = '<div class="dh-muted">Нет данных — возможно, ты не в лиге</div>';
+      return;
+    }
+    const myId = String(getMyId() || "");
+    const tierName =
+      data && typeof data.tier === "number" && LEAGUE_TIERS[data.tier]
+        ? LEAGUE_TIERS[data.tier]
+        : "League";
+    const myRankIdx = rankings.findIndex((u) => String(u.user_id) === myId);
+    const myScore = myRankIdx >= 0 ? rankings[myRankIdx].score : 0;
+
+    rankings.forEach((u, i) => {
+      const row = document.createElement("div");
+      const me = String(u.user_id) === myId;
+      row.className = "dh-setting-row";
+      row.style.borderBottom = "none";
+      row.style.padding = "3px 0";
+      row.style.background = me ? "rgba(88,204,2,0.12)" : "transparent";
+      row.style.borderRadius = "6px";
+      const gap = Number(u.score || 0) - myScore;
+      const gapTxt = me
+        ? "это ты"
+        : gap > 0
+          ? "+" + gap
+          : String(gap);
+      row.innerHTML = `<div class="dh-setting-label" style="min-width:0">
+          <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+            #${i + 1} ${u.name || u.username || u.user_id}
+          </div>
+          <small>${Number(u.score || 0)} XP · ${gapTxt}${u.is_promoted ? " · ↑" : ""}${u.is_demoted ? " · ↓" : ""}</small>
+        </div>`;
+      els.lbList.appendChild(row);
+    });
+
+    const prom = rankings.slice(0, 10).some((u) => String(u.user_id) === myId);
+    setLbStatus(
+      `${tierName} · моё место: ${myRankIdx >= 0 ? myRankIdx + 1 : "—"} · XP: ${myScore}${
+        data && data.is_promoted ? " · повышение" : ""
+      }${data && data.is_demoted ? " · понижение" : ""}`,
+    );
+  }
+
+  async function loadLeague() {
+    const btn = els.lbLoad;
+    if (btn) btn.disabled = true;
+    setLbStatus("Загрузка лиги…");
+    try {
+      const data = await fetchLeaderboard();
+      if (!data) {
+        setLbStatus("Нет активной лиги");
+        els.lbList.innerHTML =
+          '<div class="dh-muted">Не в лиге или нет данных</div>';
+        return;
+      }
+      renderLeaderboard(data);
+    } catch (e) {
+      setLbStatus("Ошибка: " + (e && e.message));
+      showToast("Ошибка загрузки лиги", true);
+    } finally {
+      if (btn) btn.disabled = false;
+    }
+  }
+
+  async function joinLeague() {
+    const btn = els.lbJoin;
+    if (btn) btn.disabled = true;
+    setLbStatus("Вступление в лигу…");
+    try {
+      const myId = getMyId();
+      // если social выключен — временно включаем
+      let wasPrivate = false;
+      try {
+        const pr = await lbFetch(
+          "GET",
+          `https://www.duolingo.com/2023-05-23/users/${myId}/privacy-settings?fields=privacySettings`,
+        );
+        if (pr.status === 200 && pr.body) {
+          const soc = (pr.body.privacySettings || []).find(
+            (s) => s.id === "disable_social",
+          );
+          wasPrivate = soc ? !!soc.enabled : false;
+        }
+      } catch {}
+      if (wasPrivate) {
+        await lbFetch(
+          "PATCH",
+          `https://www.duolingo.com/2023-05-23/users/${myId}/privacy-settings?fields=privacySettings`,
+          { DISABLE_SOCIAL: false },
+        );
+        await new Promise((r) => setTimeout(r, 2000));
+      }
+
+      // лёгкий XP, чтобы попасть в лигу
+      await sessionRequest("POST", "https://www.duolingo.com/2017-06-30/sessions", {
+        challengeTypes: [],
+        fromLanguage: "en",
+        learningLanguage: "en",
+        type: "GLOBAL_PRACTICE",
+      }).catch(() => {});
+
+      if (wasPrivate) {
+        await lbFetch(
+          "PATCH",
+          `https://www.duolingo.com/2023-05-23/users/${myId}/privacy-settings?fields=privacySettings`,
+          { DISABLE_SOCIAL: true },
+        );
+      }
+      setLbStatus("Проверь таблицу лиги");
+      showToast("Запрос на вступление отправлен");
+      await loadLeague();
+    } catch (e) {
+      setLbStatus("Ошибка: " + (e && e.message));
+      showToast("Не удалось вступить в лигу", true);
+    } finally {
+      if (btn) btn.disabled = false;
+    }
+  }
+
+  async function farmLeague() {
+    if (lbRunning) return;
+    const targetRank = Math.max(
+      1,
+      Math.min(100, parseInt(els.lbTarget && els.lbTarget.value, 10) || 3),
+    );
+    lbRunning = true;
+    if (els.lbFarm) els.lbFarm.disabled = true;
+    setLbStatus("Фарм до места #" + targetRank + "…");
+
+    try {
+      let joins = 0;
+      let fails = 0;
+      while (lbRunning) {
+        const data = await fetchLeaderboard();
+        if (!data) {
+          if (joins < 3) {
+            joins++;
+            setLbStatus("Нет лиги — пробую вступить…");
+            await joinLeague();
+            await new Promise((r) => setTimeout(r, 3000));
+            continue;
+          }
+          setLbStatus("Не удалось попасть в лигу");
+          break;
+        }
+        fails = 0;
+        const rankings = data.cohort.rankings || [];
+        const myId = String(getMyId() || "");
+        const meIdx = rankings.findIndex((u) => String(u.user_id) === myId);
+        const me = meIdx >= 0 ? rankings[meIdx] : null;
+        const myRank = meIdx + 1;
+        const above = targetRank >= 2 ? rankings[targetRank - 2] : null;
+        const targetScore = above ? Number(above.score || 0) + 50 : 50;
+        const myScore = me ? Number(me.score || 0) : 0;
+
+        renderLeaderboard(data);
+        if (me && (myScore >= targetScore || (myRank > 0 && myRank <= targetRank))) {
+          setLbStatus("Цель достигнута: #" + myRank);
+          showToast("🏆 Место #" + myRank);
+          break;
+        }
+
+        setLbStatus(
+          `Фарм… место ${myRank || "—"}, цель ${targetScore} XP (сейчас ${myScore})`,
+        );
+        // накрутка XP через stories
+        const langs = await getMeLanguages();
+        const res = await new Promise((resolve) => {
+          GM_xmlhttpRequest({
+            method: "POST",
+            url: "https://stories.duolingo.com/api2/stories/fr-en-le-passeport/complete",
+            headers: {
+              "Content-Type": "application/json",
+              accept: "application/json",
+              authorization: "Bearer " + (getToken() || ""),
+            },
+            data: JSON.stringify({
+              awardXp: true,
+              completedBonusChallenge: true,
+              fromLanguage: "fr",
+              learningLanguage: "en",
+              hasXpBoost: false,
+              isLegendaryMode: true,
+            }),
+            timeout: 20000,
+            onload(r) {
+              resolve({ status: r.status });
+            },
+            onerror() {
+              resolve({ status: 0 });
+            },
+            ontimeout() {
+              resolve({ status: 0 });
+            },
+          });
+        });
+        if (res.status !== 200) {
+          fails++;
+          if (fails >= 5) {
+            setLbStatus("Слишком много ошибок, стоп");
+            break;
+          }
+          await new Promise((r) => setTimeout(r, 2500));
+        }
+        await new Promise((r) => setTimeout(r, 500 + Math.floor(Math.random() * 500)));
+      }
+    } catch (e) {
+      setLbStatus("Ошибка: " + (e && e.message));
+    } finally {
+      lbRunning = false;
+      if (els.lbFarm) els.lbFarm.disabled = false;
+    }
+  }
+
+  function stopLeagueFarm() {
+    lbRunning = false;
+    showToast("Фарм лиги остановлен");
+  }
+
   // ========== XP: фейк-буст + накрутка ==========
   // ⚠️ Читы, на свой страх и риск.
   let xpRunning = false;
@@ -4714,6 +5035,19 @@
     }
     if (els.streakStop) {
       els.streakStop.addEventListener("click", () => stopStreakFarm());
+    }
+
+    if (els.lbLoad) {
+      els.lbLoad.addEventListener("click", () => loadLeague());
+    }
+    if (els.lbJoin) {
+      els.lbJoin.addEventListener("click", () => joinLeague());
+    }
+    if (els.lbFarm) {
+      els.lbFarm.addEventListener("click", () => farmLeague());
+    }
+    if (els.lbStop) {
+      els.lbStop.addEventListener("click", () => stopLeagueFarm());
     }
 
     els.setCache.addEventListener("change", () => {
