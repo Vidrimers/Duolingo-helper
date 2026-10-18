@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Duolingo Helper
 // @namespace    https://github.com/Vidrimers/Duolingo-helper
-// @version      0.5.3
+// @version      0.5.5
 // @description  Проверка взаимной подписки на профилях Duolingo. Панель, бейджи, кеш.
 // @author       Vidrimers
 // @match        *://*.duolingo.com/*
@@ -50,6 +50,8 @@
         protectHearts: true, // блокировать списание сердец
         lessonShortener: false, // укорачивать урок до 1-2 заданий (по умолчанию выкл)
         autoSolver: false, // автосолвер в уроках (по умолчанию выкл)
+        fakeXpBoost: false, // фейк XP-буста
+        xpBoostMins: 15,
       },
       // username -> { followsMe: true/false, checkedAt: ts, theirId, theirName }
       followCache: {},
@@ -739,6 +741,8 @@
             }
             .dh-footer .dh-btn { flex: 1; text-align: center; padding: 6px 10px; }
 
+            .dh-op-status:empty { display: none; }
+
             .dh-placeholder {
                 color: #666;
                 font-size: 11px;
@@ -780,6 +784,67 @@
                 white-space: nowrap;
             }
             .dh-update-btn:hover { filter: brightness(1.1); }
+
+            /* ===== Accordion ===== */
+            .dh-acc {
+                border: 1px solid rgba(255,255,255,0.1);
+                border-radius: 10px;
+                background: rgba(0,0,0,0.12);
+                overflow: hidden;
+            }
+            .dh-acc-head {
+                width: 100%;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 8px;
+                padding: 10px 12px;
+                background: transparent;
+                border: none;
+                color: inherit;
+                font: 700 12px/1.3 Tahoma, "Segoe UI", sans-serif;
+                cursor: pointer;
+                text-align: left;
+                font-family: inherit;
+            }
+            .dh-acc-title {
+                flex: 1;
+                min-width: 0;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+            }
+            .dh-acc-arrow {
+                transition: transform 0.25s ease;
+                opacity: 0.7;
+                font-size: 12px;
+                flex-shrink: 0;
+            }
+            .dh-acc.open .dh-acc-arrow { transform: rotate(180deg); }
+            .dh-acc-body {
+                display: grid;
+                grid-template-rows: 0fr;
+                transition: grid-template-rows 0.28s ease;
+            }
+            .dh-acc.open .dh-acc-body { grid-template-rows: 1fr; }
+            .dh-acc-inner {
+                overflow: hidden;
+                min-height: 0;
+                padding: 0 12px;
+            }
+            .dh-acc.open .dh-acc-inner { padding-bottom: 12px; }
+
+            /* XP card accents by theme */
+            .dh-modal.dh-theme-vista .dh-acc {
+                border-color: rgba(120,160,210,0.35);
+                background: rgba(255,255,255,0.35);
+            }
+            .dh-modal.dh-theme-win95 .dh-acc {
+                border: 2px solid;
+                border-color: #808080 #FFF #FFF #808080;
+                border-radius: 0;
+                background: #C0C0C0;
+            }
 
             /* ===== Theme picker ===== */
             .dh-theme-picker { display: flex; gap: 6px; flex-wrap: wrap; }
@@ -1234,93 +1299,153 @@
             </div>
 
             <div class="dh-tab-content" data-tab="tools">
-                <div class="dh-card">
-                    <div class="dh-card-title">Защита сердец</div>
-                    <div class="dh-setting-row" style="border-bottom:none;padding:4px 0">
-                        <div class="dh-setting-label">
-                            Блокировать списание сердец
-                            <small>Не даёт Duolingo уменьшать сердца при ошибках в уроках</small>
+                <div class="dh-acc open" data-acc>
+                    <button type="button" class="dh-acc-head">
+                        <span class="dh-acc-title">Защита сердец</span>
+                        <span class="dh-acc-arrow">▾</span>
+                    </button>
+                    <div class="dh-acc-body"><div class="dh-acc-inner">
+                        <div class="dh-setting-row" style="border-bottom:none;padding:4px 0">
+                            <div class="dh-setting-label">
+                                Блокировать списание сердец
+                                <small>Не даёт Duolingo уменьшать сердца при ошибках в уроках</small>
+                            </div>
+                            <div class="dh-switch" id="dh-set-hearts"></div>
                         </div>
-                        <div class="dh-switch" id="dh-set-hearts"></div>
-                    </div>
-                    <div class="dh-muted" style="margin-top:6px">
-                        Статус: <strong id="dh-hearts-status">…</strong>
-                    </div>
-                </div>
-
-                <div class="dh-card">
-                    <div class="dh-card-title">⚠️ Уроки — на свой страх и риск</div>
-                    <div class="dh-setting-row" style="border-bottom:none;padding:4px 0">
-                        <div class="dh-setting-label">
-                            Короткие уроки
-                            <small>Вместо полного урока 1–2 простых задания</small>
+                        <div class="dh-muted" style="margin-top:6px">
+                            Статус: <strong id="dh-hearts-status">…</strong>
                         </div>
-                        <div class="dh-switch" id="dh-set-short"></div>
-                    </div>
-                    <div class="dh-setting-row" style="border-bottom:none;padding:4px 0">
-                        <div class="dh-setting-label">
-                            Автосолвер
-                            <small>Сам подставляет ответы в уроках</small>
+                    </div></div>
+                </div>
+
+                <div class="dh-acc" data-acc>
+                    <button type="button" class="dh-acc-head">
+                        <span class="dh-acc-title">⚠️ Уроки — на свой страх и риск</span>
+                        <span class="dh-acc-arrow">▾</span>
+                    </button>
+                    <div class="dh-acc-body"><div class="dh-acc-inner">
+                        <div class="dh-setting-row" style="border-bottom:none;padding:4px 0">
+                            <div class="dh-setting-label">
+                                Короткие уроки
+                                <small>Вместо полного урока 1–2 простых задания</small>
+                            </div>
+                            <div class="dh-switch" id="dh-set-short"></div>
                         </div>
-                        <div class="dh-switch" id="dh-set-solver"></div>
-                    </div>
-                    <div class="dh-row" style="margin-top:6px">
-                        <button class="dh-btn dh-btn-primary" id="dh-solve-now">Решить сейчас</button>
-                    </div>
-                    <div class="dh-muted" id="dh-lesson-status" style="margin-top:6px">Готово</div>
+                        <div class="dh-setting-row" style="border-bottom:none;padding:4px 0">
+                            <div class="dh-setting-label">
+                                Автосолвер
+                                <small>Сам подставляет ответы в уроках</small>
+                            </div>
+                            <div class="dh-switch" id="dh-set-solver"></div>
+                        </div>
+                        <div class="dh-row" style="margin-top:6px">
+                            <button class="dh-btn dh-btn-primary" id="dh-solve-now">Решить сейчас</button>
+                        </div>
+                        <div class="dh-muted dh-op-status" id="dh-lesson-status"></div>
+                    </div></div>
                 </div>
 
-                <div class="dh-card">
-                    <div class="dh-card-title">⚠️ Квесты — на свой страх и риск</div>
-                    <div class="dh-muted" style="margin-bottom:8px">
-                        Инъекция прогресса в daily/monthly квесты. Формально нарушает правила Duolingo — возможна блокировка.
-                    </div>
-                    <div class="dh-row" style="margin-bottom:6px">
-                        <button class="dh-btn dh-btn-primary" id="dh-quest-daily">Daily</button>
-                        <button class="dh-btn" id="dh-quest-load">Monthly</button>
-                        <button class="dh-btn" id="dh-quest-claim-all">Забрать все</button>
-                    </div>
-                    <div class="dh-muted" id="dh-quest-status">Готово</div>
-                    <div id="dh-quest-list" style="margin-top:8px;display:flex;flex-direction:column;gap:6px"></div>
+                <div class="dh-acc" data-acc>
+                    <button type="button" class="dh-acc-head">
+                        <span class="dh-acc-title">⚠️ XP / буст — на свой страх и риск</span>
+                        <span class="dh-acc-arrow">▾</span>
+                    </button>
+                    <div class="dh-acc-body"><div class="dh-acc-inner">
+                        <div class="dh-setting-row" style="border-bottom:none;padding:4px 0">
+                            <div class="dh-setting-label">
+                                Фейк XP-буст (x2)
+                                <small>Подмешивает активный буст в ответ API — UI показывает множитель</small>
+                            </div>
+                            <div class="dh-switch" id="dh-set-xpboost"></div>
+                        </div>
+                        <div class="dh-row" style="margin:6px 0">
+                            <button class="dh-btn" id="dh-xpboost-15">x2 · 15м</button>
+                            <button class="dh-btn" id="dh-xpboost-60">x2 · 60м</button>
+                        </div>
+                        <div class="dh-muted" style="margin-bottom:8px">
+                            Накрутка XP (реальное начисление, чит):
+                        </div>
+                        <div class="dh-row" style="margin-bottom:6px">
+                            <input class="dh-num-input" id="dh-xp-amount" type="number" min="1" max="99999" value="500" style="width:72px" />
+                            <button class="dh-btn dh-btn-primary" id="dh-xp-stories">Stories</button>
+                            <button class="dh-btn dh-btn-danger" id="dh-xp-sessions">Sessions</button>
+                            <button class="dh-btn" id="dh-xp-stop">Стоп</button>
+                        </div>
+                        <div class="dh-muted dh-op-status" id="dh-xp-status"></div>
+                    </div></div>
                 </div>
 
-                <div class="dh-card">
-                    <div class="dh-card-title">⚠️ Магазин — на свой страх и риск</div>
-                    <div class="dh-muted" style="margin-bottom:8px">
-                        Выдача предметов магазина без оплаты/гемов. Нарушает правила Duolingo.
-                    </div>
-                    <div class="dh-row" style="margin-bottom:6px">
-                        <button class="dh-btn dh-btn-primary" id="dh-shop-load">Загрузить</button>
-                        <button class="dh-btn dh-btn-danger" id="dh-shop-super">Super 3 дня</button>
-                    </div>
-                    <div class="dh-muted" id="dh-shop-status">Готово</div>
-                    <div id="dh-shop-list" style="margin-top:8px;display:flex;flex-direction:column;gap:6px;max-height:260px;overflow-y:auto"></div>
+                <div class="dh-acc" data-acc>
+                    <button type="button" class="dh-acc-head">
+                        <span class="dh-acc-title">⚠️ Квесты — на свой страх и риск</span>
+                        <span class="dh-acc-arrow">▾</span>
+                    </button>
+                    <div class="dh-acc-body"><div class="dh-acc-inner">
+                        <div class="dh-muted" style="margin-bottom:8px">
+                            Инъекция прогресса в daily/monthly квесты. Нарушает правила Duolingo.
+                        </div>
+                        <div class="dh-row" style="margin-bottom:6px">
+                            <button class="dh-btn dh-btn-primary" id="dh-quest-daily">Daily</button>
+                            <button class="dh-btn" id="dh-quest-load">Monthly</button>
+                            <button class="dh-btn" id="dh-quest-claim-all">Забрать все</button>
+                        </div>
+                        <div class="dh-muted dh-op-status" id="dh-quest-status"></div>
+                        <div id="dh-quest-list" style="margin-top:8px;display:flex;flex-direction:column;gap:6px"></div>
+                    </div></div>
                 </div>
 
-                <div class="dh-card">
-                    <div class="dh-card-title">⚠️ Гемы (алмазы) — на свой страх и риск</div>
-                    <div class="dh-muted" style="margin-bottom:8px">
-                        Сбор rewardBundles (SKILL_COMPLETION). Кнопки GET в магазине баланс гемов НЕ пополняют.
-                    </div>
-                    <div class="dh-row" style="margin-bottom:6px">
-                        <button class="dh-btn dh-btn-primary" id="dh-gems-once">Собрать</button>
-                        <button class="dh-btn dh-btn-danger" id="dh-gems-farm">Фарм</button>
-                        <button class="dh-btn" id="dh-gems-stop">Стоп</button>
-                    </div>
-                    <div class="dh-muted" id="dh-gems-status">Баланс: —</div>
+                <div class="dh-acc" data-acc>
+                    <button type="button" class="dh-acc-head">
+                        <span class="dh-acc-title">⚠️ Магазин — на свой страх и риск</span>
+                        <span class="dh-acc-arrow">▾</span>
+                    </button>
+                    <div class="dh-acc-body"><div class="dh-acc-inner">
+                        <div class="dh-muted" style="margin-bottom:8px">
+                            Выдача предметов магазина без оплаты/гемов. Нарушает правила Duolingo.
+                        </div>
+                        <div class="dh-row" style="margin-bottom:6px">
+                            <button class="dh-btn dh-btn-primary" id="dh-shop-load">Загрузить</button>
+                            <button class="dh-btn dh-btn-danger" id="dh-shop-super">Super 3 дня</button>
+                        </div>
+                        <div class="dh-muted dh-op-status" id="dh-shop-status"></div>
+                        <div id="dh-shop-list" style="margin-top:8px;display:flex;flex-direction:column;gap:6px;max-height:260px;overflow-y:auto"></div>
+                    </div></div>
                 </div>
 
-                <div class="dh-card">
-                    <div class="dh-card-title">⚠️ Streak — на свой страх и риск</div>
-                    <div class="dh-muted" style="margin-bottom:8px">
-                        Восстановление/накрутка дней серии через подмену дат в sessions. Нарушает правила Duolingo.
-                    </div>
-                    <div class="dh-row" style="margin-bottom:6px">
-                        <input class="dh-num-input" id="dh-streak-days" type="number" min="1" max="365" value="7" style="width:64px" />
-                        <button class="dh-btn dh-btn-primary" id="dh-streak-run">Накрутить дни</button>
-                        <button class="dh-btn" id="dh-streak-stop">Стоп</button>
-                    </div>
-                    <div class="dh-muted" id="dh-streak-status">Готово</div>
+                <div class="dh-acc" data-acc>
+                    <button type="button" class="dh-acc-head">
+                        <span class="dh-acc-title">⚠️ Гемы (алмазы) — на свой страх и риск</span>
+                        <span class="dh-acc-arrow">▾</span>
+                    </button>
+                    <div class="dh-acc-body"><div class="dh-acc-inner">
+                        <div class="dh-muted" style="margin-bottom:8px">
+                            Сбор rewardBundles (SKILL_COMPLETION). Кнопки GET в магазине баланс гемов НЕ пополняют.
+                        </div>
+                        <div class="dh-row" style="margin-bottom:6px">
+                            <button class="dh-btn dh-btn-primary" id="dh-gems-once">Собрать</button>
+                            <button class="dh-btn dh-btn-danger" id="dh-gems-farm">Фарм</button>
+                            <button class="dh-btn" id="dh-gems-stop">Стоп</button>
+                        </div>
+                        <div class="dh-muted dh-op-status" id="dh-gems-status"></div>
+                    </div></div>
+                </div>
+
+                <div class="dh-acc" data-acc>
+                    <button type="button" class="dh-acc-head">
+                        <span class="dh-acc-title">⚠️ Streak — на свой страх и риск</span>
+                        <span class="dh-acc-arrow">▾</span>
+                    </button>
+                    <div class="dh-acc-body"><div class="dh-acc-inner">
+                        <div class="dh-muted" style="margin-bottom:8px">
+                            Восстановление/накрутка дней серии через подмену дат в sessions. Нарушает правила Duolingo.
+                        </div>
+                        <div class="dh-row" style="margin-bottom:6px">
+                            <input class="dh-num-input" id="dh-streak-days" type="number" min="1" max="365" value="7" style="width:64px" />
+                            <button class="dh-btn dh-btn-primary" id="dh-streak-run">Накрутить дни</button>
+                            <button class="dh-btn" id="dh-streak-stop">Стоп</button>
+                        </div>
+                        <div class="dh-muted dh-op-status" id="dh-streak-status"></div>
+                    </div></div>
                 </div>
 
                 <div class="dh-placeholder">
@@ -1440,6 +1565,15 @@
       setSolver: modal.querySelector("#dh-set-solver"),
       solveNow: modal.querySelector("#dh-solve-now"),
       lessonStatus: modal.querySelector("#dh-lesson-status"),
+      setXpBoost: modal.querySelector("#dh-set-xpboost"),
+      xpBoost15: modal.querySelector("#dh-xpboost-15"),
+      xpBoost60: modal.querySelector("#dh-xpboost-60"),
+      xpAmount: modal.querySelector("#dh-xp-amount"),
+      xpStories: modal.querySelector("#dh-xp-stories"),
+      xpSessions: modal.querySelector("#dh-xp-sessions"),
+      xpStop: modal.querySelector("#dh-xp-stop"),
+      xpStatus: modal.querySelector("#dh-xp-status"),
+      accs: [...modal.querySelectorAll("[data-acc]")],
       questDaily: modal.querySelector("#dh-quest-daily"),
       questLoad: modal.querySelector("#dh-quest-load"),
       questClaimAll: modal.querySelector("#dh-quest-claim-all"),
@@ -3342,6 +3476,266 @@
     showToast("Накрутка streak остановлена");
   }
 
+  // ========== XP: фейк-буст + накрутка ==========
+  // ⚠️ Читы, на свой страх и риск.
+  let xpRunning = false;
+
+  function setXpStatus(t) {
+    if (els.xpStatus) els.xpStatus.textContent = t;
+  }
+
+  function syncXpBoostFlag() {
+    const on = !!DATA.settings.fakeXpBoost;
+    try {
+      localStorage.setItem("dh_fake_xpboost", on ? "true" : "false");
+      localStorage.setItem(
+        "dh_xpboost_mins",
+        String(DATA.settings.xpBoostMins || 15),
+      );
+    } catch {}
+    if (els.setXpBoost) els.setXpBoost.classList.toggle("on", on);
+    if (els.xpBoost15 && els.xpBoost60) {
+      const m = DATA.settings.xpBoostMins || 15;
+      els.xpBoost15.classList.toggle("dh-btn-primary", on && m === 15);
+      els.xpBoost60.classList.toggle("dh-btn-primary", on && m === 60);
+    }
+    setXpStatus(
+      on
+        ? "фейк-буст: x2 · " + (DATA.settings.xpBoostMins || 15) + " мин"
+        : "",
+    );
+  }
+
+  function installXpBoostHook() {
+    if (document.getElementById("dh-xpboost-hook")) return;
+    const s = document.createElement("script");
+    s.id = "dh-xpboost-hook";
+    s.textContent = `(function() {
+      if (window.__dhXpBoostHooked) return;
+      window.__dhXpBoostHooked = true;
+
+      function active() {
+        try { return localStorage.getItem('dh_fake_xpboost') === 'true'; } catch (e) { return false; }
+      }
+      function mins() {
+        try { return parseInt(localStorage.getItem('dh_xpboost_mins') || '15', 10) || 15; } catch (e) { return 15; }
+      }
+      function isUserUrl(url) {
+        return /\\/\\d{4}-\\d{2}-\\d{2}\\/users\\//.test(String(url)) ||
+          /\\/2023-05-23\\/users\\//.test(String(url));
+      }
+      function modUser(text) {
+        try {
+          var d = JSON.parse(text);
+          if (!active()) return text;
+          var exp = Date.now() + mins() * 60 * 1000;
+          d.hasPlus = d.hasPlus || true;
+          d.shopItems = Object.assign({}, d.shopItems, {
+            xp_boost_15: { itemName: 'xp_boost_15', expirationTime: exp, quantity: 1 },
+            xp_boost_60: { itemName: 'xp_boost_60', expirationTime: exp, quantity: 1 },
+            general_xp_boost: { itemName: 'general_xp_boost', expirationTime: exp, quantity: 1 },
+            xp_boost_stackable: { itemName: 'xp_boost_stackable', expirationTime: exp, quantity: 1 }
+          });
+          if (!d.trackingProperties || typeof d.trackingProperties !== 'object') d.trackingProperties = {};
+          d.trackingProperties.has_item_xp_boost_15 = true;
+          d.trackingProperties.has_item_xp_boost_60 = true;
+          d.trackingProperties.has_item_general_xp_boost = true;
+          if (d.activeXpBoost == null) {
+            d.activeXpBoost = { multiplier: 2, expirationTime: exp };
+          }
+          return JSON.stringify(d);
+        } catch (e) { return text; }
+      }
+      function makeResponse(text, orig) {
+        var hdrs = {};
+        try {
+          orig.headers.forEach(function(v, k) { hdrs[k] = v; });
+        } catch (e) {}
+        hdrs['content-type'] = 'application/json';
+        return new Response(text, {
+          status: orig.status,
+          statusText: orig.statusText,
+          headers: hdrs
+        });
+      }
+
+      var origFetch = window.fetch;
+      window.fetch = function(resource, options) {
+        var url = resource instanceof Request ? resource.url : String(resource || '');
+        var method = options && options.method ? String(options.method).toUpperCase() : 'GET';
+        if (method === 'GET' && active() && isUserUrl(url) && url.indexOf('shop-items') === -1) {
+          return origFetch.apply(this, arguments).then(function(r) {
+            return r.clone().text().then(function(t) {
+              return makeResponse(modUser(t), r);
+            }).catch(function() { return r; });
+          });
+        }
+        return origFetch.apply(this, arguments);
+      };
+      window.fetch.__dhXpBoost = true;
+
+      var origOpen = XMLHttpRequest.prototype.open;
+      var origSend = XMLHttpRequest.prototype.send;
+      XMLHttpRequest.prototype.open = function(method, url) {
+        this.__dhXpUser = String(method || '').toUpperCase() === 'GET' && isUserUrl(url) && String(url).indexOf('shop-items') === -1;
+        return origOpen.apply(this, arguments);
+      };
+      XMLHttpRequest.prototype.send = function() {
+        var xhr = this;
+        if (xhr.__dhXpUser) {
+          var origChange = xhr.onreadystatechange;
+          xhr.onreadystatechange = function() {
+            if (xhr.readyState === 4 && xhr.status >= 200 && xhr.status < 300 && active()) {
+              try {
+                var raw = modUser(xhr.responseText);
+                Object.defineProperty(xhr, 'responseText', { writable: true, configurable: true, value: raw });
+                Object.defineProperty(xhr, 'response', { writable: true, configurable: true, value: raw });
+              } catch (e) {}
+            }
+            if (origChange) origChange.apply(this, arguments);
+          };
+        }
+        return origSend.apply(this, arguments);
+      };
+    })();`;
+    (document.documentElement || document.body).appendChild(s);
+    s.remove();
+    syncXpBoostFlag();
+  }
+
+  const STORY_SLUG = "fr-en-le-passeport";
+
+  async function farmXp(mode) {
+    if (xpRunning) return;
+    const target = Math.max(1, Math.min(99999, parseInt(els.xpAmount && els.xpAmount.value, 10) || 500));
+    xpRunning = true;
+    if (els.xpStories) els.xpStories.disabled = true;
+    if (els.xpSessions) els.xpSessions.disabled = true;
+    setXpStatus(`Накрутка (${mode})… 0 / ${target}`);
+
+    const langs = await getMeLanguages();
+    const myId = getMyId();
+    let earned = 0;
+    let fails = 0;
+
+    try {
+      while (xpRunning && earned < target) {
+        let got = 0;
+        if (mode === "stories") {
+          const res = await new Promise((resolve) => {
+            GM_xmlhttpRequest({
+              method: "POST",
+              url: `https://stories.duolingo.com/api2/stories/${STORY_SLUG}/complete`,
+              headers: {
+                "Content-Type": "application/json",
+                accept: "application/json",
+                authorization: "Bearer " + (getToken() || ""),
+              },
+              data: JSON.stringify({
+                awardXp: true,
+                completedBonusChallenge: true,
+                fromLanguage: langs.fromLanguage === "en" ? "fr" : langs.fromLanguage,
+                learningLanguage: "en",
+                hasXpBoost: true,
+                illustrationFormat: "svg",
+                isFeaturedStoryInPracticeHub: true,
+                isLegendaryMode: true,
+                isV2Redo: false,
+              }),
+              timeout: 20000,
+              onload(r) {
+                let body = null;
+                try {
+                  body = JSON.parse(r.responseText || "null");
+                } catch {}
+                resolve({ status: r.status, body });
+              },
+              onerror() {
+                resolve({ status: 0, body: null });
+              },
+              ontimeout() {
+                resolve({ status: 0, body: null });
+              },
+            });
+          });
+          if (res.status === 200) {
+            got = Number((res.body && (res.body.awardedXp || res.body.xpGain)) || 499);
+          }
+        } else {
+          const sr = await sessionRequest("POST", "https://www.duolingo.com/2017-06-30/sessions", {
+            challengeTypes: [],
+            fromLanguage: langs.fromLanguage,
+            learningLanguage: langs.learningLanguage,
+            type: "UNIT_TEST",
+          });
+          if (sr.status === 200 && sr.body && sr.body.id) {
+            const now = Math.floor(Date.now() / 1000);
+            const ur = await sessionRequest(
+              "PUT",
+              `https://www.duolingo.com/2017-06-30/sessions/${sr.body.id}`,
+              {
+                id: sr.body.id,
+                metadata: sr.body.metadata,
+                type: "UNIT_TEST",
+                fromLanguage: langs.fromLanguage,
+                learningLanguage: langs.learningLanguage,
+                challenges: [],
+                adaptiveChallenges: [],
+                sessionExperimentRecord: [],
+                experiments_with_treatment_contexts: [],
+                adaptiveInterleavedChallenges: [],
+                sessionStartExperiments: [],
+                trackingProperties: [],
+                ttsAnnotations: [],
+                heartsLeft: 0,
+                startTime: now,
+                enableBonusPoints: true,
+                endTime: now + 60,
+                failed: false,
+                maxInLessonStreak: 9,
+                shouldLearnThings: true,
+                hasBoost: true,
+                happyHourBonusXp: 10,
+                pathLevelSpecifics: { unitIndex: 0 },
+              },
+            );
+            if (ur.status === 200) {
+              got = Number((ur.body && (ur.body.awardedXp || ur.body.xpGain)) || 110);
+            }
+          }
+        }
+
+        if (got > 0) {
+          earned += got;
+          fails = 0;
+          setXpStatus(`+${earned} XP (цель ${target})`);
+        } else {
+          fails++;
+          if (fails >= 5) {
+            setXpStatus("Слишком много ошибок, стоп");
+            break;
+          }
+          await new Promise((r) => setTimeout(r, 1500));
+        }
+        await new Promise((r) => setTimeout(r, 350 + Math.floor(Math.random() * 350)));
+      }
+      setXpStatus(earned ? `Готово: +${earned} XP` : "Ничего не начислено");
+      showToast(earned ? "✓ +" + earned + " XP" : "XP не начислены", !earned);
+    } catch (e) {
+      setXpStatus("Ошибка: " + (e && e.message));
+      showToast("Ошибка накрутки XP", true);
+    } finally {
+      xpRunning = false;
+      if (els.xpStories) els.xpStories.disabled = false;
+      if (els.xpSessions) els.xpSessions.disabled = false;
+    }
+  }
+
+  function stopXpFarm() {
+    xpRunning = false;
+    showToast("Накрутка XP остановлена");
+  }
+
   // ========== Toast ==========
   function showToast(msg, isError = false) {
     if (!shadow) return;
@@ -4235,6 +4629,59 @@
       els.solveNow.addEventListener("click", () => solveNow());
     }
 
+    // аккордеон: один открыт
+    if (els.accs && els.accs.length) {
+      els.accs.forEach((acc) => {
+        const head = acc.querySelector(".dh-acc-head");
+        if (!head) return;
+        head.addEventListener("click", () => {
+          const isOpen = acc.classList.contains("open");
+          els.accs.forEach((a) => a.classList.remove("open"));
+          if (!isOpen) acc.classList.add("open");
+        });
+      });
+    }
+
+    if (els.setXpBoost) {
+      els.setXpBoost.addEventListener("click", () => {
+        DATA.settings.fakeXpBoost = !DATA.settings.fakeXpBoost;
+        saveData();
+        syncXpBoostFlag();
+        showToast(
+          DATA.settings.fakeXpBoost
+            ? "Фейк XP-буст включён"
+            : "Фейк XP-буст выключен",
+        );
+      });
+    }
+    if (els.xpBoost15) {
+      els.xpBoost15.addEventListener("click", () => {
+        DATA.settings.xpBoostMins = 15;
+        DATA.settings.fakeXpBoost = true;
+        saveData();
+        syncXpBoostFlag();
+        showToast("Фейк x2 · 15 мин");
+      });
+    }
+    if (els.xpBoost60) {
+      els.xpBoost60.addEventListener("click", () => {
+        DATA.settings.xpBoostMins = 60;
+        DATA.settings.fakeXpBoost = true;
+        saveData();
+        syncXpBoostFlag();
+        showToast("Фейк x2 · 60 мин");
+      });
+    }
+    if (els.xpStories) {
+      els.xpStories.addEventListener("click", () => farmXp("stories"));
+    }
+    if (els.xpSessions) {
+      els.xpSessions.addEventListener("click", () => farmXp("sessions"));
+    }
+    if (els.xpStop) {
+      els.xpStop.addEventListener("click", () => stopXpFarm());
+    }
+
     if (els.questDaily) {
       els.questDaily.addEventListener("click", () => runDailyQuests());
     }
@@ -4349,6 +4796,8 @@
     syncHeartsFlag();
     installLessonTools();
     syncLessonFlags();
+    installXpBoostHook();
+    syncXpBoostFlag();
     watchHeartsUi();
 
     // открыть панель сразу, если включено в настройках
