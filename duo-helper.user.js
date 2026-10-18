@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Duolingo Helper
 // @namespace    https://github.com/Vidrimers/Duolingo-helper
-// @version      0.5.2
+// @version      0.5.3
 // @description  Проверка взаимной подписки на профилях Duolingo. Панель, бейджи, кеш.
 // @author       Vidrimers
 // @match        *://*.duolingo.com/*
@@ -48,8 +48,8 @@
         openOnStart: false, // открывать панель при загрузке сайта
         theme: "xp", // xp | vista | win95
         protectHearts: true, // блокировать списание сердец
-        lessonShortener: true, // укорачивать урок до 1-2 заданий
-        autoSolver: true, // автосолвер в уроках
+        lessonShortener: false, // укорачивать урок до 1-2 заданий (по умолчанию выкл)
+        autoSolver: false, // автосолвер в уроках (по умолчанию выкл)
       },
       // username -> { followsMe: true/false, checkedAt: ts, theirId, theirName }
       followCache: {},
