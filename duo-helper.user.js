@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Duolingo Helper
 // @namespace    https://github.com/Vidrimers/Duolingo-helper
-// @version      0.3.8
+// @version      0.3.9
 // @description  Проверка взаимной подписки на профилях Duolingo. Панель, бейджи, кеш.
 // @author       Vidrimers
 // @match        *://*.duolingo.com/*
@@ -2060,6 +2060,53 @@
 
   // ========== Shop ==========
   // ⚠️ Выдача предметов isFree — чит, на свой страх и риск.
+
+  /** Человекочитаемые названия предметов магазина. */
+  function describeShopItem(item) {
+    const id = String(item.id || "").toLowerCase();
+    const rawName = item.name ? String(item.name) : "";
+
+    const table = [
+      [/immersive_subscription|super_?3/, "Super — 3 дня", "Триал-подписка Super"],
+      [/streak_repair|repair_streak/, "Починка серии", "Восстановить потерянный streak"],
+      [/friend_streak_freeze|society_streak_freeze|extra_streak_freeze|streak_freeze/, "Заморозка серии", "Один день без потери streak"],
+      [/streak_shield|streak_protect/, "Щит серии", "Защита streak на день"],
+      [/xp_boost_(\d+)/, (m) => `Буст XP на ${m[1]} мин`, "Двойной опыт"],
+      [/xp_boost|double_xp|xp_2x/, "Буст XP", "Двойной опыт на время"],
+      [/timer_boost|time_boost|heart_timer/, "Ускорение таймера", "Быстрее восстановление"],
+      [/health_refill|heart_refill|refill_heart|health_pack|buy_heart|hearts?$/, "Пополнение сердец", "Вернуть сердца"],
+      [/gem|crystal/, "Гемы", "Пакет гемов"],
+      [/outfit|skin|costume|wearable/, "Аутфит", "Внешний вид аватара"],
+      [/legendary|legend_/, "Легендарный", "Доступ к legendary-контенту"],
+      [/practice|workbook/, "Практика", "Дополнительная практика"],
+      [/quiz|challenge_/, "Челлендж", "Особое испытание"],
+      [/super_?trial|free_taste|trial/, "Пробный Super", "Короткая подписка Super"],
+      [/chest|loot|gift_(?!.*block)/, "Сундук", "Набор наград"],
+      [/ad_?free|no_?ads/, "Без рекламы", "Убрать рекламу"],
+    ];
+
+    for (const [re, name, desc] of table) {
+      const m = id.match(re);
+      if (m) {
+        return {
+          name: typeof name === "function" ? name(m) : name,
+          desc,
+        };
+      }
+    }
+
+    // fallback: «society streak freeze society_streak_freeze» → «Society Streak Freeze»
+    const pretty = (rawName || id)
+      .replace(/[_-]+/g, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+      .replace(/\b\w/g, (c) => c.toUpperCase());
+    return {
+      name: pretty || id,
+      desc: item.id || "",
+    };
+  }
+
   function setShopStatus(text) {
     if (els.shopStatus) els.shopStatus.textContent = text;
   }
@@ -2156,14 +2203,14 @@
       head.textContent = label;
       els.shopList.appendChild(head);
       for (const item of group) {
-        const name = item.name || String(item.id).replace(/_/g, " ");
+        const info = describeShopItem(item);
         const row = document.createElement("div");
         row.className = "dh-setting-row";
         row.style.borderBottom = "none";
         row.style.padding = "3px 0";
         row.innerHTML = `<div class="dh-setting-label" style="min-width:0">
-            <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${name}</div>
-            <small>${item.id || ""}</small>
+            <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${info.name}</div>
+            <small>${info.desc}</small>
         </div>
         <button class="dh-btn" style="padding:4px 10px;font-size:11px">GET</button>`;
         const b = row.querySelector("button");
@@ -2172,7 +2219,7 @@
           b.textContent = "…";
           const ok = await buyShopItem(item.id);
           b.textContent = ok ? "✓" : "ERR";
-          showToast(ok ? "✓ " + name : "Не удалось: " + name, !ok);
+          showToast(ok ? "✓ " + info.name : "Не удалось: " + info.name, !ok);
           setTimeout(() => {
             b.disabled = false;
             b.textContent = "GET";
