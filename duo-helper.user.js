@@ -4281,7 +4281,7 @@
   function startUpdateReload() {
     window.open(installUrl, "_blank");
     let left = 8;
-    showToast(`Установи обновление в Tampermonkey. Перезагрузка через ${left}…`);
+    showToast(`Установка обновления… перезагрузка через ${left}…`);
     const tick = setInterval(() => {
       left -= 1;
       if (left <= 0) {
@@ -4289,7 +4289,7 @@
         location.reload();
         return;
       }
-      showToast(`Перезагрузка через ${left}… (установи обновление в Tampermonkey)`);
+      showToast(`Установка обновления… перезагрузка через ${left}…`);
     }, 1000);
   }
 
