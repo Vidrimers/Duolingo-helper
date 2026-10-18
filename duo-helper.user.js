@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Duolingo Helper
 // @namespace    https://github.com/Vidrimers/Duolingo-helper
-// @version      0.2.6
+// @version      0.2.7
 // @description  Проверка взаимной подписки на профилях Duolingo. Панель, бейджи, кеш.
 // @author       Vidrimers
 // @match        *://*.duolingo.com/*
@@ -1310,7 +1310,8 @@
         `@${username} · проверено ${fmtTime(entry.checkedAt)}`,
       );
       if (!manual) {
-        setBadge("yes", "✅ Подписан(а) на вас", `@${username}`);
+        // без эмодзи в тексте — иконка ставится отдельно в .dh-inline-icon
+        setBadge("yes", "Подписан(а) на вас", `@${username}`);
       }
     } else {
       setStatusFn(
@@ -1319,7 +1320,7 @@
         `@${username} · проверено ${fmtTime(entry.checkedAt)}`,
       );
       if (!manual) {
-        setBadge("no", "❌ Не подписан(а) на вас", `@${username}`);
+        setBadge("no", "Не подписан(а) на вас", `@${username}`);
       }
     }
   }
@@ -1401,7 +1402,7 @@
   }
 
   // ========== ПРОВЕРКА ОБНОВЛЕНИЙ ==========
-  const CURRENT_VERSION = "0.2.6";
+  const CURRENT_VERSION = "0.2.7";
   const REPO_RAW_BASE =
     "https://raw.githubusercontent.com/Vidrimers/Duolingo-helper";
   // запасная ссылка установки, если SHA не удалось получить
