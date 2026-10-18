@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Duolingo Helper
 // @namespace    https://github.com/Vidrimers/Duolingo-helper
-// @version      0.5.8
+// @version      0.5.10
 // @description  Проверка взаимной подписки на профилях Duolingo. Панель, бейджи, кеш.
 // @author       Vidrimers
 // @match        *://*.duolingo.com/*
@@ -59,6 +59,9 @@
       followCache: {},
       me: null, // { id, username, name }
       actionLog: [], // история отписок/действий для undo
+      friendSnapshots: [], // [{ ts, following:[ids], followers:[ids] }]
+      friendChanges: [], // [{ ts, type, userId, username, name, seen }]
+      friendChangesUnread: 0,
     };
     if (!raw) return def;
     try {
@@ -68,6 +71,13 @@
         followCache: parsed.followCache || {},
         me: parsed.me || null,
         actionLog: Array.isArray(parsed.actionLog) ? parsed.actionLog : [],
+        friendSnapshots: Array.isArray(parsed.friendSnapshots)
+          ? parsed.friendSnapshots
+          : [],
+        friendChanges: Array.isArray(parsed.friendChanges)
+          ? parsed.friendChanges
+          : [],
+        friendChangesUnread: Number(parsed.friendChangesUnread) || 0,
       };
     } catch {
       return def;
@@ -760,6 +770,29 @@
 
             .dh-op-status:empty { display: none; }
 
+            /* New change rows — highlight until hover */
+            .dh-change-new {
+                background: rgba(88,204,2,0.14);
+                border-radius: 6px;
+            }
+            .dh-change-new:hover {
+                background: rgba(88,204,2,0.06);
+            }
+            .dh-modal.dh-theme-vista .dh-change-new {
+                background: rgba(46,109,168,0.14);
+            }
+            .dh-modal.dh-theme-win95 .dh-change-new {
+                background: #000080;
+                color: #fff;
+            }
+            .dh-modal.dh-theme-win95 .dh-change-new small {
+                color: #ddd;
+            }
+            .dh-modal.dh-theme-win95 .dh-change-new:hover {
+                background: #000080;
+                color: #fff;
+            }
+
             .dh-placeholder {
                 color: #666;
                 font-size: 11px;
@@ -1417,6 +1450,7 @@
                 <div class="dh-muted" style="display:flex;gap:12px;margin-bottom:8px;font-size:11px">
                     <button type="button" id="dh-unfollow-all" style="background:none;border:none;color:#c0392b;cursor:pointer;font:inherit;font-size:11px;padding:0;text-decoration:underline">Отписаться от неподписанных ❌</button>
                     <button type="button" id="dh-history-open" style="background:none;border:none;color:#888;cursor:pointer;font:inherit;font-size:11px;padding:0;text-decoration:underline">История</button>
+                    <button type="button" id="dh-changes-open" style="background:none;border:none;color:#888;cursor:pointer;font:inherit;font-size:11px;padding:0;text-decoration:underline">Изменения<span id="dh-changes-badge" style="display:none;min-width:16px;height:16px;padding:0 4px;margin-left:4px;border-radius:8px;background:#c0392b;color:#fff;font-size:10px;font-weight:700;line-height:16px;text-align:center;vertical-align:middle;text-decoration:none"></span></button>
                     <button type="button" id="dh-history-back" style="display:none;background:none;border:none;color:#888;cursor:pointer;font:inherit;font-size:11px;padding:0;text-decoration:underline">← Друзья</button>
                 </div>
                 <div class="dh-tabs" style="margin:8px 0" id="dh-friends-filters">
@@ -1427,6 +1461,7 @@
                 <div class="dh-muted dh-op-status" id="dh-friends-status"></div>
                 <div id="dh-friends-list" style="display:flex;flex-direction:column;gap:4px;max-height:52vh;overflow-y:auto"></div>
                 <div id="dh-history-list" style="display:none;flex-direction:column;gap:4px;max-height:52vh;overflow-y:auto"></div>
+                <div id="dh-changes-list" style="display:none;flex-direction:column;gap:4px;max-height:52vh;overflow-y:auto"></div>
             </div>
 
             <div class="dh-tab-content" data-tab="tools">
@@ -1765,6 +1800,9 @@
       historyOpen: modal.querySelector("#dh-history-open"),
       historyBack: modal.querySelector("#dh-history-back"),
       historyList: modal.querySelector("#dh-history-list"),
+      changesOpen: modal.querySelector("#dh-changes-open"),
+      changesList: modal.querySelector("#dh-changes-list"),
+      changesBadge: modal.querySelector("#dh-changes-badge"),
       setCache: modal.querySelector("#dh-set-cache"),
       clearCache: modal.querySelector("#dh-clear-cache"),
       refreshPage: modal.querySelector("#dh-refresh-page"),
@@ -4091,19 +4129,194 @@
   function showFriendsView() {
     if (els.friendsList) els.friendsList.style.display = "flex";
     if (els.historyList) els.historyList.style.display = "none";
+    if (els.changesList) els.changesList.style.display = "none";
     if (els.friendsFiltersWrap) els.friendsFiltersWrap.style.display = "flex";
     if (els.historyOpen) els.historyOpen.style.display = "";
+    if (els.changesOpen) els.changesOpen.style.display = "";
     if (els.historyBack) els.historyBack.style.display = "none";
   }
 
   function showHistoryView() {
     if (els.friendsList) els.friendsList.style.display = "none";
     if (els.historyList) els.historyList.style.display = "flex";
+    if (els.changesList) els.changesList.style.display = "none";
     if (els.friendsFiltersWrap) els.friendsFiltersWrap.style.display = "none";
     if (els.historyOpen) els.historyOpen.style.display = "none";
+    if (els.changesOpen) els.changesOpen.style.display = "none";
     if (els.historyBack) els.historyBack.style.display = "";
     renderHistory();
     setFriendsStatus("История действий");
+  }
+
+  function updateChangesBadge() {
+    if (!els.changesBadge) return;
+    const n = DATA.friendChangesUnread || 0;
+    if (n > 0) {
+      els.changesBadge.style.display = "inline-block";
+      els.changesBadge.textContent = n > 99 ? "99+" : String(n);
+    } else {
+      els.changesBadge.style.display = "none";
+      els.changesBadge.textContent = "";
+    }
+  }
+
+  function renderChanges() {
+    if (!els.changesList) return;
+    const changes = DATA.friendChanges || [];
+    els.changesList.innerHTML = "";
+    if (!changes.length) {
+      els.changesList.innerHTML =
+        '<div class="dh-muted">Изменений пока нет — обнови список друзей ещё раз, чтобы появилось сравнение</div>';
+      return;
+    }
+    for (const c of changes) {
+      const row = document.createElement("div");
+      row.className = "dh-setting-row" + (c.seen ? "" : " dh-change-new");
+      row.style.borderBottom = "none";
+      row.style.padding = "5px 2px";
+      const sign = c.dir === "plus" ? "+" : "−";
+      const label =
+        c.kind === "unfollowed_me"
+          ? "отписался от тебя"
+          : c.kind === "followed_me"
+            ? "подписался на тебя"
+            : c.kind === "i_unfollowed"
+              ? "ты отписался"
+              : c.kind === "i_followed"
+                ? "ты подписался"
+                : c.kind || "";
+      row.innerHTML = `<div class="dh-setting-label" style="min-width:0">
+          <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+            ${sign} ${c.name || c.username || c.userId} · ${label}
+          </div>
+          <small>${fmtTime(c.ts)}</small>
+        </div>`;
+      row.style.cursor = "pointer";
+      // наведение — снять «новизну» строки
+      row.addEventListener("mouseenter", () => {
+        if (!c.seen) {
+          c.seen = true;
+          row.classList.remove("dh-change-new");
+          saveData();
+        }
+      });
+      row.addEventListener("click", () => {
+        const u = c.username || c.name;
+        if (u) {
+          window.open(
+            "https://www.duolingo.com/profile/" + encodeURIComponent(u),
+            "_blank",
+          );
+        }
+      });
+      els.changesList.appendChild(row);
+    }
+    setFriendsStatus("Изменений: " + changes.length);
+  }
+
+  function showChangesView() {
+    if (els.friendsList) els.friendsList.style.display = "none";
+    if (els.historyList) els.historyList.style.display = "none";
+    if (els.changesList) els.changesList.style.display = "flex";
+    if (els.friendsFiltersWrap) els.friendsFiltersWrap.style.display = "none";
+    if (els.historyOpen) els.historyOpen.style.display = "none";
+    if (els.changesOpen) els.changesOpen.style.display = "none";
+    if (els.historyBack) els.historyBack.style.display = "";
+    // счётчик гасим по клику
+    DATA.friendChangesUnread = 0;
+    saveData();
+    updateChangesBadge();
+    renderChanges();
+  }
+
+  /** Сравнивает снапшоты и пишет изменения. */
+  function diffFriendSnapshots(following, followers) {
+    const now = Date.now();
+    DATA.friendSnapshots = DATA.friendSnapshots || [];
+    DATA.friendChanges = DATA.friendChanges || [];
+
+    const prev = DATA.friendSnapshots[DATA.friendSnapshots.length - 1];
+    const prevFollowing = new Set(((prev && prev.following) || []).map(String));
+    const prevFollowers = new Set(((prev && prev.followers) || []).map(String));
+    const curFollowing = new Map(following.map((u) => [String(u.userId), u]));
+    const curFollowers = new Map(followers.map((u) => [String(u.userId), u]));
+
+    const myLogIds = new Set(
+      (DATA.actionLog || [])
+        .filter((a) => a.type === "unfollow" && a.userId)
+        .map((a) => String(a.userId)),
+    );
+
+    const add = (kind, dir, id, meta) => {
+      DATA.friendChanges.unshift({
+        ts: now,
+        kind,
+        dir,
+        userId: id,
+        username: (meta && meta.username) || "",
+        name: (meta && (meta.displayName || meta.name || meta.username)) || id,
+        seen: false,
+      });
+      DATA.friendChangesUnread = (DATA.friendChangesUnread || 0) + 1;
+    };
+
+    if (prev) {
+      // кто-то отписался от меня
+      for (const id of prevFollowers) {
+        if (!curFollowers.has(id)) {
+          const meta = prev.followersMeta && prev.followersMeta[id];
+          add("unfollowed_me", "minus", id, meta);
+        }
+      }
+      // подписался на меня
+      for (const [id, u] of curFollowers) {
+        if (!prevFollowers.has(id)) add("followed_me", "plus", id, u);
+      }
+      // я отписался (по diff following; если есть в actionLog — явно)
+      for (const id of prevFollowing) {
+        if (!curFollowing.has(id)) {
+          const meta = prev.followingMeta && prev.followingMeta[id];
+          add(
+            myLogIds.has(id) ? "i_unfollowed" : "unfollowed_me",
+            "minus",
+            id,
+            meta,
+          );
+        }
+      }
+      // я подписался
+      for (const [id, u] of curFollowing) {
+        if (!prevFollowing.has(id)) add("i_followed", "plus", id, u);
+      }
+    }
+
+    if (DATA.friendChanges.length > 300) DATA.friendChanges.length = 300;
+
+    DATA.friendSnapshots.push({
+      ts: now,
+      following: [...curFollowing.keys()],
+      followers: [...curFollowers.keys()],
+      followingMeta: Object.fromEntries(
+        [...curFollowing.entries()].map(([id, u]) => [
+          id,
+          {
+            username: u.username || "",
+            displayName: u.displayName || u.name || "",
+          },
+        ]),
+      ),
+      followersMeta: Object.fromEntries(
+        [...curFollowers.entries()].map(([id, u]) => [
+          id,
+          {
+            username: u.username || "",
+            displayName: u.displayName || u.name || "",
+          },
+        ]),
+      ),
+    });
+    if (DATA.friendSnapshots.length > 10) DATA.friendSnapshots.shift();
+    saveData();
   }
 
   async function massUnfollowNonFollowers() {
@@ -4259,6 +4472,8 @@
         followingCount: following.length,
         followersCount: followers.length,
       };
+      diffFriendSnapshots(following, followers);
+      updateChangesBadge();
       renderFriends();
     } catch (e) {
       setFriendsStatus("Ошибка: " + (e && e.message));
@@ -5587,6 +5802,9 @@
     if (els.historyOpen) {
       els.historyOpen.addEventListener("click", () => showHistoryView());
     }
+    if (els.changesOpen) {
+      els.changesOpen.addEventListener("click", () => showChangesView());
+    }
     if (els.historyBack) {
       els.historyBack.addEventListener("click", () => showFriendsView());
     }
@@ -5673,6 +5891,7 @@
     syncLessonFlags();
     installXpBoostHook();
     syncXpBoostFlag();
+    updateChangesBadge();
     watchHeartsUi();
 
     // открыть панель сразу, если включено в настройках
