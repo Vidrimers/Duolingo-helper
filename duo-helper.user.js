@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Duolingo Helper
 // @namespace    https://github.com/Vidrimers/Duolingo-helper
-// @version      0.5.7
+// @version      0.5.8
 // @description  Проверка взаимной подписки на профилях Duolingo. Панель, бейджи, кеш.
 // @author       Vidrimers
 // @match        *://*.duolingo.com/*
@@ -58,6 +58,7 @@
       // username -> { followsMe: true/false, checkedAt: ts, theirId, theirName }
       followCache: {},
       me: null, // { id, username, name }
+      actionLog: [], // история отписок/действий для undo
     };
     if (!raw) return def;
     try {
@@ -66,6 +67,7 @@
         settings: { ...def.settings, ...(parsed.settings || {}) },
         followCache: parsed.followCache || {},
         me: parsed.me || null,
+        actionLog: Array.isArray(parsed.actionLog) ? parsed.actionLog : [],
       };
     } catch {
       return def;
@@ -800,6 +802,99 @@
             }
             .dh-update-btn:hover { filter: brightness(1.1); }
 
+            /* ===== Confirm dialog (XP) ===== */
+            .dh-confirm-overlay {
+                position: fixed;
+                inset: 0;
+                z-index: 2147483646;
+                background: rgba(0,0,0,0.35);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                pointer-events: auto;
+            }
+            .dh-confirm-box {
+                width: 340px;
+                max-width: 90vw;
+                background: #ECE9D8;
+                border: 3px solid;
+                border-color: #0055EA #003DD7 #003DD7 #0055EA;
+                border-radius: 8px 8px 3px 3px;
+                box-shadow: 2px 2px 12px rgba(0,0,0,0.45);
+                font-family: Tahoma, sans-serif;
+                color: #000;
+                overflow: hidden;
+            }
+            .dh-confirm-title {
+                height: 28px;
+                display: flex;
+                align-items: center;
+                padding: 0 10px;
+                background: linear-gradient(to bottom, #0A246A, #3593FF 40%, #0058EE 90%);
+                color: #fff;
+                font-weight: 700;
+                font-size: 13px;
+                text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+            }
+            .dh-confirm-body {
+                padding: 16px 14px 8px;
+                font-size: 12px;
+                line-height: 1.45;
+            }
+            .dh-confirm-actions {
+                display: flex;
+                gap: 8px;
+                justify-content: flex-end;
+                padding: 10px 14px 14px;
+            }
+
+            /* Confirm — Vista */
+            .dh-confirm-overlay.dh-theme-vista .dh-confirm-box {
+                background: #E8EEF5;
+                border: 1px solid rgba(40, 70, 110, 0.55);
+                border-radius: 10px;
+                box-shadow: 0 12px 40px rgba(0,0,0,0.45);
+                font-family: "Segoe UI", Tahoma, sans-serif;
+            }
+            .dh-confirm-overlay.dh-theme-vista .dh-confirm-title {
+                height: 32px;
+                border-radius: 9px 9px 0 0;
+                background:
+                    linear-gradient(to bottom, rgba(255,255,255,0.4), rgba(120,170,220,0.1) 50%, rgba(20,50,100,0.35)),
+                    linear-gradient(to right, #1B3A5F, #2E6DA8 45%, #1B3A5F);
+                font-family: "Segoe UI", sans-serif;
+                font-weight: 600;
+            }
+
+            /* Confirm — Win95 */
+            .dh-confirm-overlay.dh-theme-win95 .dh-confirm-box {
+                background: #C0C0C0;
+                border: 2px solid;
+                border-color: #DFDFDF #000 #000 #DFDFDF;
+                border-radius: 0;
+                font-family: "MS Sans Serif", Tahoma, sans-serif;
+            }
+            .dh-confirm-overlay.dh-theme-win95 .dh-confirm-title {
+                height: 22px;
+                background: linear-gradient(to right, #000080, #1084D0);
+                border-radius: 0;
+                font-family: inherit;
+                text-shadow: none;
+            }
+            .dh-confirm-overlay.dh-theme-win95 .dh-btn {
+                border-radius: 0;
+                border: 2px solid;
+                border-color: #FFF #000 #000 #FFF;
+                background: #C0C0C0;
+                color: #000;
+                font-family: inherit;
+            }
+            .dh-confirm-overlay.dh-theme-win95 .dh-btn-primary {
+                background: #C0C0C0;
+                color: #000;
+                font-weight: 700;
+            }
+
             /* ===== Accordion ===== */
             .dh-acc {
                 border: 1px solid rgba(255,255,255,0.1);
@@ -1315,17 +1410,23 @@
             </div>
 
             <div class="dh-tab-content" data-tab="friends">
-                <div class="dh-row">
+                <div class="dh-row" style="margin-bottom:4px">
                     <input class="dh-input" id="dh-friends-search" placeholder="Поиск по имени" />
                     <button class="dh-btn dh-btn-primary" id="dh-friends-load">Обновить</button>
                 </div>
-                <div class="dh-tabs" style="margin:8px 0">
+                <div class="dh-muted" style="display:flex;gap:12px;margin-bottom:8px;font-size:11px">
+                    <button type="button" id="dh-unfollow-all" style="background:none;border:none;color:#c0392b;cursor:pointer;font:inherit;font-size:11px;padding:0;text-decoration:underline">Отписаться от неподписанных ❌</button>
+                    <button type="button" id="dh-history-open" style="background:none;border:none;color:#888;cursor:pointer;font:inherit;font-size:11px;padding:0;text-decoration:underline">История</button>
+                    <button type="button" id="dh-history-back" style="display:none;background:none;border:none;color:#888;cursor:pointer;font:inherit;font-size:11px;padding:0;text-decoration:underline">← Друзья</button>
+                </div>
+                <div class="dh-tabs" style="margin:8px 0" id="dh-friends-filters">
                     <button class="dh-tab active" data-friend-filter="all">Все</button>
                     <button class="dh-tab" data-friend-filter="nobody">❌ Не подписаны</button>
                     <button class="dh-tab" data-friend-filter="mutual">✅ Взаимно</button>
                 </div>
                 <div class="dh-muted dh-op-status" id="dh-friends-status"></div>
                 <div id="dh-friends-list" style="display:flex;flex-direction:column;gap:4px;max-height:52vh;overflow-y:auto"></div>
+                <div id="dh-history-list" style="display:none;flex-direction:column;gap:4px;max-height:52vh;overflow-y:auto"></div>
             </div>
 
             <div class="dh-tab-content" data-tab="tools">
@@ -1659,6 +1760,11 @@
       friendsStatus: modal.querySelector("#dh-friends-status"),
       friendsList: modal.querySelector("#dh-friends-list"),
       friendFilters: [...modal.querySelectorAll("[data-friend-filter]")],
+      friendsFiltersWrap: modal.querySelector("#dh-friends-filters"),
+      unfollowAll: modal.querySelector("#dh-unfollow-all"),
+      historyOpen: modal.querySelector("#dh-history-open"),
+      historyBack: modal.querySelector("#dh-history-back"),
+      historyList: modal.querySelector("#dh-history-list"),
       setCache: modal.querySelector("#dh-set-cache"),
       clearCache: modal.querySelector("#dh-clear-cache"),
       refreshPage: modal.querySelector("#dh-refresh-page"),
@@ -3866,6 +3972,178 @@
     });
   }
 
+  async function followUser(targetId) {
+    const myId = getMyId();
+    if (!myId || !targetId) return false;
+    return new Promise((resolve) => {
+      GM_xmlhttpRequest({
+        method: "POST",
+        url: `https://www.duolingo.com/2017-06-30/friends/users/${myId}/follow/${targetId}`,
+        headers: {
+          accept: "application/json",
+          "content-type": "application/json",
+          authorization: "Bearer " + (getToken() || ""),
+        },
+        data: JSON.stringify({ component: "profile_header_button" }),
+        timeout: 15000,
+        onload(resp) {
+          resolve(resp.status === 200 || resp.status === 201);
+        },
+        onerror() {
+          resolve(false);
+        },
+        ontimeout() {
+          resolve(false);
+        },
+      });
+    });
+  }
+
+  function logAction(entry) {
+    const item = {
+      id: "a" + Date.now() + "_" + Math.floor(Math.random() * 1000),
+      ts: Date.now(),
+      undone: false,
+      ...entry,
+    };
+    DATA.actionLog = DATA.actionLog || [];
+    DATA.actionLog.unshift(item);
+    // держим последние 200
+    if (DATA.actionLog.length > 200) DATA.actionLog.length = 200;
+    saveData();
+    return item;
+  }
+
+  function renderHistory() {
+    if (!els.historyList) return;
+    const log = DATA.actionLog || [];
+    els.historyList.innerHTML = "";
+    if (!log.length) {
+      els.historyList.innerHTML =
+        '<div class="dh-muted">История пуста</div>';
+      return;
+    }
+    for (const item of log) {
+      const row = document.createElement("div");
+      row.className = "dh-setting-row";
+      row.style.borderBottom = "none";
+      row.style.padding = "5px 2px";
+      const when = fmtTime(item.ts);
+      const label =
+        item.type === "unfollow_mass"
+          ? `Отписка от неподписанных ❌ (${(item.ids || []).length})`
+          : item.type === "unfollow"
+            ? "Отписка от " + (item.name || item.userId)
+            : item.type || "действие";
+      row.innerHTML = `<div class="dh-setting-label" style="min-width:0">
+          <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+            ${item.undone ? "↩ " : ""}${label}
+          </div>
+          <small>${when}</small>
+        </div>`;
+      if (!item.undone) {
+        const b = document.createElement("button");
+        b.className = "dh-btn";
+        b.style.cssText = "padding:4px 8px;font-size:11px;flex-shrink:0";
+        b.textContent = "Вернуть";
+        b.addEventListener("click", async () => {
+          b.disabled = true;
+          b.textContent = "…";
+          const ok = await undoAction(item);
+          if (ok) {
+            showToast("Возвращено");
+            renderHistory();
+          } else {
+            b.disabled = false;
+            b.textContent = "Вернуть";
+            showToast("Не удалось вернуть", true);
+          }
+        });
+        row.appendChild(b);
+      }
+      els.historyList.appendChild(row);
+    }
+  }
+
+  async function undoAction(item) {
+    try {
+      if (item.type === "unfollow") {
+        const ok = await followUser(item.userId);
+        if (!ok) return false;
+        item.undone = true;
+        saveData();
+        return true;
+      }
+      if (item.type === "unfollow_mass") {
+        let ok = 0;
+        for (const id of item.ids || []) {
+          if (await followUser(id)) ok++;
+          await new Promise((r) => setTimeout(r, 250));
+        }
+        item.undone = true;
+        saveData();
+        return ok > 0;
+      }
+    } catch {}
+    return false;
+  }
+
+  function showFriendsView() {
+    if (els.friendsList) els.friendsList.style.display = "flex";
+    if (els.historyList) els.historyList.style.display = "none";
+    if (els.friendsFiltersWrap) els.friendsFiltersWrap.style.display = "flex";
+    if (els.historyOpen) els.historyOpen.style.display = "";
+    if (els.historyBack) els.historyBack.style.display = "none";
+  }
+
+  function showHistoryView() {
+    if (els.friendsList) els.friendsList.style.display = "none";
+    if (els.historyList) els.historyList.style.display = "flex";
+    if (els.friendsFiltersWrap) els.friendsFiltersWrap.style.display = "none";
+    if (els.historyOpen) els.historyOpen.style.display = "none";
+    if (els.historyBack) els.historyBack.style.display = "";
+    renderHistory();
+    setFriendsStatus("История действий");
+  }
+
+  async function massUnfollowNonFollowers() {
+    const rows = (friendsCache && friendsCache.rows) || [];
+    const targets = rows.filter((r) => !r.followsMe);
+    if (!targets.length) {
+      showToast("Нет «неподписанных» в списке");
+      return;
+    }
+    const okGo = await showConfirm(
+      `Отписаться от ${targets.length} пользователей, которые не подписаны на вас?`,
+      "Отписка от неподписанных",
+    );
+    if (!okGo) return;
+
+    const ids = [];
+    let ok = 0;
+    for (let i = 0; i < targets.length; i++) {
+      setFriendsStatus(`Отписка ${i + 1}/${targets.length}…`);
+      const success = await unfollowUser(targets[i].userId);
+      if (success) {
+        ok++;
+        ids.push(targets[i].userId);
+      }
+      await new Promise((r) => setTimeout(r, 300 + Math.floor(Math.random() * 250)));
+    }
+    logAction({
+      type: "unfollow_mass",
+      ids,
+      name: `отписка от ${ok} неподписанных`,
+    });
+    if (friendsCache) {
+      const idSet = new Set(ids.map(String));
+      friendsCache.rows = friendsCache.rows.filter((r) => !idSet.has(String(r.userId)));
+    }
+    renderFriends();
+    setFriendsStatus(`Отписался от ${ok} / ${targets.length}`);
+    showToast("✓ Отписка завершена: " + ok);
+  }
+
   function renderFriends() {
     if (!els.friendsList) return;
     const q = (els.friendsSearch && els.friendsSearch.value || "")
@@ -3919,6 +4197,12 @@
           unBtn.textContent = "…";
           const ok = await unfollowUser(r.userId);
           if (ok) {
+            logAction({
+              type: "unfollow",
+              userId: r.userId,
+              name: r.name || sub,
+              username: r.username || "",
+            });
             showToast("Отписался от " + (r.name || sub));
             if (friendsCache) {
               friendsCache.rows = friendsCache.rows.filter((x) => String(x.userId) !== String(r.userId));
@@ -4242,6 +4526,40 @@
   function stopXpFarm() {
     xpRunning = false;
     showToast("Накрутка XP остановлена");
+  }
+
+  // ========== Confirm dialog ==========
+  function showConfirm(message, title = "Подтверждение") {
+    return new Promise((resolve) => {
+      if (!shadow) {
+        resolve(window.confirm(message));
+        return;
+      }
+      const theme = DATA.settings.theme || "xp";
+      const overlay = document.createElement("div");
+      overlay.className = "dh-confirm-overlay dh-theme-" + theme;
+      overlay.innerHTML = `
+        <div class="dh-confirm-box">
+          <div class="dh-confirm-title">${title}</div>
+          <div class="dh-confirm-body"></div>
+          <div class="dh-confirm-actions">
+            <button class="dh-btn" data-cf="no">Отмена</button>
+            <button class="dh-btn dh-btn-primary" data-cf="yes">Да</button>
+          </div>
+        </div>
+      `;
+      overlay.querySelector(".dh-confirm-body").textContent = message;
+      const done = (val) => {
+        overlay.remove();
+        resolve(val);
+      };
+      overlay.addEventListener("click", (e) => {
+        if (e.target === overlay) done(false);
+      });
+      overlay.querySelector('[data-cf="no"]').addEventListener("click", () => done(false));
+      overlay.querySelector('[data-cf="yes"]').addEventListener("click", () => done(true));
+      shadow.appendChild(overlay);
+    });
   }
 
   // ========== Toast ==========
@@ -5261,6 +5579,16 @@
           renderFriends();
         });
       });
+    }
+
+    if (els.unfollowAll) {
+      els.unfollowAll.addEventListener("click", () => massUnfollowNonFollowers());
+    }
+    if (els.historyOpen) {
+      els.historyOpen.addEventListener("click", () => showHistoryView());
+    }
+    if (els.historyBack) {
+      els.historyBack.addEventListener("click", () => showFriendsView());
     }
 
     els.setCache.addEventListener("change", () => {
