@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Duolingo Helper
 // @namespace    https://github.com/Vidrimers/Duolingo-helper
-// @version      0.3.6
+// @version      0.3.7
 // @description  Проверка взаимной подписки на профилях Duolingo. Панель, бейджи, кеш.
 // @author       Vidrimers
 // @match        *://*.duolingo.com/*
@@ -1533,6 +1533,21 @@
   }
 
   let lastServerHearts = null;
+  let heartNumElsCache = null;
+
+  function getHeartNumEls() {
+    // кэш на короткое время — React иногда пересоздаёт DOM
+    if (heartNumElsCache && heartNumElsCache.ts && Date.now() - heartNumElsCache.ts < 3000) {
+      const live = heartNumElsCache.list.filter((el) => el.isConnected);
+      if (live.length) {
+        heartNumElsCache.list = live;
+        return live;
+      }
+    }
+    const list = findHeartCountEls();
+    heartNumElsCache = { list, ts: Date.now() };
+    return list;
+  }
 
   async function fixHeartsUi({ silent = false, forceFetch = false } = {}) {
     if (!DATA.settings.protectHearts) return;
@@ -1543,7 +1558,7 @@
     }
     if (!server || !Number.isFinite(server.hearts)) return;
 
-    const elsH = findHeartCountEls();
+    const elsH = getHeartNumEls();
     const maxH = Math.max(server.maxHearts, server.hearts, 5);
     let patched = 0;
     for (const el of elsH) {
@@ -1564,6 +1579,7 @@
   let heartsLessonTimer = null;
   let heartsRaf = 0;
   let heartsMo = null;
+  let heartsRafLoop = false;
 
   function startHeartsWatch() {
     stopHeartsWatch();
@@ -1588,9 +1604,19 @@
         characterData: true,
       });
     }
+
+    // жёсткий режим: каждый кадр держим цифру = серверу
+    heartsRafLoop = true;
+    const tick = () => {
+      if (!heartsRafLoop) return;
+      fixHeartsUi({ silent: true });
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
   }
 
   function stopHeartsWatch() {
+    heartsRafLoop = false;
     if (heartsLessonTimer) {
       clearInterval(heartsLessonTimer);
       heartsLessonTimer = null;
