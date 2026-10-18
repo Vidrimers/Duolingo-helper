@@ -35,7 +35,7 @@ Userscript для Tampermonkey — расширение для Duolingo с пр�
 
 **Шаг 2.** Нажми кнопку ниже чтобы установить скрипт:
 
-[![Установить скрипт](https://img.shields.io/badge/Установить-Tampermonkey-green?style=for-the-badge&logo=tampermonkey)](https://raw.githubusercontent.com/Vidrimers/duolingo-ext/refs/heads/master/duo-helper.user.js)
+[![Установить скрипт](https://img.shields.io/badge/Установить-Tampermonkey-green?style=for-the-badge&logo=tampermonkey)](https://raw.githubusercontent.com/Vidrimers/Duolingo-helper/refs/heads/master/duo-helper.user.js)
 
 > При открытии ссылки Tampermonkey автоматически распознает скрипт и откроет диалог установки. Нажми **«Установить»**.
 

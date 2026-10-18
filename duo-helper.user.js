@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         Duolingo Helper
-// @namespace    https://github.com/Vidrimers/duolingo-ext
+// @namespace    https://github.com/Vidrimers/Duolingo-helper
 // @version      0.2.0
 // @description  Проверка взаимной подписки на профилях Duolingo. Панель, бейджи, кеш.
 // @author       Vidrimers
