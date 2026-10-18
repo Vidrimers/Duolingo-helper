@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Duolingo Helper
 // @namespace    https://github.com/Vidrimers/Duolingo-helper
-// @version      0.3.5
+// @version      0.3.6
 // @description  Проверка взаимной подписки на профилях Duolingo. Панель, бейджи, кеш.
 // @author       Vidrimers
 // @match        *://*.duolingo.com/*
@@ -1640,6 +1640,32 @@
     };
     const isNum = (el) => /^\d+$/.test(((el && el.textContent) || "").trim());
 
+    // 1) img/svg с hearts в src/классе + сосед-цифра (основной кейс Duolingo)
+    document
+      .querySelectorAll('img[src*="hearts/"], img[src*="/hearts"], img[src*="heart"]')
+      .forEach((img) => {
+        const wrap = img.parentElement;
+        if (!wrap) return;
+        wrap.querySelectorAll("span,div,strong,b,p").forEach((n) => {
+          if (isNum(n) && n.childElementCount === 0) push(n);
+        });
+        [img.previousElementSibling, img.nextElementSibling].forEach((n) => {
+          if (isNum(n) && n.childElementCount === 0) push(n);
+        });
+        if (isNum(wrap) && wrap.childElementCount <= 2) {
+          // на wrap-контейнере сразу текст «4» рядом с картинкой
+          Array.from(wrap.childNodes).forEach((n) => {
+            if (n.nodeType === 3 && /^\d+$/.test(n.textContent.trim())) {
+              // заменяем текстовый узел через родителя — проще найти span
+            }
+          });
+          wrap.querySelectorAll("*").forEach((n) => {
+            if (isNum(n) && n.childElementCount === 0) push(n);
+          });
+        }
+      });
+
+    // 2) heart-контейнеры по классам/атрибутам
     document
       .querySelectorAll(
         '[data-test*="heart" i],[data-testid*="heart" i],[aria-label*="heart" i],[class*="heart" i],[class*="Heart"]',
@@ -1654,6 +1680,7 @@
         });
       });
 
+    // 3) svg-heart и цифры рядом
     document.querySelectorAll("svg").forEach((svg) => {
       const label = (
         (svg.getAttribute("aria-label") || "") +
@@ -1678,16 +1705,6 @@
       }
     });
 
-    if (/^\/lesson/.test(location.pathname)) {
-      document
-        .querySelectorAll("header span, header div, header strong")
-        .forEach((n) => {
-          if (isNum(n) && n.childElementCount === 0) {
-            const v = Number(n.textContent.trim());
-            if (v >= 0 && v <= 10) push(n);
-          }
-        });
-    }
     return out;
   }
 
