@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Duolingo Helper
 // @namespace    https://github.com/Vidrimers/Duolingo-helper
-// @version      0.2.1
+// @version      0.2.2
 // @description  Проверка взаимной подписки на профилях Duolingo. Панель, бейджи, кеш.
 // @author       Vidrimers
 // @match        *://*.duolingo.com/*
@@ -964,23 +964,132 @@
     }, 2800);
   }
 
-  // ========== Badge ==========
+  // ========== Badge (fixed on screen, anchored to username) ==========
+
+  /** Ищем в DOM элемент с именем пользователя (то, что в URL профиля). */
+  function findNameEl(username) {
+    if (!username) return null;
+    const uname = username.toLowerCase();
+    const skip = new Set(["SCRIPT", "STYLE", "NOSCRIPT", "SVG", "INPUT", "TEXTAREA"]);
+
+    const isMatch = (text) => {
+      const t = (text || "").trim().toLowerCase().replace(/^@/, "");
+      return t === uname;
+    };
+
+    const candidates = [];
+    const walk = document.createTreeWalker(document.body, NodeFilter.SHOW_ELEMENT);
+    let node;
+    while ((node = walk.nextNode())) {
+      if (skip.has(node.tagName)) continue;
+      if (node.closest && node.closest("#" + HOST_ID)) continue;
+      if (node.childElementCount > 3) continue;
+      if (!isMatch(node.textContent)) continue;
+
+      const rect = node.getBoundingClientRect();
+      if (rect.width < 20 || rect.height < 8) continue;
+
+      const cs = getComputedStyle(node);
+      if (cs.visibility === "hidden" || cs.display === "none") continue;
+
+      const fontSize = parseFloat(cs.fontSize) || 12;
+      const isHeading = /^H[1-3]$/.test(node.tagName) || node.getAttribute("role") === "heading";
+      candidates.push({
+        el: node,
+        score: (isHeading ? 100 : 0) + fontSize + (rect.top < 280 ? 40 : 0),
+      });
+    }
+    if (!candidates.length) return null;
+    candidates.sort((a, b) => b.score - a.score);
+    return candidates[0].el;
+  }
+
+  /**
+   * Ставит fixed-плашку рядом с именем на экране.
+   * Не привязана к скроллу — координаты берём один раз при показе.
+   */
+  function positionBadgeNearName() {
+    if (!els.badge) return false;
+    const uname = getProfileUsername();
+    const nameEl = findNameEl(uname);
+    if (!nameEl) return false;
+
+    const r = nameEl.getBoundingClientRect();
+    const bw = els.badge.offsetWidth || 180;
+    const bh = els.badge.offsetHeight || 40;
+
+    // справа от имени, по центру; если не влезает — слева
+    let x = r.right + 10;
+    if (x + bw > window.innerWidth - 12) x = r.left - bw - 10;
+    if (x < 8) x = 8;
+
+    let y = r.top + r.height / 2 - bh / 2;
+    if (y < 8) y = 8;
+    if (y + bh > window.innerHeight - 8) y = Math.max(8, window.innerHeight - bh - 8);
+
+    els.badge.style.left = Math.round(x) + "px";
+    els.badge.style.top = Math.round(y) + "px";
+    els.badge.style.right = "auto";
+    return true;
+  }
+
+  let lastBadge = null;
+
   function setBadge(state, title, sub) {
-    if (!els.badge) return;
     const s = DATA.settings;
     if (!s.showBadge || !isProfilePage()) {
-      els.badge.classList.remove("visible");
+      if (els.badge) els.badge.classList.remove("visible");
       return;
     }
+    if (!els.badge) return;
+
+    const uname = getProfileUsername();
+    lastBadge = { state, title, sub, username: uname };
+
     els.badge.className = "dh-badge visible " + state;
     els.badgeIcon.textContent =
       state === "yes" ? "✅" : state === "no" ? "❌" : state === "checking" ? "⏳" : "⚠️";
     els.badgeText.textContent = title;
     els.badgeSub.textContent = sub || "нажми, чтобы открыть панель";
+
+    // если имя уже на экране — садимся рядом; иначе остаёмся в дефолт-позиции
+    delete els.badge.dataset.anchored;
+    if (positionBadgeNearName()) els.badge.dataset.anchored = "1";
+  }
+
+  /** Если SPA перерисовала профиль или имя появилось позже — вернуть плашку. */
+  function ensureBadge() {
+    if (!DATA.settings.showBadge || !isProfilePage()) return;
+    const u = getProfileUsername();
+    if (!u) return;
+
+    // имя ещё не в DOM — ничего не делаем, подождём мутации
+    const nameEl = findNameEl(u);
+
+    if (els.badge && els.badge.classList.contains("visible")) {
+      // плашка есть, но её место ещё не привязали к имени
+      if (nameEl && !els.badge.dataset.anchored) {
+        positionBadgeNearName();
+        els.badge.dataset.anchored = "1";
+      }
+      return;
+    }
+
+    const cached = getCached(u);
+    if (cached && cached.theirId !== undefined) {
+      applyResult(u, cached);
+      return;
+    }
+    if (lastBadge && lastBadge.username === u) {
+      setBadge(lastBadge.state, lastBadge.title, lastBadge.sub);
+    }
   }
 
   function hideBadge() {
-    if (els.badge) els.badge.classList.remove("visible");
+    if (els.badge) {
+      els.badge.classList.remove("visible");
+      delete els.badge.dataset.anchored;
+    }
   }
 
   // ========== Status card ==========
@@ -1178,7 +1287,7 @@
   }
 
   // ========== ПРОВЕРКА ОБНОВЛЕНИЙ ==========
-  const CURRENT_VERSION = "0.2.1";
+  const CURRENT_VERSION = "0.2.2";
   const UPDATE_URL =
     "https://raw.githubusercontent.com/Vidrimers/Duolingo-helper/refs/heads/master/duo-helper.user.js";
   const UPDATE_CHECK_KEY = "dh_update_last_check";
@@ -1474,6 +1583,7 @@
     if (!document.getElementById(HOST_ID) && document.documentElement) {
       createUI();
     }
+    ensureBadge();
   }
 
   // ========== ЗАПУСК ==========
@@ -1481,9 +1591,19 @@
     createUI();
     hookHistory();
 
-    // SPA может перерисовать body — следим за host
-    const mo = new MutationObserver(() => ensureUI());
-    mo.observe(document.documentElement, { childList: true });
+    // SPA может перерисовать body — следим за host и плашкой (с дебаунсом)
+    let ensureTimer = null;
+    const mo = new MutationObserver(() => {
+      if (ensureTimer) return;
+      ensureTimer = setTimeout(() => {
+        ensureTimer = null;
+        ensureUI();
+      }, 150);
+    });
+    mo.observe(document.documentElement, {
+      childList: true,
+      subtree: true,
+    });
 
     if (isProfilePage()) {
       const u = getProfileUsername();
