@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Duolingo Helper
 // @namespace    https://github.com/Vidrimers/Duolingo-helper
-// @version      0.3.9
+// @version      0.4.0
 // @description  Проверка взаимной подписки на профилях Duolingo. Панель, бейджи, кеш.
 // @author       Vidrimers
 // @match        *://*.duolingo.com/*
@@ -2061,17 +2061,33 @@
   // ========== Shop ==========
   // ⚠️ Выдача предметов isFree — чит, на свой страх и риск.
 
-  /** Человекочитаемые названия предметов магазина. */
+  /** Человекочитаемые названия предметов магазина + количество/цена. */
   function describeShopItem(item) {
-    const id = String(item.id || "").toLowerCase();
+    const id = String(item.id || "");
+    const idLow = id.toLowerCase();
     const rawName = item.name ? String(item.name) : "";
+
+    // числа из id/имени: gems_500 → 500, health_refill_3 → 3, xp_boost_15 → 15
+    const numFromId =
+      (id.match(/(\d+)\s*$/) || id.match(/(\d+)/) || [])[1] ||
+      (rawName.match(/(\d+)/) || [])[1] ||
+      "";
+    const qty =
+      item.quantity != null && item.quantity !== ""
+        ? String(item.quantity)
+        : "";
+    const amount = qty || numFromId;
 
     const table = [
       [/immersive_subscription|super_?3/, "Super — 3 дня", "Триал-подписка Super"],
       [/streak_repair|repair_streak/, "Починка серии", "Восстановить потерянный streak"],
       [/friend_streak_freeze|society_streak_freeze|extra_streak_freeze|streak_freeze/, "Заморозка серии", "Один день без потери streak"],
       [/streak_shield|streak_protect/, "Щит серии", "Защита streak на день"],
-      [/xp_boost_(\d+)/, (m) => `Буст XP на ${m[1]} мин`, "Двойной опыт"],
+      [
+        /xp_boost_(\d+)|xp_(\d+)/,
+        (m) => `Буст XP на ${m[1] || m[2]} мин`,
+        "Двойной опыт",
+      ],
       [/xp_boost|double_xp|xp_2x/, "Буст XP", "Двойной опыт на время"],
       [/timer_boost|time_boost|heart_timer/, "Ускорение таймера", "Быстрее восстановление"],
       [/health_refill|heart_refill|refill_heart|health_pack|buy_heart|hearts?$/, "Пополнение сердец", "Вернуть сердца"],
@@ -2081,29 +2097,51 @@
       [/practice|workbook/, "Практика", "Дополнительная практика"],
       [/quiz|challenge_/, "Челлендж", "Особое испытание"],
       [/super_?trial|free_taste|trial/, "Пробный Super", "Короткая подписка Super"],
-      [/chest|loot|gift_(?!.*block)/, "Сундук", "Набор наград"],
+      [/chest|loot/, "Сундук", "Набор наград"],
       [/ad_?free|no_?ads/, "Без рекламы", "Убрать рекламу"],
     ];
 
-    for (const [re, name, desc] of table) {
-      const m = id.match(re);
+    let name = null;
+    let desc = null;
+    for (const [re, n, d] of table) {
+      const m = idLow.match(re);
       if (m) {
-        return {
-          name: typeof name === "function" ? name(m) : name,
-          desc,
-        };
+        name = typeof n === "function" ? n(m) : n;
+        desc = d;
+        break;
       }
     }
 
-    // fallback: «society streak freeze society_streak_freeze» → «Society Streak Freeze»
-    const pretty = (rawName || id)
-      .replace(/[_-]+/g, " ")
-      .replace(/\s+/g, " ")
-      .trim()
-      .replace(/\b\w/g, (c) => c.toUpperCase());
+    if (!name) {
+      name = (rawName || id)
+        .replace(/[_-]+/g, " ")
+        .replace(/\s+/g, " ")
+        .trim()
+        .replace(/\b\w/g, (c) => c.toUpperCase());
+      desc = id;
+    }
+
+    // «Гемы» → «Гемы ×500», «Пополнение сердец ×3»
+    if (amount && !/\d/.test(name)) {
+      name += " ×" + amount;
+    }
+
+    // цена / доступность
+    const bits = [];
+    if (desc) bits.push(desc);
+    if (item.price != null && item.price !== "") {
+      bits.push("цена: " + item.price + " " + (item.currencyType || "XGM"));
+    } else if (item.currencyType) {
+      bits.push(item.currencyType);
+    }
+    if (item.durationDays || item.duration) {
+      bits.push(String(item.durationDays || item.duration) + " дн.");
+    }
+
     return {
-      name: pretty || id,
-      desc: item.id || "",
+      name: name || id,
+      desc: (bits.join(" · ") || id) + (id ? " · " + id : ""),
+      amount,
     };
   }
 
