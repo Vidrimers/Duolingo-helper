@@ -49,6 +49,7 @@
         badgePos: "top-right",
         accent: "#58cc02",
         winPos: null, // { x, y } — позиция окна после drag
+        fabPos: null, // { x, y } — позиция FAB после drag
         openOnStart: false, // открывать панель при загрузке сайта
         theme: "xp", // xp | vista | win95
         protectHearts: true, // блокировать списание сердец
@@ -61,6 +62,7 @@
       followCache: {},
       me: null, // { id, username, name }
       actionLog: [], // история отписок/действий для undo
+      excludeList: [], // исключения от массовых операций [{userId,username,name}]
       friendSnapshots: [], // [{ ts, following:[ids], followers:[ids] }]
       friendChanges: [], // [{ ts, type, userId, username, name, seen }]
       friendChangesUnread: 0,
@@ -73,6 +75,7 @@
         followCache: parsed.followCache || {},
         me: parsed.me || null,
         actionLog: Array.isArray(parsed.actionLog) ? parsed.actionLog : [],
+        excludeList: Array.isArray(parsed.excludeList) ? parsed.excludeList : [],
         friendSnapshots: Array.isArray(parsed.friendSnapshots)
           ? parsed.friendSnapshots
           : [],
@@ -369,7 +372,11 @@
                 padding: 0;
                 animation: dh-fab-pulse 3s ease-in-out infinite;
                 pointer-events: auto;
+                cursor: grab;
+                user-select: none;
+                -webkit-user-select: none;
             }
+            .dh-fab:active { cursor: grabbing; }
             .dh-fab:hover {
                 transform: scale(1.12) rotate(-5deg);
                 box-shadow: 0 8px 32px rgba(88,204,2,0.6), 0 0 0 6px rgba(88,204,2,0.15);
@@ -538,7 +545,7 @@
             /* Body */
             .dh-body {
                 flex: 1;
-                overflow-y: auto;
+                overflow: hidden;
                 padding: 10px 12px 12px;
                 background: #ECE9D8;
                 display: flex;
@@ -588,8 +595,28 @@
             }
             .dh-tab:hover:not(.active) { background: linear-gradient(to bottom, #F8F6EE, #E5E1D0); }
 
-            .dh-tab-content { display: none; flex-direction: column; gap: 10px; }
+            .dh-tab-content {
+                display: none;
+                flex-direction: column;
+                gap: 10px;
+                flex: 1;
+                min-height: 0;
+            }
             .dh-tab-content.active { display: flex; }
+            .dh-tab-content[data-tab="friends"].active {
+                overflow: hidden;
+            }
+            .dh-tab-content:not([data-tab="friends"]).active {
+                overflow-y: auto;
+            }
+            .dh-tab-content[data-tab="friends"] #dh-friends-list,
+            .dh-tab-content[data-tab="friends"] #dh-history-list,
+            .dh-tab-content[data-tab="friends"] #dh-changes-list,
+            .dh-tab-content[data-tab="friends"] #dh-exclude-list {
+                flex: 1;
+                min-height: 0;
+                overflow-y: auto;
+            }
 
             /* ===== Inputs / Buttons (XP) ===== */
             .dh-input {
@@ -1451,6 +1478,7 @@
                 </div>
                 <div class="dh-muted" style="display:flex;gap:12px;margin-bottom:8px;font-size:11px">
                     <button type="button" id="dh-history-open" style="background:none;border:none;color:#888;cursor:pointer;font:inherit;font-size:11px;padding:0;text-decoration:underline">История</button>
+                    <button type="button" id="dh-exclude-open" style="background:none;border:none;color:#888;cursor:pointer;font:inherit;font-size:11px;padding:0;text-decoration:underline">Исключения</button>
                     <button type="button" id="dh-changes-open" style="background:none;border:none;color:#888;cursor:pointer;font:inherit;font-size:11px;padding:0;text-decoration:underline">Изменения<span id="dh-changes-badge" style="display:none;min-width:16px;height:16px;padding:0 4px;margin-left:4px;border-radius:8px;background:#c0392b;color:#fff;font-size:10px;font-weight:700;line-height:16px;text-align:center;vertical-align:middle;text-decoration:none"></span></button>
                     <button type="button" id="dh-history-back" style="display:none;background:none;border:none;color:#888;cursor:pointer;font:inherit;font-size:11px;padding:0;text-decoration:underline">← Друзья</button>
                 </div>
@@ -1463,15 +1491,21 @@
                 <div class="dh-row" id="dh-nobody-tools" style="display:none;margin:0 0 8px">
                     <button class="dh-btn dh-btn-danger" id="dh-unfollow-all" style="padding:5px 10px;font-size:11px">Отписаться от неподписанных</button>
                 </div>
-                <div class="dh-row" id="dh-inactive-tools" style="display:none;margin:0 0 8px">
-                    <button class="dh-btn dh-btn-primary" id="dh-scan-activity" style="padding:5px 10px;font-size:11px">Проверить активность</button>
-                    <button class="dh-btn" id="dh-scan-stop" style="padding:5px 10px;font-size:11px">Стоп</button>
-                    <button class="dh-btn dh-btn-danger" id="dh-unfollow-inactive" style="padding:5px 10px;font-size:11px">Отписаться от неактивных</button>
+                <div id="dh-inactive-tools" style="display:none;margin:0 0 8px;flex-direction:column;gap:6px">
+                    <div class="dh-row">
+                        <button class="dh-btn dh-btn-primary" id="dh-scan-activity" style="padding:5px 10px;font-size:11px">Проверить активность</button>
+                        <button class="dh-btn" id="dh-scan-stop" style="padding:5px 10px;font-size:11px">Стоп</button>
+                    </div>
+                    <div class="dh-row">
+                        <button class="dh-btn dh-btn-danger" id="dh-unfollow-inactive" style="padding:5px 8px;font-size:11px">Отписаться от неактивных</button>
+                        <button class="dh-btn dh-btn-danger" id="dh-block-inactive" style="padding:5px 8px;font-size:11px">Заблокировать неактивных</button>
+                    </div>
                 </div>
                 <div class="dh-muted dh-op-status" id="dh-friends-status"></div>
-                <div id="dh-friends-list" style="display:flex;flex-direction:column;gap:4px;max-height:52vh;overflow-y:auto"></div>
-                <div id="dh-history-list" style="display:none;flex-direction:column;gap:4px;max-height:52vh;overflow-y:auto"></div>
-                <div id="dh-changes-list" style="display:none;flex-direction:column;gap:4px;max-height:52vh;overflow-y:auto"></div>
+                <div id="dh-friends-list" style="display:flex;flex-direction:column;gap:4px;padding-right:8px"></div>
+                <div id="dh-history-list" style="display:none;flex-direction:column;gap:4px;padding-right:8px"></div>
+                <div id="dh-changes-list" style="display:none;flex-direction:column;gap:4px;padding-right:8px"></div>
+                <div id="dh-exclude-list" style="display:none;flex-direction:column;gap:4px;padding-right:8px"></div>
             </div>
 
             <div class="dh-tab-content" data-tab="tools">
@@ -1835,6 +1869,9 @@
       scanStop: modal.querySelector("#dh-scan-stop"),
       inactiveTools: modal.querySelector("#dh-inactive-tools"),
       unfollowInactive: modal.querySelector("#dh-unfollow-inactive"),
+      blockInactive: modal.querySelector("#dh-block-inactive"),
+      excludeOpen: modal.querySelector("#dh-exclude-open"),
+      excludeList: modal.querySelector("#dh-exclude-list"),
       clearCache: modal.querySelector("#dh-clear-cache"),
       refreshPage: modal.querySelector("#dh-refresh-page"),
       exportBtn: modal.querySelector("#dh-export"),
@@ -1851,7 +1888,9 @@
     bindEvents();
     applyTheme();
     initDrag();
+    initFabDrag();
     applyWinPos();
+    applyFabPos();
     initUpdateCheck();
   }
 
@@ -4083,6 +4122,83 @@
     return item;
   }
 
+  function isExcluded(userId) {
+    const id = String(userId);
+    return (DATA.excludeList || []).some((x) => String(x.userId) === id);
+  }
+
+  function addExclude(user) {
+    DATA.excludeList = DATA.excludeList || [];
+    const id = String(user.userId);
+    if (!isExcluded(id)) {
+      DATA.excludeList.unshift({
+        userId: id,
+        username: user.username || "",
+        name: user.name || user.username || id,
+        ts: Date.now(),
+      });
+      saveData();
+    }
+  }
+
+  function removeExclude(userId) {
+    const id = String(userId);
+    DATA.excludeList = (DATA.excludeList || []).filter(
+      (x) => String(x.userId) !== id,
+    );
+    saveData();
+  }
+
+  function renderExclusions() {
+    if (!els.excludeList) return;
+    const list = DATA.excludeList || [];
+    els.excludeList.innerHTML = "";
+    if (!list.length) {
+      els.excludeList.innerHTML = '<div class="dh-muted">Исключений нет</div>';
+      setFriendsStatus("Исключений: 0");
+      return;
+    }
+    for (const u of list) {
+      const row = document.createElement("div");
+      row.className = "dh-setting-row";
+      row.style.borderBottom = "none";
+      row.style.padding = "5px 2px";
+      row.innerHTML = `<div class="dh-setting-label" style="min-width:0">
+          <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+            🛡 ${u.name || u.username || u.userId}
+          </div>
+          <small>${u.username ? "@" + u.username : ""}</small>
+        </div>`;
+      const b = document.createElement("button");
+      b.className = "dh-btn";
+      b.style.cssText = "padding:4px 8px;font-size:11px;flex-shrink:0";
+      b.textContent = "Убрать";
+      b.addEventListener("click", () => {
+        removeExclude(u.userId);
+        renderExclusions();
+        showToast("Убран из исключений");
+      });
+      row.appendChild(b);
+      els.excludeList.appendChild(row);
+    }
+    setFriendsStatus("Исключений: " + list.length);
+  }
+
+  function showExcludeView() {
+    if (els.friendsList) els.friendsList.style.display = "none";
+    if (els.historyList) els.historyList.style.display = "none";
+    if (els.changesList) els.changesList.style.display = "none";
+    if (els.excludeList) els.excludeList.style.display = "flex";
+    if (els.friendsFiltersWrap) els.friendsFiltersWrap.style.display = "none";
+    if (els.historyOpen) els.historyOpen.style.display = "none";
+    if (els.changesOpen) els.changesOpen.style.display = "none";
+    if (els.excludeOpen) els.excludeOpen.style.display = "none";
+    if (els.inactiveTools) els.inactiveTools.style.display = "none";
+    if (els.nobodyTools) els.nobodyTools.style.display = "none";
+    if (els.historyBack) els.historyBack.style.display = "";
+    renderExclusions();
+  }
+
   function renderHistory() {
     if (!els.historyList) return;
     const log = DATA.actionLog || [];
@@ -4101,9 +4217,13 @@
       const label =
         item.type === "unfollow_mass"
           ? `Отписка от неподписанных ❌ (${(item.ids || []).length})`
-          : item.type === "unfollow"
-            ? "Отписка от " + (item.name || item.userId)
-            : item.type || "действие";
+          : item.type === "block_mass"
+            ? `Блокировка неактивных (${(item.ids || []).length})`
+            : item.type === "unfollow"
+              ? "Отписка от " + (item.name || item.userId)
+              : item.type === "block"
+                ? "Блокировка " + (item.name || item.userId)
+                : item.type || "действие";
       row.innerHTML = `<div class="dh-setting-label" style="min-width:0">
           <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
             ${item.undone ? "↩ " : ""}${label}
@@ -4143,10 +4263,27 @@
         saveData();
         return true;
       }
+      if (item.type === "block") {
+        const ok = await unblockUser(item.userId);
+        if (!ok) return false;
+        item.undone = true;
+        saveData();
+        return true;
+      }
       if (item.type === "unfollow_mass") {
         let ok = 0;
         for (const id of item.ids || []) {
           if (await followUser(id)) ok++;
+          await new Promise((r) => setTimeout(r, 250));
+        }
+        item.undone = true;
+        saveData();
+        return ok > 0;
+      }
+      if (item.type === "block_mass") {
+        let ok = 0;
+        for (const id of item.ids || []) {
+          if (await unblockUser(id)) ok++;
           await new Promise((r) => setTimeout(r, 250));
         }
         item.undone = true;
@@ -4161,12 +4298,17 @@
     if (els.friendsList) els.friendsList.style.display = "flex";
     if (els.historyList) els.historyList.style.display = "none";
     if (els.changesList) els.changesList.style.display = "none";
+    if (els.excludeList) els.excludeList.style.display = "none";
     if (els.friendsFiltersWrap) els.friendsFiltersWrap.style.display = "flex";
     if (els.historyOpen) els.historyOpen.style.display = "";
     if (els.changesOpen) els.changesOpen.style.display = "";
+    if (els.excludeOpen) els.excludeOpen.style.display = "";
     if (els.historyBack) els.historyBack.style.display = "none";
     if (els.inactiveTools) {
       els.inactiveTools.style.display = friendFilter === "inactive" ? "flex" : "none";
+    }
+    if (els.nobodyTools) {
+      els.nobodyTools.style.display = friendFilter === "nobody" ? "flex" : "none";
     }
     renderFriends();
   }
@@ -4175,9 +4317,11 @@
     if (els.friendsList) els.friendsList.style.display = "none";
     if (els.historyList) els.historyList.style.display = "flex";
     if (els.changesList) els.changesList.style.display = "none";
+    if (els.excludeList) els.excludeList.style.display = "none";
     if (els.friendsFiltersWrap) els.friendsFiltersWrap.style.display = "none";
     if (els.historyOpen) els.historyOpen.style.display = "none";
     if (els.changesOpen) els.changesOpen.style.display = "none";
+    if (els.excludeOpen) els.excludeOpen.style.display = "none";
     if (els.inactiveTools) els.inactiveTools.style.display = "none";
     if (els.nobodyTools) els.nobodyTools.style.display = "none";
     if (els.historyBack) els.historyBack.style.display = "";
@@ -4255,9 +4399,11 @@
     if (els.friendsList) els.friendsList.style.display = "none";
     if (els.historyList) els.historyList.style.display = "none";
     if (els.changesList) els.changesList.style.display = "flex";
+    if (els.excludeList) els.excludeList.style.display = "none";
     if (els.friendsFiltersWrap) els.friendsFiltersWrap.style.display = "none";
     if (els.historyOpen) els.historyOpen.style.display = "none";
     if (els.changesOpen) els.changesOpen.style.display = "none";
+    if (els.excludeOpen) els.excludeOpen.style.display = "none";
     if (els.inactiveTools) els.inactiveTools.style.display = "none";
     if (els.nobodyTools) els.nobodyTools.style.display = "none";
     if (els.historyBack) els.historyBack.style.display = "";
@@ -4360,7 +4506,7 @@
 
   async function massUnfollowNonFollowers() {
     const rows = (friendsCache && friendsCache.rows) || [];
-    const targets = rows.filter((r) => !r.followsMe);
+    const targets = rows.filter((r) => !r.followsMe && !isExcluded(r.userId));
     if (!targets.length) {
       showToast("Нет «неподписанных» в списке");
       return;
@@ -4401,7 +4547,9 @@
     const rows = (friendsCache && friendsCache.rows) || [];
     const daysLimit = DATA.settings.inactiveDays || 3;
     const targets = rows.filter(
-      (r) => r.inactive === true || (r.inactiveDays || 0) >= daysLimit,
+      (r) =>
+        (r.inactive === true || (r.inactiveDays || 0) >= daysLimit) &&
+        !isExcluded(r.userId),
     );
     if (!targets.length) {
       showToast("Сначала проверь активность");
@@ -4442,6 +4590,100 @@
     renderFriends();
     setFriendsStatus(`Отписался от неактивных: ${ok} / ${targets.length}`);
     showToast("✓ Отписка от неактивных: " + ok);
+  }
+
+  async function blockUser(targetId) {
+    const myId = getMyId();
+    if (!myId || !targetId) return false;
+    return new Promise((resolve) => {
+      GM_xmlhttpRequest({
+        method: "POST",
+        url: `https://www.duolingo.com/2017-06-30/friends/users/${myId}/block/${targetId}`,
+        headers: {
+          accept: "application/json",
+          authorization: "Bearer " + (getToken() || ""),
+        },
+        timeout: 15000,
+        onload(resp) {
+          resolve(resp.status === 200 || resp.status === 201);
+        },
+        onerror() {
+          resolve(false);
+        },
+        ontimeout() {
+          resolve(false);
+        },
+      });
+    });
+  }
+
+  async function unblockUser(targetId) {
+    const myId = getMyId();
+    if (!myId || !targetId) return false;
+    return new Promise((resolve) => {
+      GM_xmlhttpRequest({
+        method: "DELETE",
+        url: `https://www.duolingo.com/2017-06-30/friends/users/${myId}/block/${targetId}`,
+        headers: {
+          accept: "application/json",
+          authorization: "Bearer " + (getToken() || ""),
+        },
+        timeout: 15000,
+        onload(resp) {
+          resolve(resp.status === 200 || resp.status === 201 || resp.status === 204);
+        },
+        onerror() {
+          resolve(false);
+        },
+        ontimeout() {
+          resolve(false);
+        },
+      });
+    });
+  }
+
+  async function massBlockInactive() {
+    const rows = (friendsCache && friendsCache.rows) || [];
+    const daysLimit = DATA.settings.inactiveDays || 3;
+    const targets = rows.filter(
+      (r) =>
+        (r.inactive === true || (r.inactiveDays || 0) >= daysLimit) &&
+        !isExcluded(r.userId),
+    );
+    if (!targets.length) {
+      showToast("Сначала проверь активность");
+      return;
+    }
+    const okGo = await showConfirm(
+      `Заблокировать ${targets.length} неактивных подписок (порог ${daysLimit} дн.)?`,
+      "Блокировка неактивных",
+    );
+    if (!okGo) return;
+
+    const delay = Math.max(0, DATA.settings.requestDelay || 350);
+    const ids = [];
+    let ok = 0;
+    for (let i = 0; i < targets.length; i++) {
+      setFriendsStatus(`Блокировка ${i + 1}/${targets.length}…`);
+      const success = await blockUser(targets[i].userId);
+      if (success) {
+        ok++;
+        ids.push(targets[i].userId);
+      }
+      if (delay) await new Promise((r) => setTimeout(r, delay));
+    }
+    logAction({
+      type: "block_mass",
+      ids,
+      name: `блокировка ${ok} неактивных`,
+    });
+    if (friendsCache) {
+      const idSet = new Set(ids.map(String));
+      friendsCache.rows = friendsCache.rows.filter((r) => !idSet.has(String(r.userId)));
+    }
+    renderFriends();
+    setFriendsStatus(`Заблокировано: ${ok} / ${targets.length}`);
+    showToast("✓ Блокировка: " + ok);
   }
 
   function friendsCountLabel(shown) {
@@ -4507,16 +4749,19 @@
       row.style.cursor = "pointer";
       const icon = r.followsMe ? "✅" : "❌";
       const deadIcon = r.inactive ? " · 💤" : "";
+      const excludedIcon = isExcluded(r.userId) ? " · 🛡" : "";
       const sub = r.username ? "@" + r.username : String(r.userId || "");
       row.innerHTML = `<div class="dh-setting-label" style="min-width:0">
           <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
-            ${icon} ${r.name || sub}${deadIcon}
+            ${icon} ${r.name || sub}${deadIcon}${excludedIcon}
           </div>
           <small>${sub}</small>
         </div>
-        <button class="dh-btn" data-unfollow="1" style="padding:4px 8px;font-size:11px;flex-shrink:0">Отписаться</button>`;
+        <button class="dh-btn" data-exclude="1" title="${isExcluded(r.userId) ? "Убрать из исключений" : "В исключения (не трогать при массовых действиях)"}" style="padding:4px 7px;font-size:11px;flex-shrink:0;display:inline-flex;align-items:center;justify-content:center">${isExcluded(r.userId) ? "🛡✓" : "🛡"}</button>
+        <button class="dh-btn" data-block="1" title="Заблокировать" style="padding:4px 8px;font-size:13px;line-height:1;flex-shrink:0;width:30px;display:inline-flex;align-items:center;justify-content:center">🚫</button>
+        <button class="dh-btn" data-unfollow="1" title="Отписаться" style="padding:4px 8px;font-size:13px;line-height:1;flex-shrink:0;width:30px;display:inline-flex;align-items:center;justify-content:center">×</button>`;
       row.addEventListener("click", (e) => {
-        if (e.target && e.target.closest && e.target.closest("[data-unfollow]")) return;
+        if (e.target && e.target.closest && e.target.closest("[data-unfollow],[data-exclude],[data-block]")) return;
         const u = r.username || r.name;
         if (u) window.open("https://www.duolingo.com/profile/" + encodeURIComponent(u), "_blank");
       });
@@ -4535,6 +4780,8 @@
               name: r.name || sub,
               username: r.username || "",
             });
+            // после одиночной отписки убираем из исключений
+            removeExclude(r.userId);
             showToast("Отписался от " + (r.name || sub));
             if (friendsCache) {
               friendsCache.rows = friendsCache.rows.filter((x) => String(x.userId) !== String(r.userId));
@@ -4542,9 +4789,57 @@
             renderFriends();
           } else {
             unBtn.disabled = false;
-            unBtn.textContent = "Отписаться";
+            unBtn.textContent = "×";
             showToast("Не удалось отписаться", true);
           }
+        });
+      }
+      const blBtn = row.querySelector("[data-block]");
+      if (blBtn) {
+        blBtn.addEventListener("click", async (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const okGo = await showConfirm(
+            `Заблокировать ${r.name || sub}?`,
+            "Блокировка",
+          );
+          if (!okGo) return;
+          blBtn.disabled = true;
+          blBtn.textContent = "…";
+          const ok = await blockUser(r.userId);
+          if (ok) {
+            logAction({
+              type: "block",
+              userId: r.userId,
+              name: r.name || sub,
+              username: r.username || "",
+            });
+            removeExclude(r.userId);
+            showToast("Заблокирован " + (r.name || sub));
+            if (friendsCache) {
+              friendsCache.rows = friendsCache.rows.filter((x) => String(x.userId) !== String(r.userId));
+            }
+            renderFriends();
+          } else {
+            blBtn.disabled = false;
+            blBtn.textContent = "🚫";
+            showToast("Не удалось заблокировать", true);
+          }
+        });
+      }
+      const exBtn = row.querySelector("[data-exclude]");
+      if (exBtn) {
+        exBtn.addEventListener("click", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          if (isExcluded(r.userId)) {
+            removeExclude(r.userId);
+            showToast("Убран из исключений");
+          } else {
+            addExclude(r);
+            showToast("В исключениях");
+          }
+          renderFriends();
         });
       }
       els.friendsList.appendChild(row);
@@ -4621,9 +4916,9 @@
   let scanRunning = false;
 
   function syncUnfollowInactiveButton() {
-    if (!els.unfollowInactive) return;
     const scanned = !!(friendsCache && friendsCache.scannedAt);
-    els.unfollowInactive.disabled = !scanned;
+    if (els.unfollowInactive) els.unfollowInactive.disabled = !scanned;
+    if (els.blockInactive) els.blockInactive.disabled = !scanned;
   }
 
   /** Опрашивает друзей и помечает неактивных. */
@@ -5731,6 +6026,94 @@
     });
   }
 
+  function clampFabPos(x, y) {
+    const w = els.fab ? els.fab.offsetWidth || 34 : 34;
+    const h = els.fab ? els.fab.offsetHeight || 24 : 24;
+    return {
+      x: Math.min(Math.max(4, x), window.innerWidth - w - 4),
+      y: Math.min(Math.max(4, y), window.innerHeight - h - 4),
+    };
+  }
+
+  function applyFabPos() {
+    if (!els.fab) return;
+    const saved = DATA.settings.fabPos;
+    if (!saved) {
+      els.fab.style.left = "24px";
+      els.fab.style.top = "auto";
+      els.fab.style.bottom = "24px";
+      return;
+    }
+    const p = clampFabPos(saved.x, saved.y);
+    els.fab.style.left = p.x + "px";
+    els.fab.style.top = p.y + "px";
+    els.fab.style.bottom = "auto";
+  }
+
+  function saveFabPos() {
+    if (!els.fab) return;
+    DATA.settings.fabPos = {
+      x: parseInt(els.fab.style.left, 10) || 0,
+      y: parseInt(els.fab.style.top, 10) || 0,
+    };
+    saveData();
+  }
+
+  function initFabDrag() {
+    const fab = els.fab;
+    if (!fab) return;
+
+    let dragging = false;
+    let moved = false;
+    let startX = 0;
+    let startY = 0;
+    let origX = 0;
+    let origY = 0;
+
+    const onMove = (e) => {
+      if (!dragging) return;
+      e.preventDefault();
+      const dx = e.clientX - startX;
+      const dy = e.clientY - startY;
+      if (Math.abs(dx) > 3 || Math.abs(dy) > 3) moved = true;
+      const p = clampFabPos(origX + dx, origY + dy);
+      fab.style.left = p.x + "px";
+      fab.style.top = p.y + "px";
+      fab.style.bottom = "auto";
+    };
+
+    const onUp = () => {
+      if (!dragging) return;
+      dragging = false;
+      if (moved) saveFabPos();
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+    };
+
+    fab.addEventListener("pointerdown", (e) => {
+      dragging = true;
+      moved = false;
+      startX = e.clientX;
+      startY = e.clientY;
+      origX = parseInt(fab.style.left, 10) || fab.offsetLeft || 24;
+      origY =
+        fab.style.top !== "auto" && fab.style.top
+          ? parseInt(fab.style.top, 10) || 24
+          : window.innerHeight - (fab.offsetHeight || 24) - 24;
+      window.addEventListener("pointermove", onMove);
+      window.addEventListener("pointerup", onUp);
+    });
+
+    fab.addEventListener("click", (e) => {
+      // если тащили — клик не открывает
+      if (moved) {
+        e.preventDefault();
+        e.stopPropagation();
+        moved = false;
+      }
+    }, true);
+  }
+
   // ========== Events ==========
   function bindEvents() {
     els.fab.addEventListener("click", () => {
@@ -6039,6 +6422,12 @@
       els.unfollowAll.addEventListener("click", () => massUnfollowNonFollowers());
     if (els.unfollowInactive) {
       els.unfollowInactive.addEventListener("click", () => massUnfollowInactive());
+    if (els.blockInactive) {
+      els.blockInactive.addEventListener("click", () => massBlockInactive());
+    }
+    if (els.excludeOpen) {
+      els.excludeOpen.addEventListener("click", () => showExcludeView());
+    }
     }
     }
     if (els.historyOpen) {
