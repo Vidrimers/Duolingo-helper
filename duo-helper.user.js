@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Duolingo Helper
 // @namespace    https://github.com/Vidrimers/Duolingo-helper
-// @version      0.3.4
+// @version      0.3.5
 // @description  Проверка взаимной подписки на профилях Duolingo. Панель, бейджи, кеш.
 // @author       Vidrimers
 // @match        *://*.duolingo.com/*
@@ -1172,7 +1172,7 @@
         <div class="dh-titlebar" id="dh-titlebar">
             <span class="dh-title-icon">🦉</span>
             <span class="dh-title-text">Duolingo Helper</span>
-            <span class="dh-chip">v0.2</span>
+            <span class="dh-chip" id="dh-version-chip"></span>
             <div class="dh-win-btns">
                 <button class="dh-win-btn min" id="dh-min-btn" title="Свернуть">–</button>
                 <button class="dh-win-btn close" id="dh-close-btn" title="Закрыть">×</button>
@@ -1387,6 +1387,7 @@
       updateBtn: modal.querySelector("#dh-update-btn"),
       checkUpdateBtn: modal.querySelector("#dh-check-update"),
       currentVersion: modal.querySelector("#dh-current-version"),
+      versionChip: modal.querySelector("#dh-version-chip"),
     };
 
     bindEvents();
@@ -1561,13 +1562,32 @@
   }
 
   let heartsLessonTimer = null;
+  let heartsRaf = 0;
+  let heartsMo = null;
 
   function startHeartsWatch() {
     stopHeartsWatch();
-    // во время урока UI часто перерисовывает счётчик — держим его равным серверу
+    if (!DATA.settings.protectHearts) return;
+
     heartsLessonTimer = setInterval(() => {
       fixHeartsUi({ silent: true });
-    }, 1200);
+    }, 500);
+
+    if (!heartsMo) {
+      heartsMo = new MutationObserver(() => {
+        if (!DATA.settings.protectHearts) return;
+        if (heartsRaf) return;
+        heartsRaf = requestAnimationFrame(() => {
+          heartsRaf = 0;
+          fixHeartsUi({ silent: true });
+        });
+      });
+      heartsMo.observe(document.body, {
+        childList: true,
+        subtree: true,
+        characterData: true,
+      });
+    }
   }
 
   function stopHeartsWatch() {
@@ -1575,11 +1595,14 @@
       clearInterval(heartsLessonTimer);
       heartsLessonTimer = null;
     }
+    if (heartsRaf) {
+      cancelAnimationFrame(heartsRaf);
+      heartsRaf = 0;
+    }
   }
 
   function watchHeartsUi() {
     document.addEventListener("dh-heart-blocked", () => {
-      // сразу чиним счётчик (без ожидания конца урока)
       setTimeout(() => fixHeartsUi({ silent: true }), 80);
       setTimeout(() => fixHeartsUi({ silent: true }), 400);
     });
@@ -1587,7 +1610,6 @@
     const sync = () => {
       const onLesson = /^\/lesson/.test(location.pathname);
       if (onLesson) {
-        // кеш + частые патчи
         fetchServerHearts().then((s) => {
           if (s) lastServerHearts = s;
           startHeartsWatch();
@@ -1611,48 +1633,61 @@
     const out = [];
     const seen = new Set();
     const push = (el) => {
-      if (el && !seen.has(el)) {
+      if (el && el.nodeType === 1 && !seen.has(el)) {
         seen.add(el);
         out.push(el);
       }
     };
-    // 1) data-test / aria / class с heart
+    const isNum = (el) => /^\d+$/.test(((el && el.textContent) || "").trim());
+
     document
       .querySelectorAll(
-        '[data-test*="heart" i],[data-testid*="heart" i],[aria-label*="heart" i],[class*="heart" i]',
+        '[data-test*="heart" i],[data-testid*="heart" i],[aria-label*="heart" i],[class*="heart" i],[class*="Heart"]',
       )
       .forEach((el) => {
-        // у самого контейнера может быть цифра или сосед-цифра
-        if (/^\d+$/.test((el.textContent || "").trim())) push(el);
-        const sib = el.querySelector("span,div,strong,b");
-        if (sib && /^\d+$/.test((sib.textContent || "").trim())) push(sib);
-        const next = el.nextElementSibling;
-        if (next && /^\d+$/.test((next.textContent || "").trim())) push(next);
-        const prev = el.previousElementSibling;
-        if (prev && /^\d+$/.test((prev.textContent || "").trim())) push(prev);
+        if (isNum(el) && el.childElementCount === 0) push(el);
+        el.querySelectorAll("span,div,strong,b,p").forEach((n) => {
+          if (isNum(n) && n.childElementCount === 0) push(n);
+        });
+        [el.previousElementSibling, el.nextElementSibling].forEach((n) => {
+          if (isNum(n) && n.childElementCount === 0) push(n);
+        });
       });
-    // 2) svg-heart и соседняя цифра
+
     document.querySelectorAll("svg").forEach((svg) => {
       const label = (
         (svg.getAttribute("aria-label") || "") +
         " " +
-        (svg.getAttribute("class") || "")
+        (svg.getAttribute("class") || "") +
+        " " +
+        (svg.getAttribute("data-test") || "")
       ).toLowerCase();
       const isHeart =
-        label.includes("heart") ||
-        (svg.innerHTML || "").toLowerCase().includes("heart");
+        label.includes("heart") || (svg.innerHTML || "").toLowerCase().includes("heart");
       if (!isHeart) return;
-      const parent = svg.parentElement;
-      if (!parent) return;
-      [parent, parent.parentElement].forEach((box) => {
-        if (!box) return;
+      let box = svg.parentElement;
+      for (let i = 0; i < 3 && box; i++) {
         box.querySelectorAll("span,div,strong,b,p").forEach((n) => {
-          if (/^\d+$/.test((n.textContent || "").trim()) && n.childElementCount === 0) {
-            push(n);
+          if (isNum(n) && n.childElementCount === 0) push(n);
+        });
+        const prev = box.previousElementSibling;
+        const next = box.nextElementSibling;
+        if (isNum(prev) && prev.childElementCount === 0) push(prev);
+        if (isNum(next) && next.childElementCount === 0) push(next);
+        box = box.parentElement;
+      }
+    });
+
+    if (/^\/lesson/.test(location.pathname)) {
+      document
+        .querySelectorAll("header span, header div, header strong")
+        .forEach((n) => {
+          if (isNum(n) && n.childElementCount === 0) {
+            const v = Number(n.textContent.trim());
+            if (v >= 0 && v <= 10) push(n);
           }
         });
-      });
-    });
+    }
     return out;
   }
 
@@ -2416,7 +2451,10 @@
   }
 
   // ========== ПРОВЕРКА ОБНОВЛЕНИЙ ==========
-  const CURRENT_VERSION = "0.3.0";
+  // версия из Tampermonkey — не расходится с @version в шапке
+  const CURRENT_VERSION =
+    (typeof GM_info !== "undefined" && GM_info.script && GM_info.script.version) ||
+    "0.3.5";
   // запасная ссылка установки, если API не дал download_url
   let installUrl =
     "https://raw.githubusercontent.com/Vidrimers/Duolingo-helper/refs/heads/master/duo-helper.user.js";
@@ -2574,7 +2612,9 @@
   }
 
   function initUpdateCheck() {
-    if (els.currentVersion) els.currentVersion.textContent = "v" + CURRENT_VERSION;
+    const verLabel = "v" + CURRENT_VERSION;
+    if (els.currentVersion) els.currentVersion.textContent = verLabel;
+    if (els.versionChip) els.versionChip.textContent = verLabel;
     if (els.checkUpdateBtn) {
       els.checkUpdateBtn.addEventListener("click", async () => {
         const btn = els.checkUpdateBtn;
