@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Duolingo Helper
 // @namespace    https://github.com/Vidrimers/Duolingo-helper
-// @version      0.4.0
+// @version      0.4.1
 // @description  Проверка взаимной подписки на профилях Duolingo. Панель, бейджи, кеш.
 // @author       Vidrimers
 // @match        *://*.duolingo.com/*
@@ -2065,82 +2065,66 @@
   function describeShopItem(item) {
     const id = String(item.id || "");
     const idLow = id.toLowerCase();
-    const rawName = item.name ? String(item.name) : "";
+    const rawName = (item.name ? String(item.name) : "").trim();
 
-    // числа из id/имени: gems_500 → 500, health_refill_3 → 3, xp_boost_15 → 15
-    const numFromId =
+    // число из id/имени: gems_500 → 500, xp_boost_15 → 15
+    const num =
       (id.match(/(\d+)\s*$/) || id.match(/(\d+)/) || [])[1] ||
       (rawName.match(/(\d+)/) || [])[1] ||
       "";
     const qty =
-      item.quantity != null && item.quantity !== ""
-        ? String(item.quantity)
-        : "";
-    const amount = qty || numFromId;
+      item.quantity != null && item.quantity !== "" ? String(item.quantity) : "";
+    const amount = qty || num;
 
-    const table = [
-      [/immersive_subscription|super_?3/, "Super — 3 дня", "Триал-подписка Super"],
-      [/streak_repair|repair_streak/, "Починка серии", "Восстановить потерянный streak"],
-      [/friend_streak_freeze|society_streak_freeze|extra_streak_freeze|streak_freeze/, "Заморозка серии", "Один день без потери streak"],
-      [/streak_shield|streak_protect/, "Щит серии", "Защита streak на день"],
-      [
-        /xp_boost_(\d+)|xp_(\d+)/,
-        (m) => `Буст XP на ${m[1] || m[2]} мин`,
-        "Двойной опыт",
-      ],
-      [/xp_boost|double_xp|xp_2x/, "Буст XP", "Двойной опыт на время"],
-      [/timer_boost|time_boost|heart_timer/, "Ускорение таймера", "Быстрее восстановление"],
-      [/health_refill|heart_refill|refill_heart|health_pack|buy_heart|hearts?$/, "Пополнение сердец", "Вернуть сердца"],
-      [/gem|crystal/, "Гемы", "Пакет гемов"],
-      [/outfit|skin|costume|wearable/, "Аутфит", "Внешний вид аватара"],
-      [/legendary|legend_/, "Легендарный", "Доступ к legendary-контенту"],
-      [/practice|workbook/, "Практика", "Дополнительная практика"],
-      [/quiz|challenge_/, "Челлендж", "Особое испытание"],
-      [/super_?trial|free_taste|trial/, "Пробный Super", "Короткая подписка Super"],
-      [/chest|loot/, "Сундук", "Набор наград"],
-      [/ad_?free|no_?ads/, "Без рекламы", "Убрать рекламу"],
+    // короткий смысл — для подписи
+    const hints = [
+      [/immersive_subscription|super_?3|super_?trial|free_taste/, "Триал Super"],
+      [/streak_repair|repair_streak/, "Починка streak"],
+      [/streak_freeze|streak_shield|streak_protect/, "Заморозка серии"],
+      [/xp_boost|double_xp|xp_2x|xp_15|xp_60/, "Двойной XP"],
+      [/health_refill|heart_refill|refill_heart|health_pack|buy_heart|hearts?$/, "Сердца"],
+      [/heart_segment|unlimited_hearts|health_shield/, "Сердца"],
+      [/gem|crystal/, "Гемы"],
+      [/outfit|skin|costume|wearable/, "Аутфит"],
+      [/legendary/, "Legendary"],
+      [/pronunciation/, "Произношение"],
+      [/row_blaster/, "Row Blaster"],
+      [/quest_reroll|daily_quest/, "Квесты"],
+      [/mastery_test|skill_test/, "Тест"],
+      [/bookshelf|chapter/, "Книга"],
+      [/ramp_up|final_level|side_quest|practice/, "Доступ"],
     ];
-
-    let name = null;
-    let desc = null;
-    for (const [re, n, d] of table) {
-      const m = idLow.match(re);
-      if (m) {
-        name = typeof n === "function" ? n(m) : n;
-        desc = d;
+    let hint = id;
+    for (const [re, h] of hints) {
+      if (re.test(idLow)) {
+        hint = h;
         break;
       }
     }
 
-    if (!name) {
-      name = (rawName || id)
+    // имя: API name в приоритете, иначе притираем id
+    let name = rawName;
+    if (!name || name.toLowerCase() === idLow) {
+      name = id
         .replace(/[_-]+/g, " ")
         .replace(/\s+/g, " ")
         .trim()
         .replace(/\b\w/g, (c) => c.toUpperCase());
-      desc = id;
     }
-
-    // «Гемы» → «Гемы ×500», «Пополнение сердец ×3»
+    // подставляем количество, если его нет в названии
     if (amount && !/\d/.test(name)) {
       name += " ×" + amount;
     }
 
-    // цена / доступность
-    const bits = [];
-    if (desc) bits.push(desc);
+    const bits = [hint];
     if (item.price != null && item.price !== "") {
-      bits.push("цена: " + item.price + " " + (item.currencyType || "XGM"));
-    } else if (item.currencyType) {
-      bits.push(item.currencyType);
+      bits.push(item.price + " " + (item.currencyType || ""));
     }
-    if (item.durationDays || item.duration) {
-      bits.push(String(item.durationDays || item.duration) + " дн.");
-    }
+    bits.push(id);
 
     return {
       name: name || id,
-      desc: (bits.join(" · ") || id) + (id ? " · " + id : ""),
+      desc: bits.filter(Boolean).join(" · "),
       amount,
     };
   }
