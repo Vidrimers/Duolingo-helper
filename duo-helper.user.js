@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Duolingo Helper
 // @namespace    https://github.com/Vidrimers/Duolingo-helper
-// @version      0.5.11
+// @version      0.5.12
 // @description  Проверка взаимной подписки на профилях Duolingo. Панель, бейджи, кеш.
 // @author       Vidrimers
 // @match        *://*.duolingo.com/*
@@ -63,6 +63,7 @@
       me: null, // { id, username, name }
       actionLog: [], // история отписок/действий для undo
       excludeList: [], // исключения от массовых операций [{userId,username,name}]
+      blockList: [], // локальный блок-лист [{userId,username,name,ts}]
       friendSnapshots: [], // [{ ts, following:[ids], followers:[ids] }]
       friendChanges: [], // [{ ts, type, userId, username, name, seen }]
       friendChangesUnread: 0,
@@ -76,6 +77,7 @@
         me: parsed.me || null,
         actionLog: Array.isArray(parsed.actionLog) ? parsed.actionLog : [],
         excludeList: Array.isArray(parsed.excludeList) ? parsed.excludeList : [],
+        blockList: Array.isArray(parsed.blockList) ? parsed.blockList : [],
         friendSnapshots: Array.isArray(parsed.friendSnapshots)
           ? parsed.friendSnapshots
           : [],
@@ -1478,7 +1480,8 @@
                 </div>
                 <div class="dh-muted" style="display:flex;gap:12px;margin-bottom:8px;font-size:11px">
                     <button type="button" id="dh-history-open" style="background:none;border:none;color:#888;cursor:pointer;font:inherit;font-size:11px;padding:0;text-decoration:underline">История</button>
-                    <button type="button" id="dh-exclude-open" style="background:none;border:none;color:#888;cursor:pointer;font:inherit;font-size:11px;padding:0;text-decoration:underline">Исключения</button>
+                    <button type="button" id="dh-exclude-open" style="background:none;border:none;color:#888;cursor:pointer;font:inherit;font-size:11px;padding:0;text-decoration:underline">Исключения<span id="dh-exclude-badge" style="display:none;margin-left:3px;color:#888;font-size:11px;font-weight:400;text-decoration:none"></span></button>
+                    <button type="button" id="dh-blocks-open" style="background:none;border:none;color:#888;cursor:pointer;font:inherit;font-size:11px;padding:0;text-decoration:underline">Блоки<span id="dh-blocks-badge" style="display:none;margin-left:3px;color:#888;font-size:11px;font-weight:400;text-decoration:none"></span></button>
                     <button type="button" id="dh-changes-open" style="background:none;border:none;color:#888;cursor:pointer;font:inherit;font-size:11px;padding:0;text-decoration:underline">Изменения<span id="dh-changes-badge" style="display:none;min-width:16px;height:16px;padding:0 4px;margin-left:4px;border-radius:8px;background:#c0392b;color:#fff;font-size:10px;font-weight:700;line-height:16px;text-align:center;vertical-align:middle;text-decoration:none"></span></button>
                     <button type="button" id="dh-history-back" style="display:none;background:none;border:none;color:#888;cursor:pointer;font:inherit;font-size:11px;padding:0;text-decoration:underline">← Друзья</button>
                 </div>
@@ -1506,6 +1509,7 @@
                 <div id="dh-history-list" style="display:none;flex-direction:column;gap:4px;padding-right:8px"></div>
                 <div id="dh-changes-list" style="display:none;flex-direction:column;gap:4px;padding-right:8px"></div>
                 <div id="dh-exclude-list" style="display:none;flex-direction:column;gap:4px;padding-right:8px"></div>
+                <div id="dh-blocks-list" style="display:none;flex-direction:column;gap:4px;padding-right:8px"></div>
             </div>
 
             <div class="dh-tab-content" data-tab="tools">
@@ -1872,6 +1876,10 @@
       blockInactive: modal.querySelector("#dh-block-inactive"),
       excludeOpen: modal.querySelector("#dh-exclude-open"),
       excludeList: modal.querySelector("#dh-exclude-list"),
+      excludeBadge: modal.querySelector("#dh-exclude-badge"),
+      blocksOpen: modal.querySelector("#dh-blocks-open"),
+      blocksList: modal.querySelector("#dh-blocks-list"),
+      blocksBadge: modal.querySelector("#dh-blocks-badge"),
       clearCache: modal.querySelector("#dh-clear-cache"),
       refreshPage: modal.querySelector("#dh-refresh-page"),
       exportBtn: modal.querySelector("#dh-export"),
@@ -4149,10 +4157,61 @@
     saveData();
   }
 
+  function isBlocked(userId) {
+    const id = String(userId);
+    return (DATA.blockList || []).some((x) => String(x.userId) === id);
+  }
+
+  function addBlock(user) {
+    DATA.blockList = DATA.blockList || [];
+    const id = String(user.userId);
+    if (!isBlocked(id)) {
+      DATA.blockList.unshift({
+        userId: id,
+        username: user.username || "",
+        name: user.name || user.username || id,
+        ts: Date.now(),
+      });
+      saveData();
+    }
+  }
+
+  function removeBlock(userId) {
+    const id = String(userId);
+    DATA.blockList = (DATA.blockList || []).filter(
+      (x) => String(x.userId) !== id,
+    );
+    saveData();
+  }
+
+  function updateListBadges() {
+    if (els.excludeBadge) {
+      const n = (DATA.excludeList || []).length;
+      if (n > 0) {
+        els.excludeBadge.style.display = "inline";
+        els.excludeBadge.textContent = "(" + (n > 99 ? "99+" : n) + ")";
+      } else {
+        els.excludeBadge.style.display = "none";
+        els.excludeBadge.textContent = "";
+      }
+    }
+    if (els.blocksBadge) {
+      const n = (DATA.blockList || []).length;
+      if (n > 0) {
+        els.blocksBadge.style.display = "inline";
+        els.blocksBadge.textContent = "(" + (n > 99 ? "99+" : n) + ")";
+      } else {
+        els.blocksBadge.style.display = "none";
+        els.blocksBadge.textContent = "";
+      }
+    }
+  }
+
   function renderExclusions() {
     if (!els.excludeList) return;
     const list = DATA.excludeList || [];
     els.excludeList.innerHTML = "";
+    updateListBadges();
     if (!list.length) {
       els.excludeList.innerHTML = '<div class="dh-muted">Исключений нет</div>';
       setFriendsStatus("Исключений: 0");
@@ -4184,19 +4243,78 @@
     setFriendsStatus("Исключений: " + list.length);
   }
 
-  function showExcludeView() {
+  function renderBlockList() {
+    if (!els.blocksList) return;
+    const list = DATA.blockList || [];
+    els.blocksList.innerHTML = "";
+    updateListBadges();
+    if (!list.length) {
+      els.blocksList.innerHTML = '<div class="dh-muted">Блок-лист пуст</div>';
+      setFriendsStatus("Заблокировано: 0");
+      return;
+    }
+    for (const u of list) {
+      const row = document.createElement("div");
+      row.className = "dh-setting-row";
+      row.style.borderBottom = "none";
+      row.style.padding = "5px 2px";
+      row.innerHTML = `<div class="dh-setting-label" style="min-width:0">
+          <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+            🚫 ${u.name || u.username || u.userId}
+          </div>
+          <small>${u.username ? "@" + u.username : ""} · ${fmtTime(u.ts)}</small>
+        </div>`;
+      const b = document.createElement("button");
+      b.className = "dh-btn";
+      b.style.cssText = "padding:4px 8px;font-size:11px;flex-shrink:0";
+      b.textContent = "Разблокировать";
+      b.addEventListener("click", async () => {
+        b.disabled = true;
+        b.textContent = "…";
+        const ok = await unblockUser(u.userId);
+        if (ok) {
+          removeBlock(u.userId);
+          renderBlockList();
+          showToast("Разблокирован " + (u.name || u.username || u.userId));
+        } else {
+          b.disabled = false;
+          b.textContent = "Разблокировать";
+          showToast("Не удалось разблокировать", true);
+        }
+      });
+      row.appendChild(b);
+      els.blocksList.appendChild(row);
+    }
+    setFriendsStatus("Заблокировано: " + list.length);
+  }
+
+  function hideFriendsSubViews() {
     if (els.friendsList) els.friendsList.style.display = "none";
     if (els.historyList) els.historyList.style.display = "none";
     if (els.changesList) els.changesList.style.display = "none";
-    if (els.excludeList) els.excludeList.style.display = "flex";
+    if (els.excludeList) els.excludeList.style.display = "none";
+    if (els.blocksList) els.blocksList.style.display = "none";
     if (els.friendsFiltersWrap) els.friendsFiltersWrap.style.display = "none";
     if (els.historyOpen) els.historyOpen.style.display = "none";
     if (els.changesOpen) els.changesOpen.style.display = "none";
     if (els.excludeOpen) els.excludeOpen.style.display = "none";
+    if (els.blocksOpen) els.blocksOpen.style.display = "none";
     if (els.inactiveTools) els.inactiveTools.style.display = "none";
     if (els.nobodyTools) els.nobodyTools.style.display = "none";
     if (els.historyBack) els.historyBack.style.display = "";
+    updateListBadges();
+  }
+
+  function showExcludeView() {
+    hideFriendsSubViews();
+    if (els.excludeList) els.excludeList.style.display = "flex";
     renderExclusions();
+  }
+
+  function showBlocksView() {
+    hideFriendsSubViews();
+    if (els.blocksList) els.blocksList.style.display = "flex";
+    renderBlockList();
   }
 
   function renderHistory() {
@@ -4266,6 +4384,7 @@
       if (item.type === "block") {
         const ok = await unblockUser(item.userId);
         if (!ok) return false;
+        removeBlock(item.userId);
         item.undone = true;
         saveData();
         return true;
@@ -4283,7 +4402,10 @@
       if (item.type === "block_mass") {
         let ok = 0;
         for (const id of item.ids || []) {
-          if (await unblockUser(id)) ok++;
+          if (await unblockUser(id)) {
+            ok++;
+            removeBlock(id);
+          }
           await new Promise((r) => setTimeout(r, 250));
         }
         item.undone = true;
@@ -4299,10 +4421,12 @@
     if (els.historyList) els.historyList.style.display = "none";
     if (els.changesList) els.changesList.style.display = "none";
     if (els.excludeList) els.excludeList.style.display = "none";
+    if (els.blocksList) els.blocksList.style.display = "none";
     if (els.friendsFiltersWrap) els.friendsFiltersWrap.style.display = "flex";
     if (els.historyOpen) els.historyOpen.style.display = "";
     if (els.changesOpen) els.changesOpen.style.display = "";
     if (els.excludeOpen) els.excludeOpen.style.display = "";
+    if (els.blocksOpen) els.blocksOpen.style.display = "";
     if (els.historyBack) els.historyBack.style.display = "none";
     if (els.inactiveTools) {
       els.inactiveTools.style.display = friendFilter === "inactive" ? "flex" : "none";
@@ -4310,6 +4434,7 @@
     if (els.nobodyTools) {
       els.nobodyTools.style.display = friendFilter === "nobody" ? "flex" : "none";
     }
+    updateListBadges();
     renderFriends();
   }
 
@@ -4318,13 +4443,16 @@
     if (els.historyList) els.historyList.style.display = "flex";
     if (els.changesList) els.changesList.style.display = "none";
     if (els.excludeList) els.excludeList.style.display = "none";
+    if (els.blocksList) els.blocksList.style.display = "none";
     if (els.friendsFiltersWrap) els.friendsFiltersWrap.style.display = "none";
     if (els.historyOpen) els.historyOpen.style.display = "none";
     if (els.changesOpen) els.changesOpen.style.display = "none";
     if (els.excludeOpen) els.excludeOpen.style.display = "none";
+    if (els.blocksOpen) els.blocksOpen.style.display = "none";
     if (els.inactiveTools) els.inactiveTools.style.display = "none";
     if (els.nobodyTools) els.nobodyTools.style.display = "none";
     if (els.historyBack) els.historyBack.style.display = "";
+    updateListBadges();
     renderHistory();
     setFriendsStatus("История действий");
   }
@@ -4400,10 +4528,12 @@
     if (els.historyList) els.historyList.style.display = "none";
     if (els.changesList) els.changesList.style.display = "flex";
     if (els.excludeList) els.excludeList.style.display = "none";
+    if (els.blocksList) els.blocksList.style.display = "none";
     if (els.friendsFiltersWrap) els.friendsFiltersWrap.style.display = "none";
     if (els.historyOpen) els.historyOpen.style.display = "none";
     if (els.changesOpen) els.changesOpen.style.display = "none";
     if (els.excludeOpen) els.excludeOpen.style.display = "none";
+    if (els.blocksOpen) els.blocksOpen.style.display = "none";
     if (els.inactiveTools) els.inactiveTools.style.display = "none";
     if (els.nobodyTools) els.nobodyTools.style.display = "none";
     if (els.historyBack) els.historyBack.style.display = "";
@@ -4677,6 +4807,9 @@
       ids,
       name: `блокировка ${ok} неактивных`,
     });
+    for (const t of targets) {
+      if (ids.map(String).includes(String(t.userId))) addBlock(t);
+    }
     if (friendsCache) {
       const idSet = new Set(ids.map(String));
       friendsCache.rows = friendsCache.rows.filter((r) => !idSet.has(String(r.userId)));
@@ -4814,6 +4947,7 @@
               name: r.name || sub,
               username: r.username || "",
             });
+            addBlock(r);
             removeExclude(r.userId);
             showToast("Заблокирован " + (r.name || sub));
             if (friendsCache) {
@@ -6428,6 +6562,9 @@
     if (els.excludeOpen) {
       els.excludeOpen.addEventListener("click", () => showExcludeView());
     }
+    if (els.blocksOpen) {
+      els.blocksOpen.addEventListener("click", () => showBlocksView());
+    }
     }
     }
     if (els.historyOpen) {
@@ -6547,6 +6684,7 @@
     installXpBoostHook();
     syncXpBoostFlag();
     updateChangesBadge();
+    updateListBadges();
     watchHeartsUi();
 
     // открыть панель сразу, если включено в настройках
