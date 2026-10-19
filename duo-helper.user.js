@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Duolingo Helper
 // @namespace    https://github.com/Vidrimers/Duolingo-helper
-// @version      0.5.17
+// @version      0.6.0
 // @description  Проверка взаимной подписки на профилях Duolingo. Панель, бейджи, кеш.
 // @author       Vidrimers
 // @match        *://*.duolingo.com/*
@@ -68,6 +68,7 @@
       friendSnapshots: [], // [{ ts, following:[ids], followers:[ids] }]
       friendChanges: [], // [{ ts, type, userId, username, name, seen }]
       friendChangesUnread: 0,
+      userTags: {}, // userId -> { label, color, note, username, name }
     };
     if (!raw) return def;
     try {
@@ -86,6 +87,7 @@
           ? parsed.friendChanges
           : [],
         friendChangesUnread: Number(parsed.friendChangesUnread) || 0,
+        userTags: parsed.userTags && typeof parsed.userTags === "object" ? parsed.userTags : {},
       };
     } catch {
       return def;
@@ -1560,6 +1562,31 @@
                     <button class="dh-btn dh-btn-ghost" id="dh-copy-btn">📋 Копировать</button>
                     <button class="dh-btn dh-btn-ghost" id="dh-refresh-page">🔄 Обновить</button>
                 </div>
+
+                <div class="dh-card" id="dh-tags-card">
+                    <div class="dh-card-title">Метки</div>
+                    <div id="dh-tags-form">
+                        <div class="dh-muted" id="dh-tags-user">Для текущего профиля</div>
+                        <div class="dh-setting-row" style="border-bottom:none;padding:4px 0">
+                            <div class="dh-setting-label">Текст метки</div>
+                            <input class="dh-input" id="dh-tag-label" maxlength="40" style="width:170px" />
+                        </div>
+                        <div class="dh-setting-row" style="border-bottom:none;padding:4px 0">
+                            <div class="dh-setting-label">Цвет</div>
+                            <input type="color" id="dh-tag-color" class="dh-num-input" style="width:48px;height:32px;padding:2px" value="#58cc02" />
+                        </div>
+                        <div class="dh-setting-row" style="border-bottom:none;padding:4px 0">
+                            <div class="dh-setting-label">Заметка</div>
+                            <input class="dh-input" id="dh-tag-note" maxlength="120" style="width:170px" />
+                        </div>
+                    </div>
+                    <div class="dh-row" style="margin-top:6px">
+                        <button class="dh-btn dh-btn-primary" id="dh-tag-save">Сохранить метку</button>
+                        <button type="button" id="dh-tags-open" style="background:none;border:none;color:#888;cursor:pointer;font:inherit;font-size:11px;padding:0;text-decoration:underline">Люди с метками<span id="dh-tags-badge" style="display:none;margin-left:3px;color:#888;font-size:11px;font-weight:400;text-decoration:none"></span></button>
+                        <button type="button" id="dh-tags-back" style="display:none;background:none;border:none;color:#888;cursor:pointer;font:inherit;font-size:11px;padding:0;text-decoration:underline">← Назад</button>
+                    </div>
+                    <div id="dh-tags-list" style="display:none;flex-direction:column;gap:4px;margin-top:8px;max-height:36vh;overflow-y:auto;padding-right:8px"></div>
+                </div>
             </div>
 
             <div class="dh-tab-content" data-tab="friends">
@@ -1989,6 +2016,16 @@
       excludeList: modal.querySelector("#dh-exclude-list"),
       excludeBadge: modal.querySelector("#dh-exclude-badge"),
       blocksOpen: modal.querySelector("#dh-blocks-open"),
+      tagsOpen: modal.querySelector("#dh-tags-open"),
+      tagsList: modal.querySelector("#dh-tags-list"),
+      tagsBadge: modal.querySelector("#dh-tags-badge"),
+      tagsBack: modal.querySelector("#dh-tags-back"),
+      tagsUser: modal.querySelector("#dh-tags-user"),
+      tagsForm: modal.querySelector("#dh-tags-form"),
+      tagLabel: modal.querySelector("#dh-tag-label"),
+      tagColor: modal.querySelector("#dh-tag-color"),
+      tagNote: modal.querySelector("#dh-tag-note"),
+      tagSave: modal.querySelector("#dh-tag-save"),
       blocksList: modal.querySelector("#dh-blocks-list"),
       blocksBadge: modal.querySelector("#dh-blocks-badge"),
       clearCache: modal.querySelector("#dh-clear-cache"),
@@ -4290,6 +4327,104 @@
     saveData();
   }
 
+  function getTag(userId) {
+    if (!userId) return null;
+    return (DATA.userTags || {})[String(userId)] || null;
+  }
+
+  function findTagByUser(userId, username) {
+    const byId = getTag(userId);
+    if (byId) return byId;
+    const uname = String(username || "").toLowerCase().replace(/^@/, "");
+    if (!uname) return null;
+    const tags = DATA.userTags || {};
+    for (const key of Object.keys(tags)) {
+      const t = tags[key];
+      if (
+        t &&
+        t.username &&
+        String(t.username).toLowerCase().replace(/^@/, "") === uname
+      ) {
+        return t;
+      }
+    }
+    return null;
+  }
+
+  function setTag(userId, patch) {
+    if (!userId) return;
+    DATA.userTags = DATA.userTags || {};
+    const id = String(userId);
+    const prev = DATA.userTags[id] || {};
+    const next = { ...prev, ...patch };
+    if (!next.label && !next.note) {
+      delete DATA.userTags[id];
+    } else {
+      DATA.userTags[id] = next;
+    }
+    saveData();
+    if (els.tagsBadge) updateTagsBadge();
+  }
+
+  /** Сохраняет метку по userId (или username), не плодя дубликаты ключей. */
+  function upsertTag(user, patch) {
+    if (!user) return;
+    DATA.userTags = DATA.userTags || {};
+    const uid = user.userId ? String(user.userId) : "";
+    const uname = String(user.username || "").toLowerCase().replace(/^@/, "");
+    // ищем существующий ключ
+    let key = uid;
+    if (!getTag(key) && uname) {
+      const keys = Object.keys(DATA.userTags);
+      for (const k of keys) {
+        const t = DATA.userTags[k];
+        if (
+          (uid && String(k) === uid) ||
+          (t &&
+            t.username &&
+            String(t.username).toLowerCase().replace(/^@/, "") === uname)
+        ) {
+          key = k;
+          break;
+        }
+      }
+    }
+    if (!key) key = uname || uid;
+    setTag(key, {
+      ...patch,
+      username: user.username || (getTag(key) && getTag(key).username) || uname,
+      name: user.name || (getTag(key) && getTag(key).name) || uname,
+    });
+    // удаляем дубль по username, если он отличается от key
+    if (uname && uname !== key && DATA.userTags[uname] && uid) {
+      delete DATA.userTags[uname];
+      saveData();
+    }
+  }
+
+  function tagListUsers() {
+    return Object.entries(DATA.userTags || {}).map(([userId, t]) => ({
+      userId,
+      username: t.username || "",
+      name: t.name || t.username || userId,
+      label: t.label || "",
+      color: t.color || "#58cc02",
+      note: t.note || "",
+    }));
+  }
+
+  function updateTagsBadge() {
+    if (!els.tagsBadge) return;
+    const n = Object.keys(DATA.userTags || {}).length;
+    if (n > 0) {
+      els.tagsBadge.style.display = "inline";
+      els.tagsBadge.textContent = "(" + (n > 99 ? "99+" : n) + ")";
+    } else {
+      els.tagsBadge.style.display = "none";
+      els.tagsBadge.textContent = "";
+    }
+  }
+
   function isBlocked(userId) {
     const id = String(userId);
     return (DATA.blockList || []).some((x) => String(x.userId) === id);
@@ -4652,7 +4787,11 @@
                 ? "ты заблокировал"
                 : c.kind === "i_followed"
                   ? "ты подписался"
-                  : c.kind || "";
+                  : c.kind === "renamed_user"
+                    ? `username: ${c.from || "?"} → ${c.to || "?"}`
+                    : c.kind === "renamed_name"
+                      ? `имя: ${c.from || "?"} → ${c.to || "?"}`
+                      : c.kind || "";
       row.innerHTML = `<div class="dh-setting-label" style="min-width:0">
           <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
             ${sign} ${c.name || c.username || c.userId} · ${label}
@@ -4732,25 +4871,30 @@
       .forEach((a) => a.ids.forEach((id) => myBlockIds.add(String(id))));
     (DATA.blockList || []).forEach((b) => myBlockIds.add(String(b.userId)));
 
-    const add = (kind, dir, id, meta) => {
+    const add = (kind, dir, id, meta, extra) => {
       DATA.friendChanges.unshift({
         ts: now,
         kind,
         dir,
         userId: id,
-        username: (meta && meta.username) || "",
+        username: (meta && meta.username) || (extra && extra.username) || "",
         name: (meta && (meta.displayName || meta.name || meta.username)) || id,
         seen: false,
+        ...(extra || {}),
       });
       DATA.friendChangesUnread = (DATA.friendChangesUnread || 0) + 1;
     };
+
+    const metaOf = (map, id) => map && map[id] ? map[id] : null;
+    const userNameOf = (m) =>
+      (m && (m.username || m.displayName || m.name)) || "";
 
     if (prev) {
       // 1) кто-то отписался от меня (только если это НЕ моя блокировка/отписка)
       for (const id of prevFollowers) {
         if (curFollowers.has(id)) continue;
         if (myBlockIds.has(id) || myUnfollowIds.has(id)) continue;
-        const meta = prev.followersMeta && prev.followersMeta[id];
+        const meta = metaOf(prev.followersMeta, id);
         add("unfollowed_me", "minus", id, meta);
       }
       // подписался на меня
@@ -4760,7 +4904,7 @@
       // 2) исчез из моих подписок — классифицируем по действиям
       for (const id of prevFollowing) {
         if (curFollowing.has(id)) continue;
-        const meta = prev.followingMeta && prev.followingMeta[id];
+        const meta = metaOf(prev.followingMeta, id);
         if (myBlockIds.has(id)) {
           add("i_blocked", "minus", id, meta);
         } else if (myUnfollowIds.has(id)) {
@@ -4775,6 +4919,46 @@
       for (const [id, u] of curFollowing) {
         if (!prevFollowing.has(id)) add("i_followed", "plus", id, u);
       }
+
+      // 3) смена имени / username (id тот же)
+      const checkRename = (prevMetaMap, curMap) => {
+        for (const [id, u] of curMap) {
+          const pm = metaOf(prevMetaMap, id);
+          if (!pm) continue;
+          const prevUser = pm.username || "";
+          const curUser = u.username || "";
+          const prevName = pm.displayName || pm.name || "";
+          const curName = u.displayName || u.name || "";
+          if (prevUser && curUser && prevUser.toLowerCase() !== curUser.toLowerCase()) {
+            add("renamed_user", "edit", id, {
+              username: curUser,
+              displayName: curName || curUser,
+            }, {
+              from: prevUser,
+              to: curUser,
+              fromName: prevName,
+              toName: curName,
+            });
+          } else if (
+            prevName &&
+            curName &&
+            prevName !== curName &&
+            (!prevUser || !curUser || prevUser.toLowerCase() === curUser.toLowerCase())
+          ) {
+            add("renamed_name", "edit", id, {
+              username: curUser,
+              displayName: curName,
+            }, {
+              from: prevName,
+              to: curName,
+              fromName: prevName,
+              toName: curName,
+            });
+          }
+        }
+      };
+      checkRename(prev.followingMeta, curFollowing);
+      checkRename(prev.followersMeta, curFollowers);
     }
 
     if (DATA.friendChanges.length > 300) DATA.friendChanges.length = 300;
@@ -5156,20 +5340,34 @@
       const icon = r.followsMe ? "✅" : "❌";
       const deadIcon = r.inactive ? " · 💤" : "";
       const excludedIcon = isExcluded(r.userId) ? " · 🛡" : "";
+      const tagInfo = findTagByUser(r.userId, r.username);
+      const tagIcon =
+        tagInfo && tagInfo.label
+          ? ` · <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${tagInfo.color || "#58cc02"};margin:0 2px"></span>`
+          : "";
       row.innerHTML = `<div class="dh-setting-label" style="min-width:0">
           <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
-            ${icon} ${r.name || sub}${deadIcon}${excludedIcon}
+            ${icon} ${r.name || sub}${tagIcon}${deadIcon}${excludedIcon}
           </div>
           <small>${sub}</small>
         </div>
+        <button class="dh-btn" data-tag-edit="1" title="Метка" style="padding:4px 7px;font-size:11px;flex-shrink:0;display:inline-flex;align-items:center;justify-content:center">✏</button>
         <button class="dh-btn" data-exclude="1" title="${isExcluded(r.userId) ? "Убрать из исключений" : "В исключения (не трогать при массовых действиях)"}" style="padding:4px 7px;font-size:11px;flex-shrink:0;display:inline-flex;align-items:center;justify-content:center">${isExcluded(r.userId) ? "🛡✓" : "🛡"}</button>
         <button class="dh-btn" data-block="1" title="Заблокировать" style="padding:4px 8px;font-size:13px;line-height:1;flex-shrink:0;width:30px;display:inline-flex;align-items:center;justify-content:center">🚫</button>
         <button class="dh-btn" data-unfollow="1" title="Отписаться" style="padding:4px 8px;font-size:13px;line-height:1;flex-shrink:0;width:30px;display:inline-flex;align-items:center;justify-content:center">×</button>`;
       row.addEventListener("click", (e) => {
-        if (e.target && e.target.closest && e.target.closest("[data-unfollow],[data-exclude],[data-block]")) return;
+        if (e.target && e.target.closest && e.target.closest("[data-unfollow],[data-exclude],[data-block],[data-tag-edit]")) return;
         const u = r.username || r.name;
         if (u) window.open("https://www.duolingo.com/profile/" + encodeURIComponent(u), "_blank");
       });
+      const tagBtn = row.querySelector("[data-tag-edit]");
+      if (tagBtn) {
+        tagBtn.addEventListener("click", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          showTagEditor(r);
+        });
+      }
       const unBtn = row.querySelector("[data-unfollow]");
       if (unBtn) {
         unBtn.addEventListener("click", async (e) => {
@@ -5767,7 +5965,7 @@
             <li>Неактивные друзья: streak, XP, массовые действия</li>
             <li>Защита сердец, короткие уроки, автосолвер</li>
             <li>Квесты, магазин, гемы, streak, лига, XP-буст</li>
-            <li>Окно XP / Vista / Win95, темы, drag, кеш</li>
+            <li>Темы: XP / Vista / Win95</li>
           </ul>
           <p style="margin:0 0 10px">
             Часть механик (уроки, квесты, магазин, гемы, лига, XP)
@@ -5777,6 +5975,9 @@
           <p style="margin:0;color:#888;font-size:11px">
             Массовые действия и читы — на свой страх и риск.
             JWT-токен никуда не отправляется.
+          </p>
+		  <p style="margin:0;color:#888;font-size:11px">
+            Помните, что используя читерские функции, вы не выучите язык: они сделаны для развлечения!
           </p>
         </div>
         <div class="dh-confirm-actions">
@@ -5790,6 +5991,175 @@
     });
     overlay.querySelector('[data-about="close"]').addEventListener("click", close);
     shadow.appendChild(overlay);
+  }
+
+  function showTagEditor(user) {
+    if (!shadow) return;
+    const theme = DATA.settings.theme || "xp";
+    const id = String(user.userId || "");
+    const cur = findTagByUser(user.userId, user.username) || {};
+    // ключ сохранения: userId если есть, иначе username
+    const saveKey = id || String(user.username || "").toLowerCase().replace(/^@/, "");
+    const overlay = document.createElement("div");
+    overlay.className = "dh-confirm-overlay dh-theme-" + theme;
+    overlay.innerHTML = `
+      <div class="dh-confirm-box" style="width:380px">
+        <div class="dh-confirm-title">Метка</div>
+        <div class="dh-confirm-body">
+          <div class="dh-muted" style="margin-bottom:8px">
+            ${user.name || user.username || id}
+          </div>
+          <div class="dh-setting-row" style="border-bottom:none;padding:4px 0">
+            <div class="dh-setting-label">Текст метки</div>
+            <input class="dh-input" data-tag="label" maxlength="40" style="width:180px" />
+          </div>
+          <div class="dh-setting-row" style="border-bottom:none;padding:4px 0">
+            <div class="dh-setting-label">Цвет</div>
+            <input type="color" data-tag="color" class="dh-num-input" style="width:48px;height:32px;padding:2px" />
+          </div>
+          <div class="dh-setting-row" style="border-bottom:none;padding:4px 0">
+            <div class="dh-setting-label">Заметка</div>
+            <input class="dh-input" data-tag="note" maxlength="120" style="width:180px" />
+          </div>
+        </div>
+        <div class="dh-confirm-actions">
+          <button class="dh-btn" data-tag="clear">Убрать</button>
+          <button class="dh-btn" data-tag="cancel">Отмена</button>
+          <button class="dh-btn dh-btn-primary" data-tag="save">Сохранить</button>
+        </div>
+      </div>
+    `;
+    const labelIn = overlay.querySelector('[data-tag="label"]');
+    const colorIn = overlay.querySelector('[data-tag="color"]');
+    const noteIn = overlay.querySelector('[data-tag="note"]');
+    labelIn.value = cur.label || "";
+    colorIn.value = cur.color || "#58cc02";
+    noteIn.value = cur.note || "";
+
+    const close = () => overlay.remove();
+    overlay.addEventListener("click", (e) => {
+      if (e.target === overlay) close();
+    });
+    overlay.querySelector('[data-tag="cancel"]').addEventListener("click", close);
+    overlay.querySelector('[data-tag="clear"]').addEventListener("click", () => {
+      upsertTag({ userId: user.userId, username: user.username, name: user.name }, { label: "", note: "", color: colorIn.value });
+      close();
+      renderFriends();
+      if (els.tagsList && els.tagsList.style.display !== "none") renderTagsList();
+      showToast("Метка убрана");
+    });
+    overlay.querySelector('[data-tag="save"]').addEventListener("click", () => {
+      upsertTag({ userId: user.userId, username: user.username, name: user.name }, {
+        label: labelIn.value.trim(),
+        note: noteIn.value.trim(),
+        color: colorIn.value,
+      });
+      close();
+      renderFriends();
+      if (els.tagsList && els.tagsList.style.display !== "none") renderTagsList();
+      showToast("Метка сохранена");
+    });
+    shadow.appendChild(overlay);
+  }
+
+  function renderTagsList() {
+    if (!els.tagsList) return;
+    const list = tagListUsers();
+    els.tagsList.innerHTML = "";
+    updateTagsBadge();
+    if (!list.length) {
+      els.tagsList.innerHTML = '<div class="dh-muted">Меток пока нет</div>';
+      return;
+    }
+    for (const u of list) {
+      const row = document.createElement("div");
+      row.className = "dh-setting-row";
+      row.style.borderBottom = "none";
+      row.style.padding = "5px 2px";
+      row.style.cursor = "pointer";
+      const swatch = u.color || "#58cc02";
+      row.innerHTML = `<div class="dh-setting-label" style="min-width:0">
+          <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+            <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${swatch};margin-right:6px"></span>
+            ${u.label || "без метки"} · ${u.name}
+          </div>
+          <small>${u.username ? "@" + u.username : ""}${u.note ? " · " + u.note : ""}</small>
+        </div>
+        <button class="dh-btn" data-tag-edit="1" title="Изменить метку" style="padding:4px 8px;font-size:11px">✏</button>`;
+      row.addEventListener("click", (e) => {
+        if (e.target && e.target.closest && e.target.closest("[data-tag-edit]")) return;
+        if (u.username) {
+          window.open(
+            "https://www.duolingo.com/profile/" + encodeURIComponent(u.username),
+            "_blank",
+          );
+        }
+      });
+      const b = row.querySelector("[data-tag-edit]");
+      if (b) {
+        b.addEventListener("click", (e) => {
+          e.stopPropagation();
+          showTagEditor(u);
+        });
+      }
+      els.tagsList.appendChild(row);
+    }
+  }
+
+  function showTagsListOnly() {
+    if (els.tagsList) els.tagsList.style.display = "flex";
+    if (els.tagsForm) els.tagsForm.style.display = "none";
+    if (els.tagsOpen) els.tagsOpen.style.display = "none";
+    if (els.tagsBack) els.tagsBack.style.display = "";
+    if (els.tagSave) els.tagSave.style.display = "none";
+    renderTagsList();
+  }
+
+  function showTagsForm() {
+    if (els.tagsList) els.tagsList.style.display = "none";
+    if (els.tagsForm) els.tagsForm.style.display = "";
+    if (els.tagsOpen) els.tagsOpen.style.display = "";
+    if (els.tagsBack) els.tagsBack.style.display = "none";
+    if (els.tagSave) els.tagSave.style.display = "";
+    syncTagFormFromProfile();
+  }
+
+  function syncTagFormFromProfile() {
+    const uname = getProfileUsername();
+    if (!els.tagLabel) return;
+    if (!uname) {
+      if (els.tagsUser) els.tagsUser.textContent = "Открой профиль пользователя";
+      els.tagLabel.value = "";
+      els.tagNote.value = "";
+      els.tagColor.value = "#58cc02";
+      return;
+    }
+    const tag = findTagByUser(null, uname) || {};
+    if (els.tagsUser) els.tagsUser.textContent = "Профиль @" + uname;
+    els.tagLabel.value = tag.label || "";
+    els.tagNote.value = tag.note || "";
+    els.tagColor.value = tag.color || "#58cc02";
+  }
+
+  function saveTagFromForm() {
+    const uname = getProfileUsername();
+    if (!uname) {
+      showToast("Сначала открой профиль пользователя", true);
+      return;
+    }
+    upsertTag({ username: uname, name: uname }, {
+      label: (els.tagLabel && els.tagLabel.value.trim()) || "",
+      note: (els.tagNote && els.tagNote.value.trim()) || "",
+      color: (els.tagColor && els.tagColor.value) || "#58cc02",
+    });
+    showToast("Метка сохранена");
+    renderFriends();
+    updateTagsBadge();
+    mountInlineTag(uname);
+  }
+
+  function showTagsView() {
+    showTagsListOnly();
   }
 
   function openBugReport() {
@@ -5941,6 +6311,8 @@
   function removeInlineBadge() {
     const old = document.getElementById(INLINE_BADGE_ID);
     if (old) old.remove();
+    const oldTag = document.getElementById("dh-inline-tag");
+    if (oldTag) oldTag.remove();
   }
 
   /**
@@ -5982,7 +6354,47 @@
         if (typeof refreshMeInfo === "function") refreshMeInfo();
       });
     }
+
+    // отдельная плашка метки (не входит в статус подписки)
+    mountInlineTag(username);
     return true;
+  }
+
+  function mountInlineTag(username) {
+    const old = document.getElementById("dh-inline-tag");
+    const tag = findTagByUser(null, username);
+    if (old) old.remove();
+    if (!tag || !tag.label) return;
+
+    const nameEl = findNameEl(username);
+    if (!nameEl) return;
+
+    const el = document.createElement("span");
+    el.id = "dh-inline-tag";
+    el.textContent = tag.label;
+    el.title = tag.note || "Метка";
+    el.style.cssText =
+      "display:inline-flex;align-items:center;margin-left:8px;padding:2px 10px;" +
+      "border-radius:999px;font:700 11px/1.3 Tahoma,sans-serif;white-space:nowrap;" +
+      "background:" +
+      (tag.color || "#58cc02") +
+      ";color:#fff;border:1px solid rgba(0,0,0,0.12);box-shadow:0 1px 3px rgba(0,0,0,0.12);cursor:pointer;";
+    el.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (els.modal) {
+        els.modal.classList.add("open");
+        if (typeof showTagsForm === "function") showTagsForm();
+      }
+    });
+
+    // после плашки подписки, если она есть; иначе после имени
+    const followBadge = document.getElementById(INLINE_BADGE_ID);
+    if (followBadge && followBadge.parentNode) {
+      followBadge.insertAdjacentElement("afterend", el);
+    } else {
+      nameEl.insertAdjacentElement("afterend", el);
+    }
   }
 
   let lastBadge = null;
@@ -6227,6 +6639,8 @@
     const path = location.pathname;
     if (path === lastPath) return;
     lastPath = path;
+
+    syncTagFormFromProfile();
 
     if (isProfilePage()) {
       const u = getProfileUsername();
@@ -7004,6 +7418,15 @@
     if (els.blocksOpen) {
       els.blocksOpen.addEventListener("click", () => showBlocksView());
     }
+    if (els.tagsOpen) {
+      els.tagsOpen.addEventListener("click", () => showTagsListOnly());
+    }
+    if (els.tagsBack) {
+      els.tagsBack.addEventListener("click", () => showTagsForm());
+    }
+    if (els.tagSave) {
+      els.tagSave.addEventListener("click", () => saveTagFromForm());
+    }
     if (els.historyOpen) {
       els.historyOpen.addEventListener("click", () => showHistoryView());
     }
@@ -7122,6 +7545,8 @@
     syncXpBoostFlag();
     updateChangesBadge();
     updateListBadges();
+    updateTagsBadge();
+    syncTagFormFromProfile();
     watchHeartsUi();
 
     // открыть панель сразу, если включено в настройках
