@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Duolingo Helper
 // @namespace    https://github.com/Vidrimers/Duolingo-helper
-// @version      0.5.16
+// @version      0.5.17
 // @description  Проверка взаимной подписки на профилях Duolingo. Панель, бейджи, кеш.
 // @author       Vidrimers
 // @match        *://*.duolingo.com/*
@@ -4098,9 +4098,13 @@
         const meIdx = rankings.findIndex((u) => String(u.user_id) === myId);
         const me = meIdx >= 0 ? rankings[meIdx] : null;
         const myRank = meIdx + 1;
-        const above = targetRank >= 2 ? rankings[targetRank - 2] : null;
-        const targetScore = above ? Number(above.score || 0) + 50 : 50;
+        // цель — обогнать того, кто сейчас на целевом месте (+50 XP)
+        const targetPerson = rankings[targetRank - 1] || null;
         const myScore = me ? Number(me.score || 0) : 0;
+        const targetScore =
+          targetPerson && String(targetPerson.user_id) !== myId
+            ? Number(targetPerson.score || 0) + 50
+            : myScore + 50;
 
         renderLeaderboard(data);
         if (me && (myScore >= targetScore || (myRank > 0 && myRank <= targetRank))) {
