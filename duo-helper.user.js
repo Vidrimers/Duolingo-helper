@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Duolingo Helper
 // @namespace    https://github.com/Vidrimers/Duolingo-helper
-// @version      0.5.15
+// @version      0.5.16
 // @description  Проверка взаимной подписки на профилях Duolingo. Панель, бейджи, кеш.
 // @author       Vidrimers
 // @match        *://*.duolingo.com/*
@@ -1504,6 +1504,8 @@
             <span class="dh-title-text">Duolingo Helper</span>
             <span class="dh-chip" id="dh-version-chip"></span>
             <div class="dh-win-btns">
+                <button class="dh-win-btn" id="dh-about-btn" title="О скрипте" style="width:22px;height:22px">?</button>
+                <button class="dh-win-btn" id="dh-bug-btn" title="Сообщить об ошибке" style="width:22px;height:22px">🐞</button>
                 <button class="dh-win-btn min" id="dh-min-btn" title="Свернуть">–</button>
                 <button class="dh-win-btn close" id="dh-close-btn" title="Закрыть">×</button>
             </div>
@@ -1896,6 +1898,8 @@
       titlebar: modal.querySelector("#dh-titlebar"),
       minBtn: modal.querySelector("#dh-min-btn"),
       closeBtn: modal.querySelector("#dh-close-btn"),
+      aboutBtn: modal.querySelector("#dh-about-btn"),
+      bugBtn: modal.querySelector("#dh-bug-btn"),
       resetPosBtn: modal.querySelector("#dh-reset-pos"),
       tabs: [...modal.querySelectorAll(".dh-tab[data-tab]")],
       tabContents: [...modal.querySelectorAll(".dh-tab-content")],
@@ -5736,6 +5740,83 @@
     });
   }
 
+  function showAbout() {
+    if (!shadow) return;
+    const theme = DATA.settings.theme || "xp";
+    const ver = (typeof GM_info !== "undefined" && GM_info.script && GM_info.script.version) || CURRENT_VERSION;
+    const overlay = document.createElement("div");
+    overlay.className = "dh-confirm-overlay dh-theme-" + theme;
+    overlay.innerHTML = `
+      <div class="dh-confirm-box" style="width:420px">
+        <div class="dh-confirm-title">Справка</div>
+        <div class="dh-confirm-body" style="max-height:55vh;overflow-y:auto;line-height:1.55">
+          <p style="margin:0 0 10px">
+            Userscript для Tampermonkey — расширение для Duolingo.
+            Помогает следить за подписками, чистить друзей, держать серию
+            и ускорять рутину в аккаунте.
+          </p>
+          <p style="margin:0 0 8px"><strong>Что умеет:</strong></p>
+          <ul style="margin:0 0 10px;padding-left:18px">
+            <li>Проверка взаимной подписки на профиле и в списке друзей</li>
+            <li>Кто подписался / отписался, история действий с откатом</li>
+            <li>Отписка, блокировка, исключения (🛡), блок-лист</li>
+            <li>Неактивные друзья: streak, XP, массовые действия</li>
+            <li>Защита сердец, короткие уроки, автосолвер</li>
+            <li>Квесты, магазин, гемы, streak, лига, XP-буст</li>
+            <li>Окно XP / Vista / Win95, темы, drag, кеш</li>
+          </ul>
+          <p style="margin:0 0 10px">
+            Часть механик (уроки, квесты, магазин, гемы, лига, XP)
+            написана с нуля, вдохновившись проектом пользователя
+            <strong>DuoHacker</strong>.
+          </p>
+          <p style="margin:0;color:#888;font-size:11px">
+            Массовые действия и читы — на свой страх и риск.
+            JWT-токен никуда не отправляется.
+          </p>
+        </div>
+        <div class="dh-confirm-actions">
+          <button class="dh-btn dh-btn-primary" data-about="close">Понятно</button>
+        </div>
+      </div>
+    `;
+    const close = () => overlay.remove();
+    overlay.addEventListener("click", (e) => {
+      if (e.target === overlay) close();
+    });
+    overlay.querySelector('[data-about="close"]').addEventListener("click", close);
+    shadow.appendChild(overlay);
+  }
+
+  function openBugReport() {
+    const ver = (typeof GM_info !== "undefined" && GM_info.script && GM_info.script.version) || CURRENT_VERSION;
+    const body = encodeURIComponent(
+      [
+        "**Версия скрипта:** " + ver,
+        "**Браузер:** ",
+        "**Тема окна:** " + (DATA.settings.theme || "xp"),
+        "",
+        "**Шаги воспроизведения:**",
+        "1. ",
+        "2. ",
+        "",
+        "**Ожидаемое поведение:**",
+        "",
+        "**Фактическое поведение:**",
+        "",
+        "**Дополнительно:**",
+        "- ",
+      ].join("\n"),
+    );
+    window.open(
+      "https://github.com/Vidrimers/Duolingo-helper/issues/new?title=" +
+        encodeURIComponent("[Bug] ") +
+        "&body=" +
+        body,
+      "_blank",
+    );
+  }
+
   // ========== Toast ==========
   function showToast(msg, isError = false) {
     if (!shadow) return;
@@ -6579,6 +6660,13 @@
         applyWinPos();
         showToast("Позиция окна сброшена");
       });
+    }
+
+    if (els.aboutBtn) {
+      els.aboutBtn.addEventListener("click", () => showAbout());
+    }
+    if (els.bugBtn) {
+      els.bugBtn.addEventListener("click", () => openBugReport());
     }
 
     els.tabs.forEach((tab) => {
