@@ -72,6 +72,7 @@
       autoSolver: false,
       fakeXpBoost: false,
       xpBoostMins: 15,
+      notifyHideSec: 5,
     };
   }
 
@@ -398,30 +399,53 @@
     style.textContent = `
             *, *::before, *::after { box-sizing: border-box; }
 
-            /* ===== Toast ===== */
-            .dh-toast {
+            /* ===== Notification stack ===== */
+            .dh-notifs {
                 position: fixed;
-                bottom: 80px;
-                left: 50%;
-                transform: translateX(-50%) translateY(20px);
+                top: 16px;
+                right: 16px;
+                z-index: 2147483647;
+                display: flex;
+                flex-direction: column;
+                gap: 8px;
+                pointer-events: none;
+                max-width: min(320px, calc(100vw - 32px));
+            }
+            .dh-notif {
+                pointer-events: auto;
+                display: flex;
+                align-items: flex-start;
+                gap: 8px;
                 background: linear-gradient(135deg, #1e1e2e, #2a2a3e);
                 color: #fff;
-                border: 1px solid rgba(255,255,255,0.1);
-                border-radius: 12px;
-                padding: 12px 24px;
-                font: 600 14px/1.4 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-                z-index: 2147483647;
-                box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+                border-radius: 8px;
+                border-left: 4px solid #58cc02;
+                padding: 10px 12px;
+                font: 600 12px/1.35 Tahoma, sans-serif;
+                box-shadow: 0 8px 24px rgba(0,0,0,0.35);
                 opacity: 0;
-                transition: opacity 0.3s, transform 0.3s;
-                backdrop-filter: blur(10px);
-                max-width: 340px;
-                text-align: center;
-                pointer-events: none;
+                transform: translateX(20px);
+                transition: opacity 0.25s ease, transform 0.25s ease;
+                cursor: pointer;
             }
-            .dh-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
-            .dh-toast.error { border-color: #ff4444; }
-            .dh-toast.ok { border-color: #58cc02; }
+            .dh-notif.show {
+                opacity: 1;
+                transform: translateX(0);
+            }
+            .dh-notif.error { border-left-color: #e74c3c; }
+            .dh-notif.ok { border-left-color: #58cc02; }
+            .dh-notif.info { border-left-color: #3498db; }
+            .dh-notif.warn { border-left-color: #f39c12; }
+            .dh-notif-icon {
+                font-size: 14px;
+                line-height: 1.2;
+                flex-shrink: 0;
+            }
+            .dh-notif-text {
+                flex: 1;
+                min-width: 0;
+                word-break: break-word;
+            }
 
             /* ===== FAB ===== */
             .dh-fab {
@@ -715,6 +739,7 @@
             }
             .dh-tab-content:not([data-tab="friends"]).active {
                 overflow-y: auto;
+                padding-right: 6px;
             }
             .dh-tab-content[data-tab="friends"] #dh-friends-list,
             .dh-tab-content[data-tab="friends"] #dh-history-list,
@@ -1983,6 +2008,13 @@
                 </div>
                 <div class="dh-setting-row">
                     <div class="dh-setting-label">
+                        Уведомления, сек
+                        <small>Через сколько пропадают (1–30)</small>
+                    </div>
+                    <input class="dh-num-input" id="dh-set-notify" type="number" min="1" max="30" />
+                </div>
+                <div class="dh-setting-row">
+                    <div class="dh-setting-label">
                         Версия скрипта
                         <small id="dh-current-version">…</small>
                     </div>
@@ -2117,6 +2149,7 @@
       changesBadge: modal.querySelector("#dh-changes-badge"),
       setCache: modal.querySelector("#dh-set-cache"),
       setDelay: modal.querySelector("#dh-set-delay"),
+      setNotify: modal.querySelector("#dh-set-notify"),
       setInactive: modal.querySelector("#dh-set-inactive"),
       scanActivity: modal.querySelector("#dh-scan-activity"),
       scanStop: modal.querySelector("#dh-scan-stop"),
@@ -6442,16 +6475,46 @@
 
   // ========== Toast ==========
   function showToast(msg, isError = false) {
+    notify(isError ? "error" : "ok", msg);
+  }
+
+  /** Стак уведомлений. kind: ok | error | info | warn */
+  function notify(kind, msg) {
     if (!shadow) return;
-    const t = document.createElement("div");
-    t.className = "dh-toast" + (isError ? " error" : " ok");
-    t.textContent = msg;
-    shadow.appendChild(t);
-    requestAnimationFrame(() => t.classList.add("show"));
-    setTimeout(() => {
-      t.classList.remove("show");
-      setTimeout(() => t.remove(), 350);
-    }, 2800);
+    let box = shadow.querySelector(".dh-notifs");
+    if (!box) {
+      box = document.createElement("div");
+      box.className = "dh-notifs";
+      shadow.appendChild(box);
+    }
+    const n = document.createElement("div");
+    n.className = "dh-notif " + (kind || "info");
+    const icon =
+      kind === "error" ? "❌" : kind === "ok" ? "✅" : kind === "warn" ? "⚠️" : "ℹ️";
+    n.innerHTML =
+      `<span class="dh-notif-icon">${icon}</span><span class="dh-notif-text"></span>`;
+    n.querySelector(".dh-notif-text").textContent = String(msg);
+    box.appendChild(n);
+    requestAnimationFrame(() => n.classList.add("show"));
+
+    const hideSec = Math.max(
+      1,
+      Math.min(30, (DATA.settings && DATA.settings.notifyHideSec) || 5),
+    );
+    const remove = () => {
+      n.classList.remove("show");
+      setTimeout(() => n.remove(), 250);
+    };
+    const timer = setTimeout(remove, hideSec * 1000);
+    n.addEventListener("click", () => {
+      clearTimeout(timer);
+      remove();
+    });
+
+    // не даём стеку вылезти за экран
+    while (box.children.length > 6) {
+      box.removeChild(box.firstElementChild);
+    }
   }
 
   // ========== Badge (inline, glued to the username element) ==========
@@ -7576,6 +7639,7 @@
       }
       els.setCache.value = DATA.settings.cacheMinutes;
       if (els.setDelay) els.setDelay.value = DATA.settings.requestDelay;
+      if (els.setNotify) els.setNotify.value = DATA.settings.notifyHideSec || 5;
       if (els.setInactive) els.setInactive.value = DATA.settings.inactiveDays;
     };
     syncSwitches();
@@ -7919,6 +7983,14 @@
         els.setInactive.value = v;
         saveData();
         renderFriends();
+      });
+    }
+    if (els.setNotify) {
+      els.setNotify.addEventListener("change", () => {
+        const v = Math.max(1, Math.min(30, parseInt(els.setNotify.value, 10) || 5));
+        DATA.settings.notifyHideSec = v;
+        els.setNotify.value = v;
+        saveData();
       });
     }
     if (els.scanActivity) {
