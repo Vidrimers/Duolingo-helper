@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Duolingo Helper
 // @namespace    https://github.com/Vidrimers/Duolingo-helper
-// @version      0.6.0
+// @version      0.6.2
 // @description  Проверка взаимной подписки на профилях Duolingo. Панель, бейджи, кеш.
 // @author       Vidrimers
 // @match        *://*.duolingo.com/*
@@ -51,7 +51,9 @@
         accent: "#58cc02",
         winPos: null, // { x, y } — позиция окна после drag
         fabPos: null, // { x, y } — позиция FAB после drag
-        openOnStart: false, // открывать панель при загрузке сайта
+        openOnStart: false, // deprecated
+        startState: "remember", // remember | closed | min | open
+        windowState: "closed", // последнее состояние окна
         theme: "xp", // xp | vista | win95
         protectHearts: true, // блокировать списание сердец
         lessonShortener: false, // укорачивать урок до 1-2 заданий (по умолчанию выкл)
@@ -467,6 +469,37 @@
                 overscroll-behavior: contain;
             }
             .dh-modal.open { display: flex; }
+            .dh-modal.dh-anim {
+                transition:
+                    left 0.28s cubic-bezier(0.2, 0.8, 0.2, 1),
+                    top 0.28s cubic-bezier(0.2, 0.8, 0.2, 1),
+                    width 0.28s cubic-bezier(0.2, 0.8, 0.2, 1),
+                    height 0.28s cubic-bezier(0.2, 0.8, 0.2, 1),
+                    transform 0.32s cubic-bezier(0.2, 0.8, 0.2, 1),
+                    opacity 0.28s ease;
+            }
+            .dh-modal.dh-min {
+                max-width: 92vw;
+                max-height: none !important;
+                width: fit-content;
+            }
+            .dh-modal.dh-min .dh-body,
+            .dh-modal.dh-min .dh-footer {
+                display: none !important;
+            }
+            .dh-modal.dh-min .dh-titlebar {
+                border-radius: 5px 5px 3px 3px;
+            }
+            .dh-modal.dh-min .dh-title-text {
+                flex: 0 0 auto;
+                max-width: none;
+                overflow: visible;
+                text-overflow: clip;
+                width: auto;
+            }
+            .dh-modal.dh-min .dh-chip {
+                display: none;
+            }
 
             /* Title bar (drag handle) */
             .dh-titlebar {
@@ -1838,10 +1871,18 @@
                 </div>
                 <div class="dh-setting-row">
                     <div class="dh-setting-label">
-                        Открывать панель при загрузке
-                        <small>UI будет раскрыт сразу при заходе на Duolingo</small>
+                        Стартовое состояние
+                        <small>Как показывать окно при заходе на Duolingo</small>
                     </div>
-                    <div class="dh-switch" id="dh-set-open"></div>
+                    <div class="dh-select" id="dh-set-start" style="width:160px;flex:0 0 160px">
+                        <span class="dh-select-text">Помнить последнее</span><span class="dh-select-arrow">▾</span>
+                        <div class="dh-select-options">
+                            <div class="dh-select-option" data-start="remember">Помнить последнее</div>
+                            <div class="dh-select-option" data-start="closed">Закрыто</div>
+                            <div class="dh-select-option" data-start="min">Свёрнуто</div>
+                            <div class="dh-select-option" data-start="open">Раскрыто</div>
+                        </div>
+                    </div>
                 </div>
                 <div class="dh-setting-row">
                     <div class="dh-setting-label">
@@ -1943,6 +1984,9 @@
       setAuto: modal.querySelector("#dh-set-auto"),
       setBadge: modal.querySelector("#dh-set-badge"),
       setOpen: modal.querySelector("#dh-set-open"),
+      setStart: modal.querySelector("#dh-set-start"),
+      setStartText: modal.querySelector("#dh-set-start .dh-select-text"),
+      setStartOpts: [...modal.querySelectorAll("#dh-set-start .dh-select-option")],
       themePicker: modal.querySelector("#dh-theme-picker"),
       themeBtns: [...modal.querySelectorAll(".dh-theme-btn")],
       setHearts: modal.querySelector("#dh-set-hearts"),
@@ -6912,6 +6956,127 @@
     saveData();
   }
 
+  function currentWindowState() {
+    if (!els.modal || !els.modal.classList.contains("open")) return "closed";
+    return els.modal.classList.contains("dh-min") ? "min" : "open";
+  }
+
+  function saveWindowState() {
+    DATA.settings.windowState = currentWindowState();
+    saveData();
+  }
+
+  function applyStartState() {
+    if (!els.modal) return;
+    const mode = DATA.settings.startState || "remember";
+    let state = DATA.settings.windowState || "closed";
+    if (mode !== "remember") state = mode;
+
+    els.modal.classList.remove("dh-min");
+    if (els.minBtn) {
+      els.minBtn.textContent = "–";
+      els.minBtn.title = "Свернуть";
+    }
+
+    if (state === "closed") {
+      els.modal.classList.remove("open");
+      return;
+    }
+    els.modal.classList.add("open");
+    if (state === "min") {
+      toggleMinimize();
+    }
+  }
+
+  let preMinPos = null;
+
+  function toggleMinimize() {
+    if (!els.modal) return;
+    const isMin = els.modal.classList.contains("dh-min");
+    els.modal.classList.add("dh-anim");
+
+    if (!isMin) {
+      preMinPos = {
+        x: parseInt(els.modal.style.left, 10) || els.modal.offsetLeft || 0,
+        y: parseInt(els.modal.style.top, 10) || els.modal.offsetTop || 0,
+        width: els.modal.offsetWidth || 420,
+      };
+      const fromW = preMinPos.width;
+      // сброс inline-width, иначе fit-content не сработает
+      els.modal.style.width = "";
+      els.modal.classList.add("dh-min");
+      // меряем по содержимому titlebar, без ellipsis
+      let toW = els.modal.offsetWidth || 300;
+      if (els.titlebar) {
+        toW = Math.max(toW, els.titlebar.scrollWidth);
+      }
+      toW = Math.min(toW, window.innerWidth - 16);
+      els.modal.style.width = fromW + "px";
+      requestAnimationFrame(() => {
+        els.modal.style.width = toW + "px";
+        els.modal.style.left = "8px";
+        els.modal.style.top = Math.max(8, window.innerHeight - 56) + "px";
+      });
+      if (els.minBtn) {
+        els.minBtn.textContent = "▢";
+        els.minBtn.title = "Развернуть";
+      }
+    } else {
+      const pos = preMinPos
+        ? clampWinPos(preMinPos.x, preMinPos.y)
+        : clampWinPos(window.innerWidth - 420 - 120, Math.round(window.innerHeight * 0.12));
+      const w = (preMinPos && preMinPos.width) || 420;
+      els.modal.classList.remove("dh-min");
+      requestAnimationFrame(() => {
+        els.modal.style.width = w + "px";
+        els.modal.style.left = pos.x + "px";
+        els.modal.style.top = pos.y + "px";
+      });
+      preMinPos = null;
+      if (els.minBtn) {
+        els.minBtn.textContent = "–";
+        els.minBtn.title = "Свернуть";
+      }
+    }
+
+    setTimeout(() => {
+      els.modal.classList.remove("dh-anim");
+      saveWindowState();
+    }, 320);
+  }
+
+  /** Анимация «втягивания» окна в FAB и закрытие. */
+  function closeToFab() {
+    if (!els.modal) return;
+    const fab = els.fab;
+    els.modal.classList.add("dh-anim");
+    if (fab) {
+      const mr = els.modal.getBoundingClientRect();
+      const fr = fab.getBoundingClientRect();
+      const dx = fr.left + fr.width / 2 - (mr.left + mr.width / 2);
+      const dy = fr.top + fr.height / 2 - (mr.top + mr.height / 2);
+      els.modal.style.transformOrigin = "center center";
+      els.modal.style.transform = `translate(${dx}px, ${dy}px) scale(0.08)`;
+      els.modal.style.opacity = "0";
+    } else {
+      els.modal.style.opacity = "0";
+      els.modal.style.transform = "scale(0.9)";
+    }
+    setTimeout(() => {
+      els.modal.classList.remove("open", "dh-min");
+      els.modal.classList.remove("dh-anim");
+      els.modal.style.transform = "";
+      els.modal.style.opacity = "";
+      els.modal.style.width = "";
+      preMinPos = null;
+      if (els.minBtn) {
+        els.minBtn.textContent = "–";
+        els.minBtn.title = "Свернуть";
+      }
+      saveWindowState();
+    }, 300);
+  }
+
   function initDrag() {
     const bar = els.titlebar;
     const modal = els.modal;
@@ -7054,22 +7219,30 @@
     }
     if (els.fab) {
       els.fab.addEventListener("click", () => {
-        els.modal.classList.toggle("open");
+        if (els.modal.classList.contains("dh-min")) {
+          toggleMinimize();
+          els.modal.classList.add("open");
+        } else {
+          els.modal.classList.toggle("open");
+        }
         if (els.modal.classList.contains("open")) {
           refreshMeInfo();
           const u = getProfileUsername() || els.userInput.value;
           if (u && !els.userInput.value) els.userInput.value = u;
         }
+        saveWindowState();
       });
     }
 
     els.badge.addEventListener("click", () => {
+      if (els.modal.classList.contains("dh-min")) toggleMinimize();
       els.modal.classList.add("open");
       refreshMeInfo();
+      saveWindowState();
     });
 
-    els.closeBtn.addEventListener("click", () => els.modal.classList.remove("open"));
-    els.minBtn.addEventListener("click", () => els.modal.classList.remove("open"));
+    els.closeBtn.addEventListener("click", () => closeToFab());
+    els.minBtn.addEventListener("click", () => toggleMinimize());
 
     if (els.resetPosBtn) {
       els.resetPosBtn.addEventListener("click", () => {
@@ -7157,10 +7330,19 @@
     });
 
     // settings
+    const startLabels = {
+      remember: "Помнить последнее",
+      closed: "Закрыто",
+      min: "Свёрнуто",
+      open: "Раскрыто",
+    };
     const syncSwitches = () => {
       els.setAuto.classList.toggle("on", !!DATA.settings.autoCheck);
       els.setBadge.classList.toggle("on", !!DATA.settings.showBadge);
-      if (els.setOpen) els.setOpen.classList.toggle("on", !!DATA.settings.openOnStart);
+      if (els.setStartText) {
+        els.setStartText.textContent =
+          startLabels[DATA.settings.startState] || startLabels.remember;
+      }
       els.setCache.value = DATA.settings.cacheMinutes;
       if (els.setDelay) els.setDelay.value = DATA.settings.requestDelay;
       if (els.setInactive) els.setInactive.value = DATA.settings.inactiveDays;
@@ -7181,16 +7363,25 @@
       else onNavigate();
     });
 
-    if (els.setOpen) {
-      els.setOpen.addEventListener("click", () => {
-        DATA.settings.openOnStart = !DATA.settings.openOnStart;
-        saveData();
-        syncSwitches();
-        showToast(
-          DATA.settings.openOnStart
-            ? "Панель будет открываться при загрузке"
-            : "Панель будет закрытой при загрузке",
-        );
+    if (els.setStart) {
+      els.setStart.addEventListener("click", (e) => {
+        e.stopPropagation();
+        els.setStart.classList.toggle("open");
+      });
+      if (els.setStartOpts && els.setStartOpts.length) {
+        els.setStartOpts.forEach((opt) => {
+          opt.addEventListener("click", (e) => {
+            e.stopPropagation();
+            DATA.settings.startState = opt.dataset.start || "remember";
+            saveData();
+            syncSwitches();
+            els.setStart.classList.remove("open");
+            showToast("Стартовое состояние: " + startLabels[DATA.settings.startState]);
+          });
+        });
+      }
+      document.addEventListener("click", () => {
+        if (els.setStart) els.setStart.classList.remove("open");
       });
     }
 
@@ -7549,10 +7740,8 @@
     syncTagFormFromProfile();
     watchHeartsUi();
 
-    // открыть панель сразу, если включено в настройках
-    if (DATA.settings.openOnStart && els.modal) {
-      els.modal.classList.add("open");
-    }
+    // стартовое состояние окна
+    applyStartState();
 
     // SPA может перерисовать body — следим за host и плашкой (с дебаунсом)
     let ensureTimer = null;
