@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Duolingo Helper
 // @namespace    https://github.com/Vidrimers/Duolingo-helper
-// @version      0.6.3
+// @version      0.6.5
 // @description  Проверка взаимной подписки на профилях Duolingo. Панель, бейджи, кеш.
 // @author       Vidrimers
 // @match        *://*.duolingo.com/*
@@ -37,70 +37,130 @@
   const HOST_ID = "dh-root-host";
 
   // ========== ХРАНИЛИЩЕ ==========
+  // ========== ХРАНИЛИЩЕ (всё per-account, включая настройки) ==========
+  const ACCOUNT_FIELDS = [
+    "settings",
+    "followCache",
+    "me",
+    "actionLog",
+    "excludeList",
+    "blockList",
+    "friendSnapshots",
+    "friendChanges",
+    "friendChangesUnread",
+    "userTags",
+  ];
+
+  function defaultSettings() {
+    return {
+      autoCheck: true,
+      cacheMinutes: 30,
+      requestDelay: 350,
+      inactiveDays: 3,
+      activitySort: "xp_desc",
+      showBadge: true,
+      badgePos: "top-right",
+      accent: "#58cc02",
+      winPos: null,
+      fabPos: null,
+      openOnStart: false,
+      startState: "remember",
+      windowState: "closed",
+      theme: "xp",
+      protectHearts: true,
+      lessonShortener: false,
+      autoSolver: false,
+      fakeXpBoost: false,
+      xpBoostMins: 15,
+    };
+  }
+
+  function emptyAccount() {
+    return {
+      settings: defaultSettings(),
+      followCache: {},
+      me: null,
+      actionLog: [],
+      excludeList: [],
+      blockList: [],
+      friendSnapshots: [],
+      friendChanges: [],
+      friendChangesUnread: 0,
+      userTags: {},
+    };
+  }
+
   function loadData() {
     const raw = GM_getValue(STORAGE_KEY, null);
-    const def = {
-      settings: {
-        autoCheck: true,
-        cacheMinutes: 30,
-        requestDelay: 350, // мс между запросами (rate limit)
-        inactiveDays: 3, // порог «неактивных» друзей
-        activitySort: "xp_desc", // сортировка в «Активности»
-        showBadge: true,
-        badgePos: "top-right",
-        accent: "#58cc02",
-        winPos: null, // { x, y } — позиция окна после drag
-        fabPos: null, // { x, y } — позиция FAB после drag
-        openOnStart: false, // deprecated
-        startState: "remember", // remember | closed | min | open
-        windowState: "closed", // последнее состояние окна
-        theme: "xp", // xp | vista | win95
-        protectHearts: true, // блокировать списание сердец
-        lessonShortener: false, // укорачивать урок до 1-2 заданий (по умолчанию выкл)
-        autoSolver: false, // автосолвер в уроках (по умолчанию выкл)
-        fakeXpBoost: false, // фейк XP-буста
-        xpBoostMins: 15,
-      },
-      // username -> { followsMe: true/false, checkedAt: ts, theirId, theirName }
-      followCache: {},
-      me: null, // { id, username, name }
-      actionLog: [], // история отписок/действий для undo
-      excludeList: [], // исключения от массовых операций [{userId,username,name}]
-      blockList: [], // локальный блок-лист [{userId,username,name,ts}]
-      friendSnapshots: [], // [{ ts, following:[ids], followers:[ids] }]
-      friendChanges: [], // [{ ts, type, userId, username, name, seen }]
-      friendChangesUnread: 0,
-      userTags: {}, // userId -> { label, color, note, username, name }
-    };
-    if (!raw) return def;
-    try {
-      const parsed = JSON.parse(raw);
-      return {
-        settings: { ...def.settings, ...(parsed.settings || {}) },
-        followCache: parsed.followCache || {},
-        me: parsed.me || null,
-        actionLog: Array.isArray(parsed.actionLog) ? parsed.actionLog : [],
-        excludeList: Array.isArray(parsed.excludeList) ? parsed.excludeList : [],
-        blockList: Array.isArray(parsed.blockList) ? parsed.blockList : [],
-        friendSnapshots: Array.isArray(parsed.friendSnapshots)
-          ? parsed.friendSnapshots
-          : [],
-        friendChanges: Array.isArray(parsed.friendChanges)
-          ? parsed.friendChanges
-          : [],
-        friendChangesUnread: Number(parsed.friendChangesUnread) || 0,
-        userTags: parsed.userTags && typeof parsed.userTags === "object" ? parsed.userTags : {},
-      };
-    } catch {
-      return def;
+    let parsed = null;
+    if (raw) {
+      try {
+        parsed = JSON.parse(raw);
+      } catch {}
     }
+    let accounts = (parsed && parsed.accounts) || {};
+
+    // миграция: старый формат (настройки и данные вперемешку)
+    if (!parsed || !parsed.accounts) {
+      const legacy = emptyAccount();
+      if (parsed) {
+        if (parsed.settings) {
+          legacy.settings = { ...defaultSettings(), ...parsed.settings };
+        }
+        for (const k of ACCOUNT_FIELDS) {
+          if (k === "settings") continue;
+          if (parsed[k] !== undefined) legacy[k] = parsed[k];
+        }
+      }
+      const myId = getMyId() || "anon";
+      accounts = { [myId]: legacy };
+    }
+
+    return { accounts };
+  }
+
+  function currentAccountId() {
+    return getMyId() || "anon";
   }
 
   function saveData() {
-    GM_setValue(STORAGE_KEY, JSON.stringify(DATA));
+    const store = DATA._store;
+    if (!store) return;
+    store.accounts = store.accounts || {};
+    const acc = { settings: DATA.settings };
+    for (const k of ACCOUNT_FIELDS) {
+      if (k === "settings") continue;
+      acc[k] = DATA[k];
+    }
+    store.accounts[currentAccountId()] = acc;
+    GM_setValue(STORAGE_KEY, JSON.stringify(store));
   }
 
-  let DATA = loadData();
+  /** Переключает контекст на аккаунт userId (или создаёт пустой слот). */
+  function switchAccount(userId) {
+    const id = String(userId || "anon");
+    if (DATA._accountId === id) return;
+    if (DATA._accountId) saveData();
+    const store = DATA._store;
+    store.accounts = store.accounts || {};
+    if (!store.accounts[id]) store.accounts[id] = emptyAccount();
+    const acc = store.accounts[id];
+    DATA.settings = { ...defaultSettings(), ...(acc.settings || {}) };
+    for (const k of ACCOUNT_FIELDS) {
+      if (k === "settings") continue;
+      DATA[k] = acc[k];
+    }
+    DATA.me = DATA.me || { id: id === "anon" ? null : id };
+    DATA._accountId = id;
+  }
+
+  const _store = loadData();
+  let DATA = {
+    _store,
+    _accountId: null,
+    ...emptyAccount(),
+  };
+  switchAccount(currentAccountId());
 
   // ========== API ==========
   function getToken() {
@@ -156,6 +216,12 @@
   async function getMe(force = false) {
     const myId = getMyId();
     if (!myId) return null;
+    const prevAcc = DATA._accountId;
+    switchAccount(myId); // на случай смены аккаунта в этой вкладке
+    if (prevAcc && prevAcc !== DATA._accountId) {
+      // сбросить кеши, привязанные к аккаунту
+      if (typeof resetLiveCaches === "function") resetLiveCaches();
+    }
     if (!force && DATA.me && String(DATA.me.id) === myId) return DATA.me;
     try {
       const u = await apiGet(
@@ -3135,7 +3201,7 @@
     });
   }
 
-  /** Универсальный прогон квестов по типу. */
+  /** Список квестов выбранного типа: статус + GET у каждого. */
   async function runQuestsByKind(kind, label, btn) {
     if (btn) btn.disabled = true;
     setQuestStatus("Загрузка " + label + "…");
@@ -3144,73 +3210,131 @@
       const earned = new Set(
         (progressRes.badges && progressRes.badges.earned) || [],
       );
+      const progressMap =
+        (progressRes.goals && progressRes.goals.progress) || progressRes.progress || {};
       const matchKind = (g) => {
         const id = String(g.goalId || "").toLowerCase();
-        // category может быть строкой или массивом
+        // исторические monthly / dated challenge — мимо
+        if (/^\d{4}_\d{2}_/.test(id) || id.includes("monthly")) return false;
+        if (id.includes("challenge") && !id.includes("weekly_challenge")) return false;
         const rawCats = g.category;
-        const cats = (Array.isArray(rawCats)
-          ? rawCats
-          : rawCats
-            ? [rawCats]
-            : []
-        ).map((c) => String(c).toUpperCase());
+        const cats = (Array.isArray(rawCats) ? rawCats : rawCats ? [rawCats] : [])
+          .map((c) => String(c).toUpperCase());
         switch (kind) {
           case "daily":
-            return cats.some((c) => c.includes("DAILY")) || id.includes("daily_quest");
+            return (
+              id.includes("daily_quest") &&
+              !id.includes("weekly") &&
+              !id.includes("friends_quest") &&
+              !id.includes("family_quest")
+            );
           case "weekly":
-            return (
-              cats.some((c) => c.includes("WEEKLY")) ||
-              id.includes("weekly_quest") ||
-              id.includes("weekly_challenge")
-            );
+            return id.includes("weekly_quest") || id.includes("weekly_challenge");
           case "friends":
-            return (
-              cats.some((c) => c.includes("FRIEND")) || id.includes("friends_quest")
-            );
+            return id.includes("friends_quest") && !id.includes("weekly");
           case "family":
-            return (
-              cats.some((c) => c.includes("FAMILY")) || id.includes("family_quest")
-            );
+            return id.includes("family_quest") && !id.includes("weekly");
           default:
             return false;
         }
       };
       const goals = (Array.isArray(schema.goals) ? schema.goals : []).filter(matchKind);
-      const metrics = [
-        ...new Set(
-          goals
-            .filter(
-              (g) =>
-                !earned.has(g.badgeId) &&
-                !earned.has(g.goalId) &&
-                g.metric &&
-                g.metric !== "QUESTS",
-            )
-            .map((g) => g.metric),
-        ),
-      ];
-      if (!metrics.length) {
-        setQuestStatus(label + " уже выполнены или не найдены");
-        showToast(label + ": нечего делать");
-        return;
+      const items = [];
+      const seen = new Set();
+      for (const g of goals) {
+        const gid = String(g.goalId || "");
+        if (!gid || seen.has(gid)) continue;
+        seen.add(gid);
+        const metric = g.metric || "QUESTS";
+        let cur = 0;
+        const p = progressMap[gid];
+        if (typeof p === "number") cur = p;
+        else if (p && typeof p === "object") cur = Number(p.progress || 0);
+        const tgt = Math.max(1, Number(g.threshold || 1));
+        const done =
+          earned.has(g.badgeId) || earned.has(g.goalId) || cur >= tgt;
+        items.push({
+          goalId: gid,
+          title: String(
+            (g.title && (g.title.uiString || g.title)) || gid || metric,
+          ),
+          metric,
+          progress: Math.min(cur, tgt),
+          target: tgt,
+          amount: Math.max(1, tgt - cur),
+          done,
+          kind,
+          label,
+        });
       }
-      setQuestStatus("Инъекция " + metrics.length + " метрик…");
-      const updates = metrics.map((m) => ({ metric: m, quantity: 2000 }));
-      updates.push({ metric: "QUESTS", quantity: 1 });
-      const res = await postGoalBatch(updates, new Date().toISOString(), tz, myId);
-      if (res.status === 200) {
-        setQuestStatus(label + ": готово (" + metrics.length + ")");
-        showToast("✓ " + label + " выполнены");
-      } else {
-        setQuestStatus(label + ": ошибка " + res.status);
-        showToast("Ошибка " + label + ": HTTP " + res.status, true);
-      }
+      items.sort((a, b) => Number(a.done) - Number(b.done));
+      // показываем только открытые — список не забивается историей
+      const openItems = items.filter((x) => !x.done);
+      questCache = { kind, label, tz, myId, items: openItems };
+      renderQuestList(openItems, label);
+      setQuestStatus(
+        label + ": " + openItems.length + " открыто из " + items.length,
+      );
     } catch (e) {
       setQuestStatus("Ошибка: " + (e && e.message));
       showToast(e && e.message ? e.message : "Ошибка квестов", true);
     } finally {
       if (btn) btn.disabled = false;
     }
+  }
+
+  let questCache = null;
+
+  function renderQuestList(items, label) {
+    if (!els.questList) return;
+    els.questList.innerHTML = "";
+    if (!items.length) {
+      els.questList.innerHTML = '<div class="dh-muted">Нет квестов этого типа</div>';
+      return;
+    }
+    for (const it of items) {
+      const row = document.createElement("div");
+      row.className = "dh-setting-row";
+      row.style.borderBottom = "none";
+      row.style.padding = "4px 0";
+      row.innerHTML =
+        `<div class="dh-setting-label" style="min-width:0">
+            <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${it.title}</div>
+            <small>${it.progress} / ${it.target} · ${it.metric}${it.done ? " · ✓" : ""}</small>
+        </div>` +
+        (it.done
+          ? `<span class="dh-btn" style="padding:4px 10px;font-size:11px;opacity:0.5;cursor:default">✓</span>`
+          : `<button class="dh-btn" style="padding:4px 10px;font-size:11px">GET</button>`);
+      const b = row.querySelector("button");
+      if (b) {
+        b.addEventListener("click", async () => {
+          b.disabled = true;
+          b.textContent = "…";
+          const ok = await claimQuestOne(it);
+          b.textContent = ok ? "✓" : "ERR";
+          if (ok) {
+            showToast("✓ " + it.title);
+            setTimeout(() => runQuestsByKind(it.kind, it.label, null), 900);
+          }
+        });
+      }
+      els.questList.appendChild(row);
+    }
+  }
+
+  async function claimQuestOne(item) {
+    const tz = questCache ? questCache.tz : Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const myId = questCache ? questCache.myId : getMyId();
+    const ts = questTimestamp(item.goalId);
+    const updates = [
+      { metric: item.metric, quantity: Math.max(item.amount, 2000) },
+      { metric: "QUESTS", quantity: 1 },
+    ];
+    const r1 = await postGoalBatch(updates, ts, tz, myId);
+    if (r1.status !== 200) return false;
+    await new Promise((r) => setTimeout(r, 700));
+    const r2 = await postGoalBatch(updates, ts, tz, myId);
+    return r2.status === 200;
   }
 
   async function runDailyQuests() {
@@ -3308,6 +3432,8 @@
         (schemaGoal && schemaGoal.title && (schemaGoal.title.uiString || schemaGoal.title)) ||
         "Monthly — " + monthLabel;
       const metric = (schemaGoal && schemaGoal.metric) || "XP";
+      // XP-челленджи не закрываются инъекцией — показываем только рабочие QUESTS
+      if (metric !== "QUESTS") return;
       items.push({
         ym,
         progressKey: progressKey || ym + "_monthly_challenge",
@@ -3346,16 +3472,16 @@
     const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
     const myId = getMyId();
     const ts = questTimestamp(item.progressKey || item.ym);
-    const payload = {
-      metric_updates: [{ metric: item.metric, quantity: item.amount }],
-      timestamp: ts,
-      timezone: tz,
-    };
+    // как в daily-бруте: большой quantity + QUESTS, иначе XP-квесты не закрываются
+    const updates = [
+      { metric: item.metric, quantity: Math.max(Number(item.amount) || 1, 2000) },
+      { metric: "QUESTS", quantity: 1 },
+    ];
     // Duolingo иногда требует второй вызов для выдачи бейджа
-    const r1 = await postGoalBatch(payload.metric_updates, ts, tz, myId);
+    const r1 = await postGoalBatch(updates, ts, tz, myId);
     if (r1.status !== 200) return false;
     await new Promise((r) => setTimeout(r, 800));
-    const r2 = await postGoalBatch(payload.metric_updates, ts, tz, myId);
+    const r2 = await postGoalBatch(updates, ts, tz, myId);
     return r2.status === 200;
   }
 
@@ -4293,6 +4419,12 @@
 
   // ========== Список друзей ==========
   let friendsCache = null;
+
+  function resetLiveCaches() {
+    friendsCache = null;
+    if (typeof monthlyCache !== "undefined") monthlyCache = null;
+    if (typeof questCache !== "undefined") questCache = null;
+  }
   let friendFilter = "all";
 
   function setFriendsStatus(t) {
@@ -7556,7 +7688,30 @@
       els.questLoad.addEventListener("click", () => loadMonthlyQuests());
     }
     if (els.questClaimAll) {
-      els.questClaimAll.addEventListener("click", () => claimAllMonthly());
+      els.questClaimAll.addEventListener("click", async () => {
+      // если открыт список monthly — работаем с ним, иначе с текущим квест-кэшем
+      if (questCache && questCache.kind && questCache.kind !== "monthly") {
+        const open = (questCache.items || []).filter((x) => !x.done);
+        if (!open.length) {
+          showToast("Нечего забирать");
+          return;
+        }
+        const btn = els.questClaimAll;
+        if (btn) btn.disabled = true;
+        let ok = 0;
+        for (let i = 0; i < open.length; i++) {
+          setQuestStatus("Забор " + (i + 1) + "/" + open.length + "…");
+          if (await claimQuestOne(open[i])) ok++;
+          await new Promise((r) => setTimeout(r, 350));
+        }
+        setQuestStatus("Забрано: " + ok + "/" + open.length);
+        showToast("✓ Забрано: " + ok);
+        if (btn) btn.disabled = false;
+        await runQuestsByKind(questCache.kind, questCache.label, null);
+        return;
+      }
+      claimAllMonthly();
+    });
     }
 
     if (els.shopLoad) {
@@ -7728,12 +7883,33 @@
     els.refreshPage.addEventListener("click", () => location.reload());
 
     els.exportBtn.addEventListener("click", () => {
-      const blob = new Blob([JSON.stringify(DATA, null, 2)], {
+      const accId = currentAccountId();
+      const accName = (DATA.me && DATA.me.username) || accId || "unknown";
+      const payload = {
+        type: "duolingo-helper-account",
+        version: 1,
+        exportedAt: new Date().toISOString(),
+        accountId: accId,
+        accountName: accName,
+        data: {
+          settings: DATA.settings,
+          followCache: DATA.followCache,
+          me: DATA.me,
+          actionLog: DATA.actionLog,
+          excludeList: DATA.excludeList,
+          blockList: DATA.blockList,
+          friendSnapshots: DATA.friendSnapshots,
+          friendChanges: DATA.friendChanges,
+          friendChangesUnread: DATA.friendChangesUnread,
+          userTags: DATA.userTags,
+        },
+      };
+      const blob = new Blob([JSON.stringify(payload, null, 2)], {
         type: "application/json",
       });
       const a = document.createElement("a");
       a.href = URL.createObjectURL(blob);
-      a.download = "duolingo-helper-data.json";
+      a.download = `duolingo-helper-${accName}-${accId}.json`;
       a.click();
       setTimeout(() => URL.revokeObjectURL(a.href), 1000);
     });
@@ -7746,24 +7922,63 @@
         els.importFile.value = "";
         if (!file) return;
         const reader = new FileReader();
-        reader.onload = () => {
+        reader.onload = async () => {
           try {
             const parsed = JSON.parse(String(reader.result || ""));
             if (!parsed || typeof parsed !== "object") {
               throw new Error("bad format");
             }
-            // мержим: настройки поверх текущих, кеш — заменой
-            if (parsed.settings && typeof parsed.settings === "object") {
-              DATA.settings = { ...DATA.settings, ...parsed.settings };
+
+            // поддержка нового формата (с accountId) и старого (плоский JSON)
+            let incoming = null;
+            let fileAccId = null;
+            let fileAccName = "";
+            if (parsed.data && typeof parsed.data === "object") {
+              incoming = parsed.data;
+              fileAccId = parsed.accountId != null ? String(parsed.accountId) : null;
+              fileAccName = parsed.accountName || "";
+            } else {
+              incoming = parsed;
             }
-            if (parsed.followCache && typeof parsed.followCache === "object") {
-              DATA.followCache = parsed.followCache;
+
+            const curId = currentAccountId();
+            if (fileAccId && fileAccId !== curId) {
+              const okGo = await showConfirm(
+                `Файл от другого аккаунта (${fileAccName || "?"} · id ${fileAccId}).\nЗагрузить в текущий (${curId})?`,
+                "Импорт данных",
+              );
+              if (!okGo) {
+                showToast("Импорт отменён");
+                return;
+              }
             }
-            if (parsed.me && typeof parsed.me === "object") {
-              DATA.me = parsed.me;
+
+            if (incoming.settings && typeof incoming.settings === "object") {
+              DATA.settings = { ...DATA.settings, ...incoming.settings };
             }
+            if (incoming.followCache && typeof incoming.followCache === "object") {
+              DATA.followCache = incoming.followCache;
+            }
+            if (incoming.me && typeof incoming.me === "object") {
+              DATA.me = incoming.me;
+            }
+            if (Array.isArray(incoming.actionLog)) DATA.actionLog = incoming.actionLog;
+            if (Array.isArray(incoming.excludeList)) DATA.excludeList = incoming.excludeList;
+            if (Array.isArray(incoming.blockList)) DATA.blockList = incoming.blockList;
+            if (Array.isArray(incoming.friendSnapshots)) DATA.friendSnapshots = incoming.friendSnapshots;
+            if (Array.isArray(incoming.friendChanges)) DATA.friendChanges = incoming.friendChanges;
+            if (incoming.friendChangesUnread != null) {
+              DATA.friendChangesUnread = Number(incoming.friendChangesUnread) || 0;
+            }
+            if (incoming.userTags && typeof incoming.userTags === "object") {
+              DATA.userTags = incoming.userTags;
+            }
+
             saveData();
             syncSwitches();
+            updateListBadges();
+            updateTagsBadge();
+            updateChangesBadge();
             showToast("✓ Данные импортированы");
           } catch (e) {
             console.warn("[DuoHelper] import failed", e);
