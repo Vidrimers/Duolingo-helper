@@ -2159,6 +2159,11 @@
     initFabDrag();
     applyWinPos();
     applyFabPos();
+    // при resize окна/открытии devtools — подтягиваем элементы в экран
+    window.addEventListener("resize", () => {
+      if (els.modal && els.modal.classList.contains("open")) applyWinPos();
+      applyFabPos();
+    });
     initUpdateCheck();
   }
 
@@ -7137,6 +7142,15 @@
   function applyWinPos() {
     if (!els.modal) return;
     const saved = DATA.settings.winPos;
+    if (saved && saved.xPct != null) {
+      // проценты от размера окна браузера
+      const x = Math.round((saved.xPct / 100) * window.innerWidth);
+      const y = Math.round((saved.yPct / 100) * window.innerHeight);
+      const pos = clampWinPos(x, y);
+      els.modal.style.left = pos.x + "px";
+      els.modal.style.top = pos.y + "px";
+      return;
+    }
     const pos = saved
       ? clampWinPos(saved.x, saved.y)
       : clampWinPos(
@@ -7149,9 +7163,13 @@
 
   function saveWinPos() {
     if (!els.modal) return;
+    const x = parseInt(els.modal.style.left, 10) || 0;
+    const y = parseInt(els.modal.style.top, 10) || 0;
+    const w = window.innerWidth || 1;
+    const h = window.innerHeight || 1;
     DATA.settings.winPos = {
-      x: parseInt(els.modal.style.left, 10) || 0,
-      y: parseInt(els.modal.style.top, 10) || 0,
+      xPct: (x / w) * 100,
+      yPct: (y / h) * 100,
     };
     saveData();
   }
@@ -7241,6 +7259,7 @@
 
     setTimeout(() => {
       els.modal.classList.remove("dh-anim");
+      saveWinPos();
       saveWindowState();
     }, 320);
   }
@@ -7335,7 +7354,15 @@
       els.fab.style.bottom = "24px";
       return;
     }
-    const p = clampFabPos(saved.x, saved.y);
+    let x, y;
+    if (saved.xPct != null) {
+      x = Math.round((saved.xPct / 100) * window.innerWidth);
+      y = Math.round((saved.yPct / 100) * window.innerHeight);
+    } else {
+      x = saved.x;
+      y = saved.y;
+    }
+    const p = clampFabPos(x, y);
     els.fab.style.left = p.x + "px";
     els.fab.style.top = p.y + "px";
     els.fab.style.bottom = "auto";
@@ -7343,9 +7370,13 @@
 
   function saveFabPos() {
     if (!els.fab) return;
+    const x = parseInt(els.fab.style.left, 10) || 0;
+    const y = parseInt(els.fab.style.top, 10) || 0;
+    const w = window.innerWidth || 1;
+    const h = window.innerHeight || 1;
     DATA.settings.fabPos = {
-      x: parseInt(els.fab.style.left, 10) || 0,
-      y: parseInt(els.fab.style.top, 10) || 0,
+      xPct: (x / w) * 100,
+      yPct: (y / h) * 100,
     };
     saveData();
   }
