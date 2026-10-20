@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Duolingo Helper
 // @namespace    https://github.com/Vidrimers/Duolingo-helper
-// @version      0.6.2
+// @version      0.6.3
 // @description  Проверка взаимной подписки на профилях Duolingo. Панель, бейджи, кеш.
 // @author       Vidrimers
 // @match        *://*.duolingo.com/*
@@ -1759,10 +1759,15 @@
                     </button>
                     <div class="dh-acc-body"><div class="dh-acc-inner">
                         <div class="dh-muted" style="margin-bottom:8px">
-                            Инъекция прогресса в daily/monthly квесты. Нарушает правила Duolingo.
+                            Инъекция прогресса в daily / weekly / friends / family / monthly. Нарушает правила Duolingo.
                         </div>
                         <div class="dh-row" style="margin-bottom:6px">
                             <button class="dh-btn dh-btn-primary" id="dh-quest-daily">Daily</button>
+                            <button class="dh-btn" id="dh-quest-weekly">Weekly</button>
+                            <button class="dh-btn" id="dh-quest-friends">Friends</button>
+                        </div>
+                        <div class="dh-row" style="margin-bottom:6px">
+                            <button class="dh-btn" id="dh-quest-family">Family</button>
                             <button class="dh-btn" id="dh-quest-load">Monthly</button>
                             <button class="dh-btn" id="dh-quest-claim-all">Забрать все</button>
                         </div>
@@ -2005,6 +2010,9 @@
       xpStatus: modal.querySelector("#dh-xp-status"),
       accs: [...modal.querySelectorAll("[data-acc]")],
       questDaily: modal.querySelector("#dh-quest-daily"),
+      questWeekly: modal.querySelector("#dh-quest-weekly"),
+      questFriends: modal.querySelector("#dh-quest-friends"),
+      questFamily: modal.querySelector("#dh-quest-family"),
       questLoad: modal.querySelector("#dh-quest-load"),
       questClaimAll: modal.querySelector("#dh-quest-claim-all"),
       questStatus: modal.querySelector("#dh-quest-status"),
@@ -3127,22 +3135,50 @@
     });
   }
 
-  /** Daily: закидываем недостающие метрики. */
-  async function runDailyQuests() {
-    const btn = els.questDaily;
+  /** Универсальный прогон квестов по типу. */
+  async function runQuestsByKind(kind, label, btn) {
     if (btn) btn.disabled = true;
-    setQuestStatus("Загрузка daily…");
+    setQuestStatus("Загрузка " + label + "…");
     try {
       const { schema, progressRes, tz, myId } = await fetchQuestData();
       const earned = new Set(
         (progressRes.badges && progressRes.badges.earned) || [],
       );
-      const daily = (schema.goals || []).filter(
-        (g) => g.category && g.category.includes("DAILY"),
-      );
+      const matchKind = (g) => {
+        const id = String(g.goalId || "").toLowerCase();
+        // category может быть строкой или массивом
+        const rawCats = g.category;
+        const cats = (Array.isArray(rawCats)
+          ? rawCats
+          : rawCats
+            ? [rawCats]
+            : []
+        ).map((c) => String(c).toUpperCase());
+        switch (kind) {
+          case "daily":
+            return cats.some((c) => c.includes("DAILY")) || id.includes("daily_quest");
+          case "weekly":
+            return (
+              cats.some((c) => c.includes("WEEKLY")) ||
+              id.includes("weekly_quest") ||
+              id.includes("weekly_challenge")
+            );
+          case "friends":
+            return (
+              cats.some((c) => c.includes("FRIEND")) || id.includes("friends_quest")
+            );
+          case "family":
+            return (
+              cats.some((c) => c.includes("FAMILY")) || id.includes("family_quest")
+            );
+          default:
+            return false;
+        }
+      };
+      const goals = (Array.isArray(schema.goals) ? schema.goals : []).filter(matchKind);
       const metrics = [
         ...new Set(
-          daily
+          goals
             .filter(
               (g) =>
                 !earned.has(g.badgeId) &&
@@ -3154,8 +3190,8 @@
         ),
       ];
       if (!metrics.length) {
-        setQuestStatus("Daily уже выполнены");
-        showToast("Daily квесты уже выполнены");
+        setQuestStatus(label + " уже выполнены или не найдены");
+        showToast(label + ": нечего делать");
         return;
       }
       setQuestStatus("Инъекция " + metrics.length + " метрик…");
@@ -3163,11 +3199,11 @@
       updates.push({ metric: "QUESTS", quantity: 1 });
       const res = await postGoalBatch(updates, new Date().toISOString(), tz, myId);
       if (res.status === 200) {
-        setQuestStatus("Daily: готово (" + metrics.length + ")");
-        showToast("✓ Daily квесты выполнены");
+        setQuestStatus(label + ": готово (" + metrics.length + ")");
+        showToast("✓ " + label + " выполнены");
       } else {
-        setQuestStatus("Daily: ошибка " + res.status);
-        showToast("Ошибка daily: HTTP " + res.status, true);
+        setQuestStatus(label + ": ошибка " + res.status);
+        showToast("Ошибка " + label + ": HTTP " + res.status, true);
       }
     } catch (e) {
       setQuestStatus("Ошибка: " + (e && e.message));
@@ -3175,6 +3211,10 @@
     } finally {
       if (btn) btn.disabled = false;
     }
+  }
+
+  async function runDailyQuests() {
+    return runQuestsByKind("daily", "Daily", els.questDaily);
   }
 
   function renderMonthlyList(items) {
@@ -7496,6 +7536,21 @@
 
     if (els.questDaily) {
       els.questDaily.addEventListener("click", () => runDailyQuests());
+    if (els.questWeekly) {
+      els.questWeekly.addEventListener("click", () =>
+        runQuestsByKind("weekly", "Weekly", els.questWeekly),
+      );
+    }
+    if (els.questFriends) {
+      els.questFriends.addEventListener("click", () =>
+        runQuestsByKind("friends", "Friends", els.questFriends),
+      );
+    }
+    if (els.questFamily) {
+      els.questFamily.addEventListener("click", () =>
+        runQuestsByKind("family", "Family", els.questFamily),
+      );
+    }
     }
     if (els.questLoad) {
       els.questLoad.addEventListener("click", () => loadMonthlyQuests());
