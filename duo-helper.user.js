@@ -1794,25 +1794,19 @@
                         <span class="dh-acc-arrow">▾</span>
                     </button>
                     <div class="dh-acc-body"><div class="dh-acc-inner">
-                        <div class="dh-setting-row" style="border-bottom:none;padding:4px 0">
-                            <div class="dh-setting-label">
-                                Фейк XP-буст (x2)
-                                <small>Подмешивает активный буст в ответ API — UI показывает множитель</small>
-                            </div>
-                            <div class="dh-switch" id="dh-set-xpboost"></div>
-                        </div>
-                        <div class="dh-row" style="margin:6px 0">
-                            <button class="dh-btn" id="dh-xpboost-15">x2 · 15м</button>
-                            <button class="dh-btn" id="dh-xpboost-60">x2 · 60м</button>
-                        </div>
                         <div class="dh-muted" style="margin-bottom:8px">
-                            Накрутка XP (реальное начисление, чит):
+                            Накрутка XP (реальное начисление, чит). Поле — цель в XP.
                         </div>
                         <div class="dh-row" style="margin-bottom:6px">
                             <input class="dh-num-input" id="dh-xp-amount" type="number" min="1" max="99999" value="500" style="width:72px" />
                             <button class="dh-btn dh-btn-primary" id="dh-xp-stories">Stories</button>
-                            <button class="dh-btn dh-btn-danger" id="dh-xp-sessions">Sessions</button>
+                            <button class="dh-btn dh-btn-danger" id="dh-xp-sessions" title="Экспериментально — может не начислять XP">Sessions *</button>
                             <button class="dh-btn" id="dh-xp-stop">Стоп</button>
+                        </div>
+                        <div class="dh-muted" style="margin-top:2px">
+                            * Sessions — экспериментально, может не начислять XP<br/>
+                            <small>Stories — истории Duolingo; за «пройденную» историю реально дают XP.</small><br/>
+                            <small>Sessions — имитация учебной сессии/урока без прохождения.</small>
                         </div>
                         <div class="dh-muted dh-op-status" id="dh-xp-status"></div>
                     </div></div>
@@ -5993,6 +5987,18 @@
 
   const STORY_SLUG = "fr-en-le-passeport";
 
+  async function getMyTotalXp() {
+    const myId = getMyId();
+    if (!myId) return null;
+    try {
+      const u = await apiGet(`${API.users}/${myId}?fields=totalXp`);
+      const v = Number(u && u.totalXp);
+      return Number.isFinite(v) ? v : null;
+    } catch {
+      return null;
+    }
+  }
+
   async function farmXp(mode) {
     if (xpRunning) return;
     const target = Math.max(1, Math.min(99999, parseInt(els.xpAmount && els.xpAmount.value, 10) || 500));
@@ -6050,11 +6056,17 @@
             got = Number((res.body && (res.body.awardedXp || res.body.xpGain)) || 499);
           }
         } else {
+          // sessions: создать UNIT_TEST, закрыть с бонусами, проверить прирост XP
+          const xpBefore = await getMyTotalXp();
           const sr = await sessionRequest("POST", "https://www.duolingo.com/2017-06-30/sessions", {
             challengeTypes: [],
             fromLanguage: langs.fromLanguage,
             learningLanguage: langs.learningLanguage,
             type: "UNIT_TEST",
+            isFinalLevel: false,
+            isV2: true,
+            juicy: true,
+            smartTipsVersion: 2,
           });
           if (sr.status === 200 && sr.body && sr.body.id) {
             const now = Math.floor(Date.now() / 1000);
@@ -6075,7 +6087,7 @@
                 sessionStartExperiments: [],
                 trackingProperties: [],
                 ttsAnnotations: [],
-                heartsLeft: 0,
+                heartsLeft: 5,
                 startTime: now,
                 enableBonusPoints: true,
                 endTime: now + 60,
@@ -6088,7 +6100,18 @@
               },
             );
             if (ur.status === 200) {
-              got = Number((ur.body && (ur.body.awardedXp || ur.body.xpGain)) || 110);
+              const b = ur.body || {};
+              got = Number(
+                b.awardedXp || b.xpGain || b.xp || b.totalXp || 0,
+              );
+              // если тело не дало XP — проверяем реальный баланс
+              if (!got) {
+                await new Promise((r) => setTimeout(r, 800));
+                const xpAfter = await getMyTotalXp();
+                if (xpBefore != null && xpAfter != null && xpAfter > xpBefore) {
+                  got = xpAfter - xpBefore;
+                }
+              }
             }
           }
         }
