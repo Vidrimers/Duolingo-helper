@@ -6016,6 +6016,11 @@
             написана с нуля, вдохновившись проектом пользователя
             <strong>DuoHacker</strong>.
           </p>
+          <p style="margin:0 0 10px">
+            Идея меток на пользователей взята из
+            <a href="https://github.com/Vidrimers/Universal-eblan-marker" target="_blank" rel="noopener"
+               style="color:#58cc02;text-decoration:underline">💀 Universal Eblan Marker</a>.
+          </p>
           <p style="margin:0;color:#888;font-size:11px">
             Массовые действия и читы — на свой страх и риск.
             JWT-токен никуда не отправляется.
