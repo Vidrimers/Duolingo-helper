@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Duolingo Helper
 // @namespace    https://github.com/Vidrimers/Duolingo-helper
-// @version      0.6.7
+// @version      0.6.8
 // @description  Проверка взаимной подписки на профилях Duolingo. Панель, бейджи, кеш.
 // @author       Vidrimers
 // @match        *://*.duolingo.com/*
@@ -1918,7 +1918,11 @@
                         <div class="dh-row" style="margin-bottom:6px">
                             <button class="dh-btn dh-btn-primary" id="dh-gems-once">Собрать</button>
                             <button class="dh-btn dh-btn-danger" id="dh-gems-farm">Фарм</button>
+                            <button class="dh-btn dh-btn-danger" id="dh-gems-farm-fast" title="8 потоков одновременно — быстрее, но опаснее (rate limit)">Фарм ×8 *</button>
                             <button class="dh-btn" id="dh-gems-stop">Стоп</button>
+                        </div>
+                        <div class="dh-muted" style="margin-bottom:4px;font-size:10px">
+                            * Фарм ×8 — 8 параллельных запросов. Быстрее, но выше риск rate limit.
                         </div>
                         <div class="dh-muted dh-op-status" id="dh-gems-status"></div>
                     </div></div>
@@ -2147,6 +2151,7 @@
       shopList: modal.querySelector("#dh-shop-list"),
       gemsOnce: modal.querySelector("#dh-gems-once"),
       gemsFarm: modal.querySelector("#dh-gems-farm"),
+      gemsFarmFast: modal.querySelector("#dh-gems-farm-fast"),
       gemsStop: modal.querySelector("#dh-gems-stop"),
       gemsStatus: modal.querySelector("#dh-gems-status"),
       streakDays: modal.querySelector("#dh-streak-days"),
@@ -4102,6 +4107,50 @@
   function stopGemsFarm() {
     gemsRunning = false;
     showToast("Фарм гемов остановлен");
+  }
+
+  /** Фарм гемов в 8 потоков — быстрее, но рискованнее. */
+  async function farmGemsFast() {
+    if (gemsRunning) return;
+    gemsRunning = true;
+    if (els.gemsFarm) els.gemsFarm.disabled = true;
+    if (els.gemsFarmFast) els.gemsFarmFast.disabled = true;
+    if (els.gemsOnce) els.gemsOnce.disabled = true;
+    let total = 0;
+    let rounds = 0;
+    const THREADS = 8;
+    setGemsStatus("Фарм ×8…");
+    try {
+      while (gemsRunning) {
+        const rewards = await fetchGemRewards();
+        if (!rewards.length) {
+          rounds++;
+          if (rounds >= 4) break;
+          await new Promise((r) => setTimeout(r, 800));
+          continue;
+        }
+        rounds = 0;
+        // разбиваем на пачки по THREADS
+        for (let i = 0; i < rewards.length && gemsRunning; i += THREADS) {
+          const batch = rewards.slice(i, i + THREADS);
+          const results = await Promise.all(
+            batch.map((r) => claimGemReward(r.id).then((ok) => (ok ? r.amount || 0 : 0))),
+          );
+          total += results.reduce((a, b) => a + b, 0);
+          setGemsStatus("Фарм ×8… + " + total);
+        }
+        // небольшая пауза между пачками
+        if (gemsRunning) await new Promise((r) => setTimeout(r, 250));
+      }
+      const gems = await getGemCount();
+      setGemsStatus(`Фарм ×8 стоп · +${total} · баланс: ${gems != null ? gems : "—"}`);
+      showToast(total ? "✓ Собрано гемов: " + total : "Фарм завершён");
+    } finally {
+      gemsRunning = false;
+      if (els.gemsFarm) els.gemsFarm.disabled = false;
+      if (els.gemsFarmFast) els.gemsFarmFast.disabled = false;
+      if (els.gemsOnce) els.gemsOnce.disabled = false;
+    }
   }
 
   // ========== Streak ==========
@@ -8025,6 +8074,9 @@
     }
     if (els.gemsFarm) {
       els.gemsFarm.addEventListener("click", () => farmGems());
+    }
+    if (els.gemsFarmFast) {
+      els.gemsFarmFast.addEventListener("click", () => farmGemsFast());
     }
     if (els.gemsStop) {
       els.gemsStop.addEventListener("click", () => stopGemsFarm());
