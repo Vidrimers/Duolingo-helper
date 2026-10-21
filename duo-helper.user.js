@@ -124,7 +124,7 @@
     return getMyId() || "anon";
   }
 
-  function saveData() {
+  function saveToSlot(slotId) {
     const store = DATA._store;
     if (!store) return;
     store.accounts = store.accounts || {};
@@ -133,15 +133,20 @@
       if (k === "settings") continue;
       acc[k] = DATA[k];
     }
-    store.accounts[currentAccountId()] = acc;
+    store.accounts[slotId] = acc;
     GM_setValue(STORAGE_KEY, JSON.stringify(store));
+  }
+
+  function saveData() {
+    // сохраняем строго в активный слот; смену аккаунта ловим отдельно
+    saveToSlot(DATA._accountId || currentAccountId());
   }
 
   /** Переключает контекст на аккаунт userId (или создаёт пустой слот). */
   function switchAccount(userId) {
     const id = String(userId || "anon");
     if (DATA._accountId === id) return;
-    if (DATA._accountId) saveData();
+    if (DATA._accountId) saveToSlot(DATA._accountId);
     const store = DATA._store;
     store.accounts = store.accounts || {};
     if (!store.accounts[id]) store.accounts[id] = emptyAccount();
@@ -153,6 +158,8 @@
     }
     DATA.me = DATA.me || { id: id === "anon" ? null : id };
     DATA._accountId = id;
+    if (typeof resetLiveCaches === "function") resetLiveCaches();
+    if (typeof refreshUiForAccount === "function") refreshUiForAccount();
   }
 
   const _store = loadData();
@@ -3233,7 +3240,7 @@
     });
   }
 
-  /** Список квестов выбранного типа: статус + GET у каждого. */
+  /** Инъекция всех незакрытых квестов выбранного типа одной кнопкой. */
   async function runQuestsByKind(kind, label, btn) {
     if (btn) btn.disabled = true;
     setQuestStatus("Загрузка " + label + "…");
@@ -3246,12 +3253,8 @@
         (progressRes.goals && progressRes.goals.progress) || progressRes.progress || {};
       const matchKind = (g) => {
         const id = String(g.goalId || "").toLowerCase();
-        // исторические monthly / dated challenge — мимо
         if (/^\d{4}_\d{2}_/.test(id) || id.includes("monthly")) return false;
         if (id.includes("challenge") && !id.includes("weekly_challenge")) return false;
-        const rawCats = g.category;
-        const cats = (Array.isArray(rawCats) ? rawCats : rawCats ? [rawCats] : [])
-          .map((c) => String(c).toUpperCase());
         switch (kind) {
           case "daily":
             return (
@@ -3271,42 +3274,39 @@
         }
       };
       const goals = (Array.isArray(schema.goals) ? schema.goals : []).filter(matchKind);
-      const items = [];
-      const seen = new Set();
+      // собираем уникальные метрики незакрытых целей
+      const updates = [];
+      const seenMetric = new Set();
+      const seenGoal = new Set();
       for (const g of goals) {
         const gid = String(g.goalId || "");
-        if (!gid || seen.has(gid)) continue;
-        seen.add(gid);
+        if (!gid || seenGoal.has(gid)) continue;
+        seenGoal.add(gid);
         const metric = g.metric || "QUESTS";
         let cur = 0;
         const p = progressMap[gid];
         if (typeof p === "number") cur = p;
         else if (p && typeof p === "object") cur = Number(p.progress || 0);
         const tgt = Math.max(1, Number(g.threshold || 1));
-        const done =
-          earned.has(g.badgeId) || earned.has(g.goalId) || cur >= tgt;
-        items.push({
-          goalId: gid,
-          title: String(
-            (g.title && (g.title.uiString || g.title)) || gid || metric,
-          ),
-          metric,
-          progress: Math.min(cur, tgt),
-          target: tgt,
-          amount: Math.max(1, tgt - cur),
-          done,
-          kind,
-          label,
-        });
+        const done = earned.has(g.badgeId) || earned.has(g.goalId) || cur >= tgt;
+        if (done) continue;
+        if (seenMetric.has(metric)) continue;
+        seenMetric.add(metric);
+        updates.push({ metric, quantity: 2000 });
       }
-      items.sort((a, b) => Number(a.done) - Number(b.done));
-      // показываем только открытые — список не забивается историей
-      const openItems = items.filter((x) => !x.done);
-      questCache = { kind, label, tz, myId, items: openItems };
-      renderQuestList(openItems, label);
-      setQuestStatus(
-        label + ": " + openItems.length + " открыто из " + items.length,
-      );
+      if (!updates.length) {
+        setQuestStatus(label + ": готово (0)");
+        showToast(label + ": нечего забирать");
+        return;
+      }
+      updates.push({ metric: "QUESTS", quantity: 1 });
+      setQuestStatus(label + ": инъекция " + updates.length + "…");
+      const ts = new Date().toISOString();
+      await postGoalBatch(updates, ts, tz, myId);
+      await new Promise((r) => setTimeout(r, 800));
+      await postGoalBatch(updates, ts, tz, myId);
+      setQuestStatus(label + ": готово (" + updates.length + ")");
+      showToast("✓ " + label + ": " + updates.length + " метрик");
     } catch (e) {
       setQuestStatus("Ошибка: " + (e && e.message));
       showToast(e && e.message ? e.message : "Ошибка квестов", true);
@@ -3315,59 +3315,8 @@
     }
   }
 
-  let questCache = null;
-
-  function renderQuestList(items, label) {
-    if (!els.questList) return;
-    els.questList.innerHTML = "";
-    if (!items.length) {
-      els.questList.innerHTML = '<div class="dh-muted">Нет квестов этого типа</div>';
-      return;
-    }
-    for (const it of items) {
-      const row = document.createElement("div");
-      row.className = "dh-setting-row";
-      row.style.borderBottom = "none";
-      row.style.padding = "4px 0";
-      row.innerHTML =
-        `<div class="dh-setting-label" style="min-width:0">
-            <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${it.title}</div>
-            <small>${it.progress} / ${it.target} · ${it.metric}${it.done ? " · ✓" : ""}</small>
-        </div>` +
-        (it.done
-          ? `<span class="dh-btn" style="padding:4px 10px;font-size:11px;opacity:0.5;cursor:default">✓</span>`
-          : `<button class="dh-btn" style="padding:4px 10px;font-size:11px">GET</button>`);
-      const b = row.querySelector("button");
-      if (b) {
-        b.addEventListener("click", async () => {
-          b.disabled = true;
-          b.textContent = "…";
-          const ok = await claimQuestOne(it);
-          b.textContent = ok ? "✓" : "ERR";
-          if (ok) {
-            showToast("✓ " + it.title);
-            setTimeout(() => runQuestsByKind(it.kind, it.label, null), 900);
-          }
-        });
-      }
-      els.questList.appendChild(row);
-    }
-  }
-
-  async function claimQuestOne(item) {
-    const tz = questCache ? questCache.tz : Intl.DateTimeFormat().resolvedOptions().timeZone;
-    const myId = questCache ? questCache.myId : getMyId();
-    const ts = questTimestamp(item.goalId);
-    const updates = [
-      { metric: item.metric, quantity: Math.max(item.amount, 2000) },
-      { metric: "QUESTS", quantity: 1 },
-    ];
-    const r1 = await postGoalBatch(updates, ts, tz, myId);
-    if (r1.status !== 200) return false;
-    await new Promise((r) => setTimeout(r, 700));
-    const r2 = await postGoalBatch(updates, ts, tz, myId);
-    return r2.status === 200;
-  }
+  // var — чтобы resetLiveCaches не падал на старте (TDZ у let)
+  var questCache = null;
 
   async function runDailyQuests() {
     return runQuestsByKind("daily", "Daily", els.questDaily);
@@ -3480,7 +3429,7 @@
     return items;
   }
 
-  let monthlyCache = null;
+  var monthlyCache = null;
 
   async function loadMonthlyQuests() {
     const btn = els.questLoad;
@@ -4450,12 +4399,68 @@
   }
 
   // ========== Список друзей ==========
-  let friendsCache = null;
+  var friendsCache = null;
 
   function resetLiveCaches() {
     friendsCache = null;
-    if (typeof monthlyCache !== "undefined") monthlyCache = null;
-    if (typeof questCache !== "undefined") questCache = null;
+    monthlyCache = null;
+    questCache = null;
+  }
+
+  /** Метки стартового состояния (нужны и в syncSwitches, и в bindEvents). */
+  const startLabels = {
+    remember: "Помнить последнее",
+    closed: "Закрыто",
+    min: "Свёрнуто",
+    open: "Раскрыто",
+  };
+
+  /** Синхронизирует тумблеры и числовые поля с DATA.settings. */
+  function syncSwitches() {
+    if (!els || !els.setAuto) return;
+    els.setAuto.classList.toggle("on", !!DATA.settings.autoCheck);
+    els.setBadge.classList.toggle("on", !!DATA.settings.showBadge);
+    if (els.setStartText) {
+      els.setStartText.textContent =
+        startLabels[DATA.settings.startState] || startLabels.remember;
+    }
+    if (els.setCache) els.setCache.value = DATA.settings.cacheMinutes;
+    if (els.setDelay) els.setDelay.value = DATA.settings.requestDelay;
+    if (els.setNotify) els.setNotify.value = DATA.settings.notifyHideSec || 5;
+    if (els.setInactive) els.setInactive.value = DATA.settings.inactiveDays;
+  }
+
+  /** Обновляет UI после смены аккаунта (тема, позиция, списки). */
+  function refreshUiForAccount() {
+    try {
+      applyTheme();
+      applyWinPos();
+      applyFabPos();
+      syncPageFlags();
+      if (typeof syncSwitches === "function") syncSwitches();
+      if (typeof syncHeartsFlag === "function") syncHeartsFlag();
+      if (typeof syncLessonFlags === "function") syncLessonFlags();
+      if (typeof updateChangesBadge === "function") updateChangesBadge();
+      if (typeof updateListBadges === "function") updateListBadges();
+      if (typeof updateTagsBadge === "function") updateTagsBadge();
+      if (typeof renderFriends === "function" && els.friendsList) {
+        renderFriends();
+      }
+    } catch (e) {
+      console.warn("[DuoHelper] refreshUiForAccount", e);
+    }
+  }
+
+  /** Синхронизирует page-context флаги (localStorage) с настройками аккаунта. */
+  function syncPageFlags() {
+    try {
+      const s = DATA.settings || {};
+      localStorage.setItem("dh_protect_hearts", s.protectHearts ? "true" : "false");
+      localStorage.setItem("dh_lesson_short", s.lessonShortener ? "true" : "false");
+      localStorage.setItem("dh_lesson_solver", s.autoSolver ? "true" : "false");
+      localStorage.setItem("dh_fake_xpboost", s.fakeXpBoost ? "true" : "false");
+      localStorage.setItem("dh_xpboost_mins", String(s.xpBoostMins || 15));
+    } catch {}
   }
   let friendFilter = "all";
 
@@ -6952,6 +6957,12 @@
     if (path === lastPath) return;
     lastPath = path;
 
+    // смена аккаунта в SPA / после логина
+    const curAcc = getMyId();
+    if (curAcc && DATA._accountId !== curAcc) {
+      switchAccount(curAcc);
+    }
+
     syncTagFormFromProfile();
 
     if (isProfilePage()) {
@@ -7624,24 +7635,6 @@
     });
 
     // settings
-    const startLabels = {
-      remember: "Помнить последнее",
-      closed: "Закрыто",
-      min: "Свёрнуто",
-      open: "Раскрыто",
-    };
-    const syncSwitches = () => {
-      els.setAuto.classList.toggle("on", !!DATA.settings.autoCheck);
-      els.setBadge.classList.toggle("on", !!DATA.settings.showBadge);
-      if (els.setStartText) {
-        els.setStartText.textContent =
-          startLabels[DATA.settings.startState] || startLabels.remember;
-      }
-      els.setCache.value = DATA.settings.cacheMinutes;
-      if (els.setDelay) els.setDelay.value = DATA.settings.requestDelay;
-      if (els.setNotify) els.setNotify.value = DATA.settings.notifyHideSec || 5;
-      if (els.setInactive) els.setInactive.value = DATA.settings.inactiveDays;
-    };
     syncSwitches();
 
     els.setAuto.addEventListener("click", () => {
@@ -7806,30 +7799,7 @@
       els.questLoad.addEventListener("click", () => loadMonthlyQuests());
     }
     if (els.questClaimAll) {
-      els.questClaimAll.addEventListener("click", async () => {
-      // если открыт список monthly — работаем с ним, иначе с текущим квест-кэшем
-      if (questCache && questCache.kind && questCache.kind !== "monthly") {
-        const open = (questCache.items || []).filter((x) => !x.done);
-        if (!open.length) {
-          showToast("Нечего забирать");
-          return;
-        }
-        const btn = els.questClaimAll;
-        if (btn) btn.disabled = true;
-        let ok = 0;
-        for (let i = 0; i < open.length; i++) {
-          setQuestStatus("Забор " + (i + 1) + "/" + open.length + "…");
-          if (await claimQuestOne(open[i])) ok++;
-          await new Promise((r) => setTimeout(r, 350));
-        }
-        setQuestStatus("Забрано: " + ok + "/" + open.length);
-        showToast("✓ Забрано: " + ok);
-        if (btn) btn.disabled = false;
-        await runQuestsByKind(questCache.kind, questCache.label, null);
-        return;
-      }
-      claimAllMonthly();
-    });
+      els.questClaimAll.addEventListener("click", () => claimAllMonthly());
     }
 
     if (els.shopLoad) {
@@ -7961,38 +7931,37 @@
       els.historyBack.addEventListener("click", () => showFriendsView());
     }
 
-    els.setCache.addEventListener("change", () => {
-      const v = Math.max(1, Math.min(1440, parseInt(els.setCache.value, 10) || 30));
+    // числовые настройки: пишем и на input, и на change (иначе теряется при F5)
+    const bindNumSetting = (el, apply) => {
+      if (!el) return;
+      const commit = () => {
+        apply(el);
+        saveData();
+      };
+      el.addEventListener("change", commit);
+      el.addEventListener("input", commit);
+    };
+    bindNumSetting(els.setCache, (el) => {
+      const v = Math.max(1, Math.min(1440, parseInt(el.value, 10) || 30));
       DATA.settings.cacheMinutes = v;
-      els.setCache.value = v;
-      saveData();
+      el.value = v;
     });
-
-    if (els.setDelay) {
-      els.setDelay.addEventListener("change", () => {
-        const v = Math.max(0, Math.min(5000, parseInt(els.setDelay.value, 10) || 0));
-        DATA.settings.requestDelay = v;
-        els.setDelay.value = v;
-        saveData();
-      });
-    }
-    if (els.setInactive) {
-      els.setInactive.addEventListener("change", () => {
-        const v = Math.max(1, Math.min(365, parseInt(els.setInactive.value, 10) || 3));
-        DATA.settings.inactiveDays = v;
-        els.setInactive.value = v;
-        saveData();
-        renderFriends();
-      });
-    }
-    if (els.setNotify) {
-      els.setNotify.addEventListener("change", () => {
-        const v = Math.max(1, Math.min(30, parseInt(els.setNotify.value, 10) || 5));
-        DATA.settings.notifyHideSec = v;
-        els.setNotify.value = v;
-        saveData();
-      });
-    }
+    bindNumSetting(els.setDelay, (el) => {
+      const v = Math.max(0, Math.min(5000, parseInt(el.value, 10) || 0));
+      DATA.settings.requestDelay = v;
+      el.value = v;
+    });
+    bindNumSetting(els.setInactive, (el) => {
+      const v = Math.max(1, Math.min(365, parseInt(el.value, 10) || 3));
+      DATA.settings.inactiveDays = v;
+      el.value = v;
+      if (typeof renderFriends === "function") renderFriends();
+    });
+    bindNumSetting(els.setNotify, (el) => {
+      const v = Math.max(1, Math.min(30, parseInt(el.value, 10) || 5));
+      DATA.settings.notifyHideSec = v;
+      el.value = v;
+    });
     if (els.scanActivity) {
       els.scanActivity.addEventListener("click", () => scanFriendActivity());
     }
@@ -8140,6 +8109,10 @@
     updateTagsBadge();
     syncTagFormFromProfile();
     watchHeartsUi();
+
+    // страховка: сохранить настройки при уходе со страницы
+    window.addEventListener("pagehide", () => saveData());
+    window.addEventListener("beforeunload", () => saveData());
 
     // стартовое состояние окна
     applyStartState();
