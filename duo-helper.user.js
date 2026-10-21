@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Duolingo Helper
 // @namespace    https://github.com/Vidrimers/Duolingo-helper
-// @version      0.6.6
+// @version      0.6.7
 // @description  Проверка взаимной подписки на профилях Duolingo. Панель, бейджи, кеш.
 // @author       Vidrimers
 // @match        *://*.duolingo.com/*
@@ -1824,6 +1824,18 @@
                         <div class="dh-row" style="margin-top:6px">
                             <button class="dh-btn dh-btn-primary" id="dh-solve-now">Решить сейчас</button>
                         </div>
+                        <div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(128,128,128,0.25)">
+                            <div class="dh-setting-label" style="margin-bottom:4px">
+                                Автопрактика
+                                <small>Решает уроки подряд без участия</small>
+                            </div>
+                            <div class="dh-row" style="gap:6px;align-items:center">
+                                <input class="dh-num-input" id="dh-ap-count" type="number" min="1" max="999" value="10" style="width:56px" title="Количество уроков" />
+                                <button class="dh-btn dh-btn-primary" id="dh-ap-start" style="padding:5px 12px;font-size:11px">Старт</button>
+                                <button class="dh-btn dh-btn-danger" id="dh-ap-stop" style="padding:5px 12px;font-size:11px" disabled>Стоп</button>
+                            </div>
+                            <div class="dh-muted dh-op-status" id="dh-ap-status" style="margin-top:4px"></div>
+                        </div>
                         <div class="dh-muted dh-op-status" id="dh-lesson-status"></div>
                     </div></div>
                 </div>
@@ -2107,6 +2119,10 @@
       setSolver: modal.querySelector("#dh-set-solver"),
       setStories: modal.querySelector("#dh-set-stories"),
       solveNow: modal.querySelector("#dh-solve-now"),
+      apCount: modal.querySelector("#dh-ap-count"),
+      apStart: modal.querySelector("#dh-ap-start"),
+      apStop: modal.querySelector("#dh-ap-stop"),
+      apStatus: modal.querySelector("#dh-ap-status"),
       lessonStatus: modal.querySelector("#dh-lesson-status"),
       setXpBoost: modal.querySelector("#dh-set-xpboost"),
       xpBoost15: modal.querySelector("#dh-xpboost-15"),
@@ -2845,6 +2861,11 @@
         }
         try {
           await handleType(type, window.sol);
+          // после выбора ответа — «Проверить», затем «Далее»
+          await new Promise(function(r) { setTimeout(r, 350); });
+          clickNext(); // «Проверить»
+          await new Promise(function(r) { setTimeout(r, 550); });
+          clickNext(); // «Далее»
           return true;
         } catch (e) {
           return false;
@@ -2887,6 +2908,134 @@
     } catch {}
     setLessonStatus("Отправлен solve…");
     showToast("Автосолвер: пробую решить");
+  }
+
+  // ========== Автопрактика ==========
+  const AP_KEY = "dh_autopractice";
+
+  function apState() {
+    try {
+      return JSON.parse(sessionStorage.getItem(AP_KEY) || "null");
+    } catch {
+      return null;
+    }
+  }
+
+  function apSave(s) {
+    try {
+      if (s) sessionStorage.setItem(AP_KEY, JSON.stringify(s));
+      else sessionStorage.removeItem(AP_KEY);
+    } catch {}
+  }
+
+  function setApRunning(running) {
+    if (els.apStart) els.apStart.disabled = running;
+    if (els.apStop) els.apStop.disabled = !running;
+    // блокируем тумблеры уроков
+    const toggles = [els.setShort, els.setSolver, els.setStories];
+    for (const t of toggles) {
+      if (!t) continue;
+      t.style.opacity = running ? "0.5" : "";
+      t.style.pointerEvents = running ? "none" : "";
+    }
+  }
+
+  function setApStatus(t) {
+    if (els.apStatus) els.apStatus.textContent = t;
+  }
+
+  function startAutoPractice(count) {
+    const st = apState();
+    if (st && st.active) {
+      showToast("Автопрактика уже идёт");
+      return;
+    }
+    const prevShort = !!DATA.settings.lessonShortener;
+    const prevSolver = !!DATA.settings.autoSolver;
+    // включаем короткие уроки + солвер для цикла
+    DATA.settings.lessonShortener = true;
+    DATA.settings.autoSolver = true;
+    saveData();
+    syncLessonFlags();
+    apSave({
+      active: true,
+      target: count,
+      done: 0,
+      prevShort,
+      prevSolver,
+    });
+    setApRunning(true);
+    setApStatus("Урок 0 / " + count + "…");
+    showToast("Автопрактика: старт (" + count + " уроков)");
+    if (location.pathname.indexOf("/practice") !== 0) {
+      location.assign("/practice");
+    } else {
+      resumeAutoPractice();
+    }
+  }
+
+  function stopAutoPractice(completed) {
+    const st = apState();
+    apSave(null);
+    setApRunning(false);
+    // восстанавливаем короткие уроки и солвер
+    if (st && typeof st.prevShort === "boolean") {
+      DATA.settings.lessonShortener = st.prevShort;
+    }
+    if (st && typeof st.prevSolver === "boolean") {
+      DATA.settings.autoSolver = st.prevSolver;
+    }
+    saveData();
+    syncLessonFlags();
+    if (completed) {
+      setApStatus("Готово: " + (st ? st.done : 0) + " уроков");
+      showToast("✓ Автопрактика завершена");
+    } else {
+      setApStatus("Остановлено");
+      showToast("Автопрактика остановлена");
+    }
+  }
+
+  function resumeAutoPractice() {
+    const st = apState();
+    if (!st || !st.active) return;
+    setApRunning(true);
+    setApStatus("Урок " + st.done + " / " + st.target + "…");
+    // ждём появления challenge или конца сессии
+    let waited = 0;
+    const iv = setInterval(() => {
+      waited += 600;
+      const st2 = apState();
+      if (!st2 || !st2.active) {
+        clearInterval(iv);
+        return;
+      }
+      // конец сессии?
+      const done =
+        document.querySelector('[data-test="session-over"]') ||
+        document.querySelector('[data-test="session-complete-slide"]') ||
+        document.querySelector('[data-test="session-complete"]');
+      if (done) {
+        clearInterval(iv);
+        st2.done++;
+        apSave(st2);
+        if (st2.done >= st2.target) {
+          stopAutoPractice(true);
+          return;
+        }
+        setApStatus("Урок " + st2.done + " / " + st2.target + "…");
+        setTimeout(() => {
+          if (apState() && apState().active) location.assign("/practice");
+        }, 900);
+        return;
+      }
+      // если challenge есть — солвер и так работает через свой interval
+      if (waited > 120000) {
+        clearInterval(iv);
+        stopAutoPractice(false);
+        setApStatus("Таймаут — урок не загрузился");
+      }
+    }, 600);
   }
 
   function installHeartsHook() {
@@ -7775,6 +7924,16 @@
     if (els.solveNow) {
       els.solveNow.addEventListener("click", () => solveNow());
     }
+    if (els.apStart) {
+      els.apStart.addEventListener("click", () => {
+        const n = Math.max(1, Math.min(999, parseInt(els.apCount.value, 10) || 10));
+        els.apCount.value = n;
+        startAutoPractice(n);
+      });
+    }
+    if (els.apStop) {
+      els.apStop.addEventListener("click", () => stopAutoPractice(false));
+    }
 
     // аккордеон: один открыт
     if (els.accs && els.accs.length) {
@@ -8168,6 +8327,9 @@
 
     // стартовое состояние окна
     applyStartState();
+
+    // продолжение автопрактики после перезагрузки страницы
+    try { resumeAutoPractice(); } catch {}
 
     // SPA может перерисовать body — следим за host и плашкой (с дебаунсом)
     let ensureTimer = null;
