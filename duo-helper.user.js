@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Duolingo Helper
 // @namespace    https://github.com/Vidrimers/Duolingo-helper
-// @version      0.6.5
+// @version      0.6.6
 // @description  Проверка взаимной подписки на профилях Duolingo. Панель, бейджи, кеш.
 // @author       Vidrimers
 // @match        *://*.duolingo.com/*
@@ -69,6 +69,7 @@
       theme: "xp",
       protectHearts: true,
       lessonShortener: false,
+    storiesShortener: false,
       autoSolver: false,
       fakeXpBoost: false,
       xpBoostMins: 15,
@@ -1813,6 +1814,13 @@
                             </div>
                             <div class="dh-switch" id="dh-set-solver"></div>
                         </div>
+                        <div class="dh-setting-row" style="border-bottom:none;padding:4px 0">
+                            <div class="dh-setting-label">
+                                Короткие stories
+                                <small>Убирает вопросы и диалоги, оставляет заголовки</small>
+                            </div>
+                            <div class="dh-switch" id="dh-set-stories"></div>
+                        </div>
                         <div class="dh-row" style="margin-top:6px">
                             <button class="dh-btn dh-btn-primary" id="dh-solve-now">Решить сейчас</button>
                         </div>
@@ -2097,6 +2105,7 @@
       heartsStatus: modal.querySelector("#dh-hearts-status"),
       setShort: modal.querySelector("#dh-set-short"),
       setSolver: modal.querySelector("#dh-set-solver"),
+      setStories: modal.querySelector("#dh-set-stories"),
       solveNow: modal.querySelector("#dh-solve-now"),
       lessonStatus: modal.querySelector("#dh-lesson-status"),
       setXpBoost: modal.querySelector("#dh-set-xpboost"),
@@ -2242,22 +2251,28 @@
   // ⚠️ Читы, на свой страх и риск.
   const LESSON_LS_SHORT = "dh_lesson_short";
   const LESSON_LS_SOLVER = "dh_lesson_solver";
+  const STORIES_LS_SHORT = "dh_stories_short";
 
   function syncLessonFlags() {
     const shortOn = !!DATA.settings.lessonShortener;
     const solveOn = !!DATA.settings.autoSolver;
+    const storiesOn = !!DATA.settings.storiesShortener;
     try {
       localStorage.setItem(LESSON_LS_SHORT, shortOn ? "true" : "false");
       localStorage.setItem(LESSON_LS_SOLVER, solveOn ? "true" : "false");
+      localStorage.setItem(STORIES_LS_SHORT, storiesOn ? "true" : "false");
     } catch {}
     if (els.setShort) els.setShort.classList.toggle("on", shortOn);
     if (els.setSolver) els.setSolver.classList.toggle("on", solveOn);
+    if (els.setStories) els.setStories.classList.toggle("on", storiesOn);
     if (els.lessonStatus) {
       els.lessonStatus.textContent =
         "короткие уроки: " +
         (shortOn ? "вкл" : "выкл") +
         " · автосолвер: " +
-        (solveOn ? "вкл" : "выкл");
+        (solveOn ? "вкл" : "выкл") +
+        " · stories: " +
+        (storiesOn ? "вкл" : "выкл");
     }
   }
 
@@ -2275,6 +2290,7 @@
 
       var SHORT_KEY = ${JSON.stringify(LESSON_LS_SHORT)};
       var SOLVER_KEY = ${JSON.stringify(LESSON_LS_SOLVER)};
+      var STORIES_KEY = ${JSON.stringify(STORIES_LS_SHORT)};
 
       function flag(k) {
         try { return localStorage.getItem(k) === 'true'; } catch (e) { return false; }
@@ -2327,6 +2343,29 @@
             }).catch(function() { return res; });
           });
         }
+
+        // ===== Stories Shortener: оставляем только HEADER =====
+        var isStoryGet =
+          method === 'GET' &&
+          url.indexOf('stories.duolingo.com/api2/stories/') !== -1;
+
+        if (isStoryGet && flag(STORIES_KEY)) {
+          return origFetch.apply(this, arguments).then(function(res) {
+            return res.clone().json().then(function(data) {
+              if (data && Array.isArray(data.elements)) {
+                data.elements = data.elements.filter(function(el) {
+                  return el.type === 'HEADER';
+                });
+              }
+              return new Response(JSON.stringify(data), {
+                status: res.status,
+                statusText: res.statusText,
+                headers: { 'content-type': 'application/json' }
+              });
+            }).catch(function() { return res; });
+          });
+        }
+
         return origFetch.apply(this, arguments);
       };
       window.fetch.__dhLesson = true;
@@ -4457,6 +4496,7 @@
       const s = DATA.settings || {};
       localStorage.setItem("dh_protect_hearts", s.protectHearts ? "true" : "false");
       localStorage.setItem("dh_lesson_short", s.lessonShortener ? "true" : "false");
+      localStorage.setItem("dh_stories_short", s.storiesShortener ? "true" : "false");
       localStorage.setItem("dh_lesson_solver", s.autoSolver ? "true" : "false");
       localStorage.setItem("dh_fake_xpboost", s.fakeXpBoost ? "true" : "false");
       localStorage.setItem("dh_xpboost_mins", String(s.xpBoostMins || 15));
@@ -7717,6 +7757,18 @@
           DATA.settings.autoSolver
             ? "Автосолвер включён"
             : "Автосолвер выключен",
+        );
+      });
+    }
+    if (els.setStories) {
+      els.setStories.addEventListener("click", () => {
+        DATA.settings.storiesShortener = !DATA.settings.storiesShortener;
+        saveData();
+        syncLessonFlags();
+        showToast(
+          DATA.settings.storiesShortener
+            ? "Короткие stories включены"
+            : "Короткие stories выключены",
         );
       });
     }
