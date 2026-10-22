@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Duolingo Helper
 // @namespace    https://github.com/Vidrimers/Duolingo-helper
-// @version      0.7.3
+// @version      0.7.4
 // @description  Проверка взаимной подписки на профилях Duolingo. Панель, бейджи, кеш.
 // @author       Vidrimers
 // @match        *://*.duolingo.com/*
@@ -70,6 +70,7 @@
       protectHearts: true,
       lessonShortener: false,
     storiesShortener: false,
+    freeSuper: false,
       autoSolver: false,
       fakeXpBoost: false,
       xpBoostMins: 15,
@@ -3400,6 +3401,25 @@
 
                 <div class="dh-acc" data-acc>
                     <button type="button" class="dh-acc-head">
+                        <span class="dh-acc-title">⚠️ Free Max / Super — на свой страх и риск</span>
+                        <span class="dh-acc-arrow">▾</span>
+                    </button>
+                    <div class="dh-acc-body"><div class="dh-acc-inner">
+                        <div class="dh-muted" style="margin-bottom:8px">
+                            Подмена ответа GET /users — клиент видит Super/Max. Разблокирует клиентские функции, серверную подписку не даёт.
+                        </div>
+                        <div class="dh-setting-row" style="border-bottom:none;padding:4px 0">
+                            <div class="dh-setting-label">
+                                Free Max / Super
+                                <small>Подменяет hasPlus и gold_subscription</small>
+                            </div>
+                            <div class="dh-switch" id="dh-set-freesuper"></div>
+                        </div>
+                    </div></div>
+                </div>
+
+                <div class="dh-acc" data-acc>
+                    <button type="button" class="dh-acc-head">
                         <span class="dh-acc-title">⚠️ Streak — на свой страх и риск</span>
                         <span class="dh-acc-arrow">▾</span>
                     </button>
@@ -3603,6 +3623,7 @@
       setShort: modal.querySelector("#dh-set-short"),
       setSolver: modal.querySelector("#dh-set-solver"),
       setStories: modal.querySelector("#dh-set-stories"),
+      setFreeSuper: modal.querySelector("#dh-set-freesuper"),
       solveNow: modal.querySelector("#dh-solve-now"),
       apCount: modal.querySelector("#dh-ap-count"),
       apStart: modal.querySelector("#dh-ap-start"),
@@ -3768,6 +3789,7 @@
   const LESSON_LS_SHORT = "dh_lesson_short";
   const LESSON_LS_SOLVER = "dh_lesson_solver";
   const STORIES_LS_SHORT = "dh_stories_short";
+  const FREE_SUPER_LS = "dh_free_super";
 
   function syncLessonFlags() {
     const shortOn = !!DATA.settings.lessonShortener;
@@ -3807,6 +3829,7 @@
       var SHORT_KEY = ${JSON.stringify(LESSON_LS_SHORT)};
       var SOLVER_KEY = ${JSON.stringify(LESSON_LS_SOLVER)};
       var STORIES_KEY = ${JSON.stringify(STORIES_LS_SHORT)};
+      var SUPER_KEY = ${JSON.stringify(FREE_SUPER_LS)};
 
       function flag(k) {
         try { return localStorage.getItem(k) === 'true'; } catch (e) { return false; }
@@ -3878,6 +3901,41 @@
                 statusText: res.statusText,
                 headers: { 'content-type': 'application/json' }
               });
+            }).catch(function() { return res; });
+          });
+        }
+
+        // ===== Free Super: подмена GET /users =====
+        var isUserGet =
+          method === 'GET' &&
+          /\\/\\d{4}-\\d{2}-\\d{2}\\/users\\/.+/.test(url) &&
+          url.indexOf('/shop-items') === -1;
+
+        if (isUserGet && flag(SUPER_KEY)) {
+          return origFetch.apply(this, arguments).then(function(res) {
+            return res.clone().text().then(function(text) {
+              try {
+                var d = JSON.parse(text);
+                d.hasPlus = true;
+                if (!d.trackingProperties || typeof d.trackingProperties !== 'object') d.trackingProperties = {};
+                d.trackingProperties.has_item_gold_subscription = true;
+                d.shopItems = Object.assign({}, d.shopItems, {
+                  gold_subscription: {
+                    itemName: 'gold_subscription',
+                    subscriptionInfo: {
+                      vendor: 'STRIPE',
+                      renewing: true,
+                      isFamilyPlan: true,
+                      expectedExpiration: 9999999999000
+                    }
+                  }
+                });
+                return new Response(JSON.stringify(d), {
+                  status: res.status,
+                  statusText: res.statusText,
+                  headers: { 'content-type': 'application/json' }
+                });
+              } catch (e) { return res; }
             }).catch(function() { return res; });
           });
         }
@@ -6296,10 +6354,12 @@
       localStorage.setItem("dh_protect_hearts", s.protectHearts ? "true" : "false");
       localStorage.setItem("dh_lesson_short", s.lessonShortener ? "true" : "false");
       localStorage.setItem("dh_stories_short", s.storiesShortener ? "true" : "false");
+      localStorage.setItem("dh_free_super", s.freeSuper ? "true" : "false");
       localStorage.setItem("dh_lesson_solver", s.autoSolver ? "true" : "false");
       localStorage.setItem("dh_fake_xpboost", s.fakeXpBoost ? "true" : "false");
       localStorage.setItem("dh_xpboost_mins", String(s.xpBoostMins || 15));
     } catch {}
+    if (els.setFreeSuper) els.setFreeSuper.classList.toggle("on", !!DATA.settings.freeSuper);
   }
   let friendFilter = "all";
 
@@ -9581,6 +9641,19 @@
           DATA.settings.storiesShortener
             ? "Короткие stories включены"
             : "Короткие stories выключены",
+        );
+      });
+    }
+    if (els.setFreeSuper) {
+      els.setFreeSuper.addEventListener("click", () => {
+        DATA.settings.freeSuper = !DATA.settings.freeSuper;
+        saveData();
+        syncPageFlags();
+        if (els.setFreeSuper) els.setFreeSuper.classList.toggle("on", DATA.settings.freeSuper);
+        showToast(
+          DATA.settings.freeSuper
+            ? "Free Max / Super включён"
+            : "Free Max / Super выключен",
         );
       });
     }
