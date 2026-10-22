@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Duolingo Helper
 // @namespace    https://github.com/Vidrimers/Duolingo-helper
-// @version      0.7.4
+// @version      0.7.5
 // @description  Проверка взаимной подписки на профилях Duolingo. Панель, бейджи, кеш.
 // @author       Vidrimers
 // @match        *://*.duolingo.com/*
@@ -130,17 +130,27 @@
     const store = DATA._store;
     if (!store) return;
     store.accounts = store.accounts || {};
+    const prev = store.accounts[slotId] || {};
     const acc = { settings: DATA.settings };
     for (const k of ACCOUNT_FIELDS) {
       if (k === "settings") continue;
       acc[k] = DATA[k];
     }
+    // не пишем чужое me — если id не совпадает со слотом
+    if (acc.me && String(acc.me.id) !== String(slotId)) {
+      acc.me = prev.me && String(prev.me.id) === String(slotId) ? prev.me : null;
+    }
+    // сохраняем jwt / username / updatedAt из предыдущего слота
+    if (prev.jwt) acc.jwt = prev.jwt;
+    if (prev.username) acc.username = prev.username;
+    if (prev.updatedAt) acc.updatedAt = prev.updatedAt;
     store.accounts[slotId] = acc;
     GM_setValue(STORAGE_KEY, JSON.stringify(store));
   }
 
   function saveData() {
-    // сохраняем строго в активный слот; смену аккаунта ловим отдельно
+    // пишем строго в активный слот (DATA._accountId), не в слот по JWT
+    // — иначе при смене JWT настройки старого аккаунта уедут в чужой слот
     saveToSlot(DATA._accountId || currentAccountId());
   }
 
@@ -158,7 +168,7 @@
       if (k === "settings") continue;
       DATA[k] = acc[k];
     }
-    DATA.me = DATA.me || { id: id === "anon" ? null : id };
+    DATA.me = (acc.me && String(acc.me.id) === id) ? acc.me : (id === "anon" ? null : { id });
     DATA._accountId = id;
     if (typeof resetLiveCaches === "function") resetLiveCaches();
     if (typeof refreshUiForAccount === "function") refreshUiForAccount();
@@ -171,6 +181,67 @@
     ...emptyAccount(),
   };
   switchAccount(currentAccountId());
+
+  // ========== Шифрование JWT (AES-GCM через Web Crypto) ==========
+  async function deriveKey(password, salt) {
+    const enc = new TextEncoder();
+    const base = await crypto.subtle.importKey("raw", enc.encode(password), "PBKDF2", false, ["deriveKey"]);
+    return crypto.subtle.deriveKey(
+      { name: "PBKDF2", salt, iterations: 100000, hash: "SHA-256" },
+      base,
+      { name: "AES-GCM", length: 256 },
+      false,
+      ["encrypt", "decrypt"],
+    );
+  }
+
+  async function encryptJWT(jwt, password) {
+    const enc = new TextEncoder();
+    const salt = crypto.getRandomValues(new Uint8Array(16));
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const key = await deriveKey(password, salt);
+    const cipher = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, enc.encode(jwt));
+    return {
+      v: 1,
+      salt: btoa(String.fromCharCode(...salt)),
+      iv: btoa(String.fromCharCode(...iv)),
+      data: btoa(String.fromCharCode(...new Uint8Array(cipher))),
+    };
+  }
+
+  async function decryptJWT(encObj, password) {
+    try {
+      const dec = new TextDecoder();
+      const salt = Uint8Array.from(atob(encObj.salt), (c) => c.charCodeAt(0));
+      const iv = Uint8Array.from(atob(encObj.iv), (c) => c.charCodeAt(0));
+      const data = Uint8Array.from(atob(encObj.data), (c) => c.charCodeAt(0));
+      const key = await deriveKey(password, salt);
+      const plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, key, data);
+      return dec.decode(plain);
+    } catch {
+      return null;
+    }
+  }
+
+  /** Сохраняет JWT текущего аккаунта в слот (открытым текстом — шифруется при экспорте). */
+  function captureJWT() {
+    const jwt = getToken();
+    if (!jwt) return;
+    // всегда берём id из JWT, а не из DATA._accountId (может быть устаревшим)
+    const id = currentAccountId();
+    if (!id || id === "anon") return;
+    const store = DATA._store;
+    if (!store) return;
+    store.accounts = store.accounts || {};
+    if (!store.accounts[id]) store.accounts[id] = emptyAccount();
+    store.accounts[id].jwt = jwt;
+    store.accounts[id].username = (DATA.me && String(DATA.me.id) === id && DATA.me.username) || store.accounts[id].username || "";
+    store.accounts[id].updatedAt = Date.now();
+    GM_setValue(STORAGE_KEY, JSON.stringify(store));
+  }
+
+  // периодически запоминаем JWT (если пользователь залогинился)
+  setTimeout(() => { try { captureJWT(); } catch {} }, 3000);
 
   // ========== API ==========
   function getToken() {
@@ -244,6 +315,7 @@
         picture: u.picture || null,
       };
       saveData();
+      try { captureJWT(); } catch {}
       return DATA.me;
     } catch (e) {
       console.warn("[DuoHelper] getMe failed", e);
@@ -3167,6 +3239,10 @@
                     </button>
                     <div class="dh-acc-body"><div class="dh-acc-inner">
                         <div class="dh-muted" id="dh-me-info">Определение…</div>
+                        <div style="margin-top:8px">
+                            <div class="dh-setting-label" style="margin-bottom:4px">Аккаунты</div>
+                            <div id="dh-acc-list" style="display:flex;flex-direction:column;gap:4px"></div>
+                        </div>
                     </div></div>
                 </div>
 
@@ -6338,6 +6414,65 @@
   }
 
   /** Обновляет UI после смены аккаунта (тема, позиция, списки). */
+  /** Список аккаунтов в блоке «Мой аккаунт». */
+  function renderAccounts() {
+    const box = shadow && shadow.querySelector("#dh-acc-list");
+    if (!box) return;
+    const store = DATA._store || { accounts: {} };
+    const accounts = store.accounts || {};
+    const curId = DATA._accountId || currentAccountId();
+    const ids = Object.keys(accounts).filter((k) => k !== "anon");
+    box.innerHTML = "";
+    if (!ids.length) {
+      box.innerHTML = '<div class="dh-muted">Нет сохранённых аккаунтов</div>';
+      return;
+    }
+    for (const id of ids) {
+      const a = accounts[id];
+      const name = (a.me && a.me.username) || a.username || id;
+      const row = document.createElement("div");
+      row.className = "dh-setting-row";
+      row.style.borderBottom = "none";
+      row.style.padding = "3px 0";
+      const isCur = id === curId;
+      row.innerHTML = `
+        <div class="dh-setting-label" style="min-width:0;${isCur ? "font-weight:700" : ""}">
+          <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${name}${isCur ? " ✓" : ""}</div>
+          <small>id: ${id}</small>
+        </div>
+        ${isCur ? "" : '<button class="dh-btn" data-switch="' + id + '" style="padding:3px 10px;font-size:10px">Переключить</button>'}`;
+      const b = row.querySelector("[data-switch]");
+      if (b) {
+        b.addEventListener("click", () => switchToAccount(id));
+      }
+      box.appendChild(row);
+    }
+  }
+
+  /** Переключение на другой аккаунт (JWT swap + reload). */
+  async function switchToAccount(id) {
+    const store = DATA._store || {};
+    const acc = (store.accounts || {})[id];
+    if (!acc) { showToast("Аккаунт не найден", true); return; }
+    if (!acc.jwt) {
+      showToast("Нет JWT для этого аккаунта — войди заново", true);
+      return;
+    }
+    const ok = await showConfirm(
+      `Переключиться на ${((acc.me && acc.me.username) || acc.username || id)}?`,
+      "Смена аккаунта",
+    );
+    if (!ok) return;
+    saveToSlot(DATA._accountId || currentAccountId());
+    // подменяем JWT cookie
+    try {
+      document.cookie = "jwt_token=" + encodeURIComponent(acc.jwt) + "; path=/; domain=.duolingo.com; max-age=31536000; secure; samesite=none";
+      localStorage.setItem("jwt_token", acc.jwt);
+    } catch {}
+    showToast("Переключение…");
+    location.reload();
+  }
+
   function refreshUiForAccount() {
     try {
       applyTheme();
@@ -6353,6 +6488,7 @@
       if (typeof renderFriends === "function" && els.friendsList) {
         renderFriends();
       }
+      if (typeof renderAccounts === "function") renderAccounts();
     } catch (e) {
       console.warn("[DuoHelper] refreshUiForAccount", e);
     }
@@ -9420,6 +9556,158 @@
     }, true);
   }
 
+  // ========== Экспорт (модалка) ==========
+  function showExportModal() {
+    if (!shadow) return;
+    const theme = DATA.settings.theme || "win95";
+    const store = DATA._store || { accounts: {} };
+    const accounts = store.accounts || {};
+    const accIds = Object.keys(accounts).filter((k) => k !== "anon");
+    const curId = DATA._accountId || currentAccountId();
+
+    const overlay = document.createElement("div");
+    overlay.className = "dh-confirm-overlay dh-theme-" + theme;
+    overlay.innerHTML = `
+      <div class="dh-confirm-box" style="width:420px">
+        <div class="dh-confirm-title">Экспорт данных</div>
+        <div class="dh-confirm-body" style="max-height:55vh;overflow-y:auto;line-height:1.5">
+          <div style="margin-bottom:10px"><strong>Аккаунты:</strong></div>
+          <div id="dh-exp-accounts" style="margin-bottom:12px;display:flex;flex-direction:column;gap:4px">
+            ${accIds.map((id) => {
+              const a = accounts[id];
+              const name = (a.me && a.me.username) || a.username || id;
+              const me = id === curId ? " — текущий" : "";
+              return `<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px">
+                <input type="checkbox" data-exp-acc="${id}" checked style="margin:0" />
+                ${name} (${id})${me}
+              </label>`;
+            }).join("")}
+          </div>
+          <div style="margin-bottom:10px;font-size:11px;color:#888">
+            <strong>Данные:</strong> настройки, кеш, история, исключения, блоки, метки, изменения, позиция окна
+          </div>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;margin-bottom:6px">
+            <input type="checkbox" id="dh-exp-jwt" checked style="margin:0" />
+            Включить JWT аккаунтов
+          </label>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;margin-bottom:10px">
+            <input type="checkbox" id="dh-exp-encrypt" checked style="margin:0" />
+            Шифровать паролем
+          </label>
+          <div id="dh-exp-pass-fields">
+            <div class="dh-setting-row" style="border-bottom:none;padding:3px 0">
+              <div class="dh-setting-label">Пароль</div>
+              <input class="dh-input" id="dh-exp-pass" type="password" style="width:160px" />
+            </div>
+            <div class="dh-setting-row" style="border-bottom:none;padding:3px 0">
+              <div class="dh-setting-label">Повтор</div>
+              <input class="dh-input" id="dh-exp-pass2" type="password" style="width:160px" />
+            </div>
+          </div>
+          <div id="dh-exp-warn" style="display:none;font-size:11px;color:#c0392b;margin-top:6px">
+            ⚠️ JWT без шифрования — не передавайте файл другим.
+          </div>
+        </div>
+        <div class="dh-confirm-actions">
+          <button class="dh-btn" data-exp="cancel">Отмена</button>
+          <button class="dh-btn dh-btn-primary" data-exp="download">Скачать</button>
+        </div>
+      </div>`;
+    shadow.appendChild(overlay);
+
+    const close = () => overlay.remove();
+    overlay.addEventListener("click", (e) => { if (e.target === overlay) close(); });
+    overlay.querySelector('[data-exp="cancel"]').addEventListener("click", close);
+
+    // показ/скрытие полей пароля и предупреждения
+    const jwtCb = overlay.querySelector("#dh-exp-jwt");
+    const encCb = overlay.querySelector("#dh-exp-encrypt");
+    const passFields = overlay.querySelector("#dh-exp-pass-fields");
+    const warn = overlay.querySelector("#dh-exp-warn");
+    const syncVis = () => {
+      const withJwt = jwtCb.checked;
+      const enc = encCb.checked;
+      passFields.style.display = withJwt && enc ? "" : "none";
+      warn.style.display = withJwt && !enc ? "" : "none";
+    };
+    jwtCb.addEventListener("change", syncVis);
+    encCb.addEventListener("change", syncVis);
+    syncVis();
+
+    overlay.querySelector('[data-exp="download"]').addEventListener("click", async () => {
+      const includeJwt = jwtCb.checked;
+      const doEncrypt = encCb.checked;
+      let password = "";
+
+      if (includeJwt && doEncrypt) {
+        password = (overlay.querySelector("#dh-exp-pass") || {}).value || "";
+        const pass2 = (overlay.querySelector("#dh-exp-pass2") || {}).value || "";
+        if (!password || password !== pass2) {
+          showToast("Пароли не совпадают или пустые", true);
+          return;
+        }
+      }
+
+      const selected = [];
+      overlay.querySelectorAll("[data-exp-acc]").forEach((cb) => {
+        if (cb.checked) selected.push(cb.dataset.expAcc);
+      });
+      if (!selected.length) {
+        showToast("Выбери хотя бы один аккаунт", true);
+        return;
+      }
+
+      const outAccounts = [];
+      for (const id of selected) {
+        const a = accounts[id] || {};
+        const entry = {
+          id,
+          username: (a.me && a.me.username) || a.username || "",
+          displayName: (a.me && a.me.name) || (a.me && a.me.displayName) || "",
+          updatedAt: a.updatedAt || 0,
+          data: {
+            settings: a.settings || {},
+            followCache: a.followCache || {},
+            me: a.me || null,
+            actionLog: a.actionLog || [],
+            excludeList: a.excludeList || [],
+            blockList: a.blockList || [],
+            friendSnapshots: a.friendSnapshots || [],
+            friendChanges: a.friendChanges || [],
+            friendChangesUnread: a.friendChangesUnread || 0,
+            userTags: a.userTags || {},
+          },
+        };
+        if (includeJwt && a.jwt) {
+          if (doEncrypt) {
+            entry.jwt_encrypted = await encryptJWT(a.jwt, password);
+          } else {
+            entry.jwt = a.jwt;
+          }
+        }
+        outAccounts.push(entry);
+      }
+
+      const payload = {
+        type: "duolingo-helper-accounts",
+        version: 2,
+        exportedAt: new Date().toISOString(),
+        encrypted: includeJwt && doEncrypt,
+        accounts: outAccounts,
+      };
+
+      const fname = `duolingo-helper-accounts-${new Date().toISOString().slice(0, 10)}.json`;
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+      const aEl = document.createElement("a");
+      aEl.href = URL.createObjectURL(blob);
+      aEl.download = fname;
+      aEl.click();
+      setTimeout(() => URL.revokeObjectURL(aEl.href), 1000);
+      close();
+      showToast("✓ Экспорт: " + outAccounts.length + " акк.");
+    });
+  }
+
   // ========== Events ==========
   function bindEvents() {
     // колесо внутри окна не должно прокручивать страницу Duolingo
@@ -9546,6 +9834,8 @@
 
     // settings
     syncSwitches();
+    try { captureJWT(); } catch {}
+    renderAccounts();
 
     els.setAuto.addEventListener("click", () => {
       DATA.settings.autoCheck = !DATA.settings.autoCheck;
@@ -9941,37 +10231,7 @@
 
     els.refreshPage.addEventListener("click", () => location.reload());
 
-    els.exportBtn.addEventListener("click", () => {
-      const accId = currentAccountId();
-      const accName = (DATA.me && DATA.me.username) || accId || "unknown";
-      const payload = {
-        type: "duolingo-helper-account",
-        version: 1,
-        exportedAt: new Date().toISOString(),
-        accountId: accId,
-        accountName: accName,
-        data: {
-          settings: DATA.settings,
-          followCache: DATA.followCache,
-          me: DATA.me,
-          actionLog: DATA.actionLog,
-          excludeList: DATA.excludeList,
-          blockList: DATA.blockList,
-          friendSnapshots: DATA.friendSnapshots,
-          friendChanges: DATA.friendChanges,
-          friendChangesUnread: DATA.friendChangesUnread,
-          userTags: DATA.userTags,
-        },
-      };
-      const blob = new Blob([JSON.stringify(payload, null, 2)], {
-        type: "application/json",
-      });
-      const a = document.createElement("a");
-      a.href = URL.createObjectURL(blob);
-      a.download = `duolingo-helper-${accName}-${accId}.json`;
-      a.click();
-      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-    });
+    els.exportBtn.addEventListener("click", () => showExportModal());
 
     // ===== Import =====
     if (els.importBtn && els.importFile) {
@@ -9984,11 +10244,15 @@
         reader.onload = async () => {
           try {
             const parsed = JSON.parse(String(reader.result || ""));
-            if (!parsed || typeof parsed !== "object") {
-              throw new Error("bad format");
+            if (!parsed || typeof parsed !== "object") throw new Error("bad format");
+
+            // === формат v2: мультиаккаунт ===
+            if (parsed.type === "duolingo-helper-accounts" && Array.isArray(parsed.accounts)) {
+              await importAccountsV2(parsed);
+              return;
             }
 
-            // поддержка нового формата (с accountId) и старого (плоский JSON)
+            // === формат v1 / плоский: один аккаунт ===
             let incoming = null;
             let fileAccId = null;
             let fileAccName = "";
@@ -10006,32 +10270,21 @@
                 `Файл от другого аккаунта (${fileAccName || "?"} · id ${fileAccId}).\nЗагрузить в текущий (${curId})?`,
                 "Импорт данных",
               );
-              if (!okGo) {
-                showToast("Импорт отменён");
-                return;
-              }
+              if (!okGo) { showToast("Импорт отменён"); return; }
             }
 
             if (incoming.settings && typeof incoming.settings === "object") {
               DATA.settings = { ...DATA.settings, ...incoming.settings };
             }
-            if (incoming.followCache && typeof incoming.followCache === "object") {
-              DATA.followCache = incoming.followCache;
-            }
-            if (incoming.me && typeof incoming.me === "object") {
-              DATA.me = incoming.me;
-            }
+            if (incoming.followCache && typeof incoming.followCache === "object") DATA.followCache = incoming.followCache;
+            if (incoming.me && typeof incoming.me === "object") DATA.me = incoming.me;
             if (Array.isArray(incoming.actionLog)) DATA.actionLog = incoming.actionLog;
             if (Array.isArray(incoming.excludeList)) DATA.excludeList = incoming.excludeList;
             if (Array.isArray(incoming.blockList)) DATA.blockList = incoming.blockList;
             if (Array.isArray(incoming.friendSnapshots)) DATA.friendSnapshots = incoming.friendSnapshots;
             if (Array.isArray(incoming.friendChanges)) DATA.friendChanges = incoming.friendChanges;
-            if (incoming.friendChangesUnread != null) {
-              DATA.friendChangesUnread = Number(incoming.friendChangesUnread) || 0;
-            }
-            if (incoming.userTags && typeof incoming.userTags === "object") {
-              DATA.userTags = incoming.userTags;
-            }
+            if (incoming.friendChangesUnread != null) DATA.friendChangesUnread = Number(incoming.friendChangesUnread) || 0;
+            if (incoming.userTags && typeof incoming.userTags === "object") DATA.userTags = incoming.userTags;
 
             saveData();
             syncSwitches();
@@ -10048,6 +10301,117 @@
         reader.readAsText(file);
       });
     }
+  }
+
+  /** Импорт формата v2: мультиаккаунт с опциональным шифрованием JWT. */
+  async function importAccountsV2(parsed) {
+    const accounts = parsed.accounts || [];
+    if (!accounts.length) {
+      showToast("Файл не содержит аккаунтов", true);
+      return;
+    }
+
+    const hasEncrypted = accounts.some((a) => a.jwt_encrypted);
+    const hasPlainJwt = accounts.some((a) => a.jwt);
+    let password = "";
+
+    if (hasEncrypted) {
+      password = await showPasswordPrompt("Введите пароль для расшифровки JWT");
+      if (password === null) {
+        showToast("Импорт отменён");
+        return;
+      }
+    } else if (hasPlainJwt) {
+      const ok = await showConfirm(
+        "Файл содержит JWT без шифрования. Продолжить импорт?",
+        "Импорт данных",
+      );
+      if (!ok) { showToast("Импорт отменён"); return; }
+    }
+
+    const store = DATA._store || {};
+    store.accounts = store.accounts || {};
+    let imported = 0;
+    let errors = 0;
+
+    for (const entry of accounts) {
+      const id = String(entry.id || "");
+      if (!id) continue;
+      const acc = store.accounts[id] || emptyAccount();
+
+      // данные
+      const d = entry.data || {};
+      if (d.settings && typeof d.settings === "object") acc.settings = { ...(acc.settings || {}), ...d.settings };
+      if (d.followCache && typeof d.followCache === "object") acc.followCache = d.followCache;
+      if (d.me && typeof d.me === "object") acc.me = d.me;
+      if (Array.isArray(d.actionLog)) acc.actionLog = d.actionLog;
+      if (Array.isArray(d.excludeList)) acc.excludeList = d.excludeList;
+      if (Array.isArray(d.blockList)) acc.blockList = d.blockList;
+      if (Array.isArray(d.friendSnapshots)) acc.friendSnapshots = d.friendSnapshots;
+      if (Array.isArray(d.friendChanges)) acc.friendChanges = d.friendChanges;
+      if (d.friendChangesUnread != null) acc.friendChangesUnread = Number(d.friendChangesUnread) || 0;
+      if (d.userTags && typeof d.userTags === "object") acc.userTags = d.userTags;
+      acc.username = entry.username || acc.username || "";
+      acc.updatedAt = entry.updatedAt || Date.now();
+
+      // JWT
+      if (entry.jwt_encrypted && password) {
+        const jwt = await decryptJWT(entry.jwt_encrypted, password);
+        if (jwt) acc.jwt = jwt;
+        else errors++;
+      } else if (entry.jwt) {
+        acc.jwt = entry.jwt;
+      }
+
+      store.accounts[id] = acc;
+      imported++;
+    }
+
+    DATA._store = store;
+    GM_setValue(STORAGE_KEY, JSON.stringify(store));
+
+    // подгружаем текущий аккаунт если попал в импорт
+    const curId = currentAccountId();
+    if (store.accounts[curId]) switchAccount(curId);
+
+    saveData();
+    syncSwitches();
+    refreshUiForAccount();
+    showToast(
+      errors
+        ? `✓ Импортировано ${imported} акк., ${errors} JWT не расшифрованы`
+        : `✓ Импортировано ${imported} акк.`,
+      errors > 0,
+    );
+  }
+
+  /** Модалка ввода пароля. Возвращает строку или null (отмена). */
+  function showPasswordPrompt(title) {
+    return new Promise((resolve) => {
+      if (!shadow) return resolve(null);
+      const theme = DATA.settings.theme || "win95";
+      const overlay = document.createElement("div");
+      overlay.className = "dh-confirm-overlay dh-theme-" + theme;
+      overlay.innerHTML = `
+        <div class="dh-confirm-box" style="width:340px">
+          <div class="dh-confirm-title">${title}</div>
+          <div class="dh-confirm-body">
+            <input class="dh-input" id="dh-pass-input" type="password" style="width:100%" />
+          </div>
+          <div class="dh-confirm-actions">
+            <button class="dh-btn" data-pass="cancel">Отмена</button>
+            <button class="dh-btn dh-btn-primary" data-pass="ok">OK</button>
+          </div>
+        </div>`;
+      shadow.appendChild(overlay);
+      const input = overlay.querySelector("#dh-pass-input");
+      if (input) input.focus();
+      const close = (val) => { overlay.remove(); resolve(val); };
+      overlay.addEventListener("click", (e) => { if (e.target === overlay) close(null); });
+      overlay.querySelector('[data-pass="cancel"]').addEventListener("click", () => close(null));
+      overlay.querySelector('[data-pass="ok"]').addEventListener("click", () => close(input ? input.value : ""));
+      if (input) input.addEventListener("keydown", (e) => { if (e.key === "Enter") close(input.value); });
+    });
   }
 
   // ========== FAB recovery (SPA) ==========
