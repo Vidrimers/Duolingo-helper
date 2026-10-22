@@ -3,3 +3,5 @@ scripts/
 
 tasks.txt
 tasks.md
+.env
+*.db

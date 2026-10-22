@@ -3154,40 +3154,50 @@
                     <div class="dh-muted" id="dh-manual-sub" style="margin-top:6px"></div>
                 </div>
 
-                <div class="dh-card" id="dh-me-card">
-                    <div class="dh-card-title">Твой аккаунт</div>
-                    <div class="dh-muted" id="dh-me-info">Определение…</div>
-                </div>
-
                 <div class="dh-row">
                     <button class="dh-btn dh-btn-ghost" id="dh-recheck-btn">🔄 Перепроверить</button>
                     <button class="dh-btn dh-btn-ghost" id="dh-copy-btn">📋 Копировать</button>
                     <button class="dh-btn dh-btn-ghost" id="dh-refresh-page">🔄 Обновить</button>
                 </div>
 
-                <div class="dh-card" id="dh-tags-card">
-                    <div class="dh-card-title">Метки</div>
-                    <div id="dh-tags-form">
-                        <div class="dh-muted" id="dh-tags-user">Для текущего профиля</div>
-                        <div class="dh-setting-row" style="border-bottom:none;padding:4px 0">
-                            <div class="dh-setting-label">Текст метки</div>
-                            <input class="dh-input" id="dh-tag-label" maxlength="40" style="width:170px" />
+                <div class="dh-acc" data-acc>
+                    <button type="button" class="dh-acc-head">
+                        <span class="dh-acc-title">Мой аккаунт</span>
+                        <span class="dh-acc-arrow">▾</span>
+                    </button>
+                    <div class="dh-acc-body"><div class="dh-acc-inner">
+                        <div class="dh-muted" id="dh-me-info">Определение…</div>
+                    </div></div>
+                </div>
+
+                <div class="dh-acc" data-acc>
+                    <button type="button" class="dh-acc-head">
+                        <span class="dh-acc-title">Метки</span>
+                        <span class="dh-acc-arrow">▾</span>
+                    </button>
+                    <div class="dh-acc-body"><div class="dh-acc-inner">
+                        <div id="dh-tags-form">
+                            <div class="dh-muted" id="dh-tags-user">Для текущего профиля</div>
+                            <div class="dh-setting-row" style="border-bottom:none;padding:4px 0">
+                                <div class="dh-setting-label">Текст метки</div>
+                                <input class="dh-input" id="dh-tag-label" maxlength="40" style="width:170px" />
+                            </div>
+                            <div class="dh-setting-row" style="border-bottom:none;padding:4px 0">
+                                <div class="dh-setting-label">Цвет</div>
+                                <input type="color" id="dh-tag-color" class="dh-num-input" style="width:48px;height:32px;padding:2px" value="#58cc02" />
+                            </div>
+                            <div class="dh-setting-row" style="border-bottom:none;padding:4px 0">
+                                <div class="dh-setting-label">Заметка</div>
+                                <input class="dh-input" id="dh-tag-note" maxlength="120" style="width:170px" />
+                            </div>
                         </div>
-                        <div class="dh-setting-row" style="border-bottom:none;padding:4px 0">
-                            <div class="dh-setting-label">Цвет</div>
-                            <input type="color" id="dh-tag-color" class="dh-num-input" style="width:48px;height:32px;padding:2px" value="#58cc02" />
+                        <div class="dh-row" style="margin-top:6px">
+                            <button class="dh-btn dh-btn-primary" id="dh-tag-save">Сохранить метку</button>
+                            <button type="button" id="dh-tags-open" style="background:none;border:none;color:#888;cursor:pointer;font:inherit;font-size:11px;padding:0;text-decoration:underline">Люди с метками<span id="dh-tags-badge" style="display:none;margin-left:3px;color:#888;font-size:11px;font-weight:400;text-decoration:none"></span></button>
+                            <button type="button" id="dh-tags-back" style="display:none;background:none;border:none;color:#888;cursor:pointer;font:inherit;font-size:11px;padding:0;text-decoration:underline">← Назад</button>
                         </div>
-                        <div class="dh-setting-row" style="border-bottom:none;padding:4px 0">
-                            <div class="dh-setting-label">Заметка</div>
-                            <input class="dh-input" id="dh-tag-note" maxlength="120" style="width:170px" />
-                        </div>
-                    </div>
-                    <div class="dh-row" style="margin-top:6px">
-                        <button class="dh-btn dh-btn-primary" id="dh-tag-save">Сохранить метку</button>
-                        <button type="button" id="dh-tags-open" style="background:none;border:none;color:#888;cursor:pointer;font:inherit;font-size:11px;padding:0;text-decoration:underline">Люди с метками<span id="dh-tags-badge" style="display:none;margin-left:3px;color:#888;font-size:11px;font-weight:400;text-decoration:none"></span></button>
-                        <button type="button" id="dh-tags-back" style="display:none;background:none;border:none;color:#888;cursor:pointer;font:inherit;font-size:11px;padding:0;text-decoration:underline">← Назад</button>
-                    </div>
-                    <div id="dh-tags-list" style="display:none;flex-direction:column;gap:4px;margin-top:8px;max-height:36vh;overflow-y:auto;padding-right:8px"></div>
+                        <div id="dh-tags-list" style="display:none;flex-direction:column;gap:4px;margin-top:8px;max-height:36vh;overflow-y:auto;padding-right:8px"></div>
+                    </div></div>
                 </div>
             </div>
 
