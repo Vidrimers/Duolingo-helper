@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Duolingo Helper
 // @namespace    https://github.com/Vidrimers/Duolingo-helper
-// @version      0.7.2
+// @version      0.7.3
 // @description  Проверка взаимной подписки на профилях Duolingo. Панель, бейджи, кеш.
 // @author       Vidrimers
 // @match        *://*.duolingo.com/*
@@ -514,6 +514,34 @@
             .dh-notifs.dh-theme-win11 .dh-notif.ok { border-left-color: #0F7B0F; }
             .dh-notifs.dh-theme-win11 .dh-notif.info { border-left-color: #0067C0; }
             .dh-notifs.dh-theme-win11 .dh-notif.warn { border-left-color: #9D5D00; }
+            /* Notifs — Material 3 Light */
+            .dh-notifs.dh-theme-m3l .dh-notif {
+                background: #322F35;
+                color: #F5EFF7;
+                border-radius: 4px;
+                border-left-color: #6750A4;
+                font-family: "Roboto", "Segoe UI", sans-serif;
+            }
+            /* Notifs — Material 3 Dark */
+            .dh-notifs.dh-theme-m3d .dh-notif {
+                background: #E6E0E9;
+                color: #322F35;
+                border-radius: 4px;
+                border-left-color: #D0BCFF;
+                font-family: "Roboto", "Segoe UI", sans-serif;
+            }
+            /* Notifs — iOS Liquid Glass */
+            .dh-notifs.dh-theme-glass .dh-notif {
+                background: rgba(30,20,50,0.85);
+                backdrop-filter: blur(24px) saturate(160%);
+                -webkit-backdrop-filter: blur(24px) saturate(160%);
+                color: rgba(255,255,255,0.96);
+                border-radius: 20px;
+                border: 1px solid rgba(255,255,255,0.12);
+                border-left: 4px solid #0A84FF;
+                box-shadow: 0 8px 32px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.15);
+                font-family: -apple-system, "SF Pro Text", sans-serif;
+            }
 
             /* ===== FAB ===== */
             .dh-fab {
@@ -1393,6 +1421,50 @@
                 color: #1A1A1A;
                 background: #F9F9F9;
                 border-bottom-color: #E5E5E5;
+                text-shadow: none;
+            }
+            .dh-confirm-overlay.dh-theme-m3l .dh-confirm-box {
+                background: #FEF7FF;
+                border: none;
+                border-radius: 28px;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                color: #1D1B20;
+                font-family: "Roboto", "Segoe UI", system-ui, sans-serif;
+            }
+            .dh-confirm-overlay.dh-theme-m3l .dh-confirm-title {
+                color: #1D1B20;
+                background: transparent;
+                border-bottom-color: #CAC4D0;
+                text-shadow: none;
+            }
+            .dh-confirm-overlay.dh-theme-m3d .dh-confirm-box {
+                background: #2B2930;
+                border: none;
+                border-radius: 28px;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+                color: #E6E0E9;
+                font-family: "Roboto", "Segoe UI", system-ui, sans-serif;
+            }
+            .dh-confirm-overlay.dh-theme-m3d .dh-confirm-title {
+                color: #E6E0E9;
+                background: transparent;
+                border-bottom-color: #49454F;
+                text-shadow: none;
+            }
+            .dh-confirm-overlay.dh-theme-glass .dh-confirm-box {
+                background: rgba(255,255,255,0.10);
+                backdrop-filter: blur(40px) saturate(160%);
+                -webkit-backdrop-filter: blur(40px) saturate(160%);
+                border: 1px solid rgba(255,255,255,0.15);
+                border-radius: 28px;
+                box-shadow: 0 8px 32px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.2);
+                color: rgba(255,255,255,0.96);
+                font-family: -apple-system, "SF Pro Text", "Helvetica Neue", sans-serif;
+            }
+            .dh-confirm-overlay.dh-theme-glass .dh-confirm-title {
+                color: rgba(255,255,255,0.96);
+                background: transparent;
+                border-bottom-color: rgba(255,255,255,0.12);
                 text-shadow: none;
             }
 
@@ -2408,6 +2480,444 @@
             .dh-modal.dh-theme-win11 .dh-lb-row .gap.down { color: #C42B1C; }
             .dh-modal.dh-theme-win11 .dh-status-yes { color: #0F7B0F; }
             .dh-modal.dh-theme-win11 .dh-status-no { color: #C42B1C; }
+
+            /* ======================= THEME: Material 3 Light ======================= */
+            .dh-modal.dh-theme-m3l {
+                background: #FEF7FF;
+                border: 1px solid #E6E0E9;
+                border-radius: 16px;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.08);
+                color: #1D1B20;
+                font-family: "Roboto", "Segoe UI", system-ui, sans-serif;
+            }
+            .dh-modal.dh-theme-m3l .dh-titlebar {
+                background: #FEF7FF;
+                border-bottom: 1px solid #E6E0E9;
+                border-radius: 16px 16px 0 0;
+                padding: 8px 14px;
+            }
+            .dh-modal.dh-theme-m3l .dh-titlebar .dh-title-text {
+                color: #1D1B20;
+                font-size: 14px;
+                font-weight: 500;
+            }
+            .dh-modal.dh-theme-m3l .dh-win-btn {
+                background: none;
+                border: none;
+                width: 32px;
+                height: 32px;
+                border-radius: 16px;
+                font-size: 12px;
+                color: #49454F;
+            }
+            .dh-modal.dh-theme-m3l .dh-win-btn:hover { background: rgba(103,80,164,0.08); }
+            .dh-modal.dh-theme-m3l .dh-win-btn.close:hover { background: rgba(179,38,30,0.12); color: #B3261E; }
+            .dh-modal.dh-theme-m3l .dh-body { background: #FEF7FF; }
+            .dh-modal.dh-theme-m3l .dh-tabs {
+                background: #FEF7FF;
+                border-bottom: 1px solid #E6E0E9;
+                padding: 4px;
+                gap: 4px;
+            }
+            .dh-modal.dh-theme-m3l .dh-tab {
+                background: transparent;
+                border: none;
+                border-radius: 9999px;
+                color: #49454F;
+                font-weight: 500;
+                padding: 8px 16px;
+            }
+            .dh-modal.dh-theme-m3l .dh-tab:hover { background: rgba(103,80,164,0.08); }
+            .dh-modal.dh-theme-m3l .dh-tab.active {
+                background: #EADDFF;
+                color: #21005D;
+            }
+            .dh-modal.dh-theme-m3l .dh-btn {
+                background: transparent;
+                border: 1px solid #79747E;
+                border-radius: 9999px;
+                color: #6750A4;
+                font-family: inherit;
+                font-weight: 500;
+            }
+            .dh-modal.dh-theme-m3l .dh-btn:hover { background: rgba(103,80,164,0.08); }
+            .dh-modal.dh-theme-m3l .dh-btn-primary {
+                background: #6750A4;
+                border-color: #6750A4;
+                color: #FFFFFF;
+            }
+            .dh-modal.dh-theme-m3l .dh-btn-primary:hover { background: #5B4390; }
+            .dh-modal.dh-theme-m3l .dh-btn-danger {
+                background: #B3261E;
+                border-color: #B3261E;
+                color: #FFFFFF;
+            }
+            .dh-modal.dh-theme-m3l .dh-input,
+            .dh-modal.dh-theme-m3l .dh-num-input {
+                background: #FFFFFF;
+                border: 1px solid #79747E;
+                border-radius: 4px 4px 0 0;
+                border-bottom: 2px solid #79747E;
+                color: #1D1B20;
+                font-family: inherit;
+            }
+            .dh-modal.dh-theme-m3l .dh-card,
+            .dh-modal.dh-theme-m3l .dh-shop-card {
+                background: #E6E0E9;
+                border: none;
+                border-radius: 12px;
+            }
+            .dh-modal.dh-theme-m3l .dh-shop-card:hover { box-shadow: 0 1px 3px rgba(0,0,0,0.15); }
+            .dh-modal.dh-theme-m3l .dh-shop-card .name { color: #1D1B20; }
+            .dh-modal.dh-theme-m3l .dh-shop-card .desc { color: #49454F; }
+            .dh-modal.dh-theme-m3l .dh-setting-row { border-bottom-color: #CAC4D0; }
+            .dh-modal.dh-theme-m3l .dh-acc {
+                background: #F1ECF4;
+                border: none;
+                border-radius: 12px;
+            }
+            .dh-modal.dh-theme-m3l .dh-acc-head {
+                background: #F1ECF4;
+                border-radius: 12px;
+            }
+            .dh-modal.dh-theme-m3l .dh-switch {
+                background: #E6E0E9;
+                border: 2px solid #79747E;
+            }
+            .dh-modal.dh-theme-m3l .dh-switch.on {
+                background: #6750A4;
+                border-color: #6750A4;
+            }
+            .dh-modal.dh-theme-m3l .dh-footer {
+                background: #F7F2FA;
+                border-top: 1px solid #E6E0E9;
+                border-radius: 0 0 16px 16px;
+            }
+            .dh-modal.dh-theme-m3l .dh-muted { color: #49454F; }
+            .dh-modal.dh-theme-m3l .dh-card-title { color: #49454F; }
+            .dh-modal.dh-theme-m3l .dh-setting-label { color: #1D1B20; }
+            .dh-modal.dh-theme-m3l .dh-setting-label small { color: #49454F; }
+            .dh-modal.dh-theme-m3l .dh-select {
+                background: #FFFFFF;
+                border-color: #79747E;
+                border-radius: 4px;
+                color: #1D1B20;
+            }
+            .dh-modal.dh-theme-m3l .dh-select-options {
+                background: #FFFFFF;
+                border-color: #CAC4D0;
+                border-radius: 12px;
+                box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+            }
+            .dh-modal.dh-theme-m3l .dh-select-option { color: #1D1B20; }
+            .dh-modal.dh-theme-m3l .dh-select-option:hover {
+                background: rgba(103,80,164,0.08);
+            }
+            .dh-modal.dh-theme-m3l .dh-lb-row.me {
+                background: rgba(103,80,164,0.12);
+                box-shadow: inset 0 0 0 2px #6750A4;
+            }
+            .dh-modal.dh-theme-m3l .dh-lb-row .gap.up { color: #146C2E; }
+            .dh-modal.dh-theme-m3l .dh-lb-row .gap.down { color: #B3261E; }
+            .dh-modal.dh-theme-m3l .dh-status-yes { color: #146C2E; }
+            .dh-modal.dh-theme-m3l .dh-status-no { color: #B3261E; }
+
+            /* ======================= THEME: Material 3 Dark ======================= */
+            .dh-modal.dh-theme-m3d {
+                background: #141218;
+                border: 1px solid #49454F;
+                border-radius: 16px;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+                color: #E6E0E9;
+                font-family: "Roboto", "Segoe UI", system-ui, sans-serif;
+            }
+            .dh-modal.dh-theme-m3d .dh-titlebar {
+                background: #141218;
+                border-bottom: 1px solid #49454F;
+                border-radius: 16px 16px 0 0;
+                padding: 8px 14px;
+            }
+            .dh-modal.dh-theme-m3d .dh-titlebar .dh-title-text {
+                color: #E6E0E9;
+                font-size: 14px;
+                font-weight: 500;
+            }
+            .dh-modal.dh-theme-m3d .dh-win-btn {
+                background: none;
+                border: none;
+                width: 32px;
+                height: 32px;
+                border-radius: 16px;
+                font-size: 12px;
+                color: #CAC4D0;
+            }
+            .dh-modal.dh-theme-m3d .dh-win-btn:hover { background: rgba(208,188,255,0.08); }
+            .dh-modal.dh-theme-m3d .dh-win-btn.close:hover { background: rgba(242,184,181,0.15); color: #F2B8B5; }
+            .dh-modal.dh-theme-m3d .dh-body { background: #141218; }
+            .dh-modal.dh-theme-m3d .dh-tabs {
+                background: #141218;
+                border-bottom: 1px solid #49454F;
+                padding: 4px;
+                gap: 4px;
+            }
+            .dh-modal.dh-theme-m3d .dh-tab {
+                background: transparent;
+                border: none;
+                border-radius: 9999px;
+                color: #CAC4D0;
+                font-weight: 500;
+                padding: 8px 16px;
+            }
+            .dh-modal.dh-theme-m3d .dh-tab:hover { background: rgba(208,188,255,0.08); }
+            .dh-modal.dh-theme-m3d .dh-tab.active {
+                background: #4F378B;
+                color: #EADDFF;
+            }
+            .dh-modal.dh-theme-m3d .dh-btn {
+                background: transparent;
+                border: 1px solid #938F99;
+                border-radius: 9999px;
+                color: #D0BCFF;
+                font-family: inherit;
+                font-weight: 500;
+            }
+            .dh-modal.dh-theme-m3d .dh-btn:hover { background: rgba(208,188,255,0.08); }
+            .dh-modal.dh-theme-m3d .dh-btn-primary {
+                background: #D0BCFF;
+                border-color: #D0BCFF;
+                color: #381E72;
+            }
+            .dh-modal.dh-theme-m3d .dh-btn-primary:hover { background: #BFA8FF; }
+            .dh-modal.dh-theme-m3d .dh-btn-danger {
+                background: #F2B8B5;
+                border-color: #F2B8B5;
+                color: #601410;
+            }
+            .dh-modal.dh-theme-m3d .dh-input,
+            .dh-modal.dh-theme-m3d .dh-num-input {
+                background: #211F26;
+                border: 1px solid #938F99;
+                border-radius: 4px 4px 0 0;
+                border-bottom: 2px solid #938F99;
+                color: #E6E0E9;
+                font-family: inherit;
+            }
+            .dh-modal.dh-theme-m3d .dh-card,
+            .dh-modal.dh-theme-m3d .dh-shop-card {
+                background: #36343B;
+                border: none;
+                border-radius: 12px;
+            }
+            .dh-modal.dh-theme-m3d .dh-shop-card:hover { box-shadow: 0 1px 3px rgba(0,0,0,0.4); }
+            .dh-modal.dh-theme-m3d .dh-shop-card .name { color: #E6E0E9; }
+            .dh-modal.dh-theme-m3d .dh-shop-card .desc { color: #CAC4D0; }
+            .dh-modal.dh-theme-m3d .dh-setting-row { border-bottom-color: #49454F; }
+            .dh-modal.dh-theme-m3d .dh-acc {
+                background: #211F26;
+                border: none;
+                border-radius: 12px;
+            }
+            .dh-modal.dh-theme-m3d .dh-acc-head {
+                background: #211F26;
+                border-radius: 12px;
+            }
+            .dh-modal.dh-theme-m3d .dh-switch {
+                background: #36343B;
+                border: 2px solid #938F99;
+            }
+            .dh-modal.dh-theme-m3d .dh-switch.on {
+                background: #D0BCFF;
+                border-color: #D0BCFF;
+            }
+            .dh-modal.dh-theme-m3d .dh-footer {
+                background: #1D1B20;
+                border-top: 1px solid #49454F;
+                border-radius: 0 0 16px 16px;
+            }
+            .dh-modal.dh-theme-m3d .dh-muted { color: #CAC4D0; }
+            .dh-modal.dh-theme-m3d .dh-card-title { color: #CAC4D0; }
+            .dh-modal.dh-theme-m3d .dh-setting-label { color: #E6E0E9; }
+            .dh-modal.dh-theme-m3d .dh-setting-label small { color: #CAC4D0; }
+            .dh-modal.dh-theme-m3d .dh-select {
+                background: #211F26;
+                border-color: #938F99;
+                border-radius: 4px;
+                color: #E6E0E9;
+            }
+            .dh-modal.dh-theme-m3d .dh-select-options {
+                background: #2B2930;
+                border-color: #49454F;
+                border-radius: 12px;
+                box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+            }
+            .dh-modal.dh-theme-m3d .dh-select-option { color: #E6E0E9; }
+            .dh-modal.dh-theme-m3d .dh-select-option:hover {
+                background: rgba(208,188,255,0.08);
+            }
+            .dh-modal.dh-theme-m3d .dh-lb-row.me {
+                background: rgba(208,188,255,0.12);
+                box-shadow: inset 0 0 0 2px #D0BCFF;
+            }
+            .dh-modal.dh-theme-m3d .dh-lb-row .gap.up { color: #7BDE8E; }
+            .dh-modal.dh-theme-m3d .dh-lb-row .gap.down { color: #F2B8B5; }
+            .dh-modal.dh-theme-m3d .dh-status-yes { color: #7BDE8E; }
+            .dh-modal.dh-theme-m3d .dh-status-no { color: #F2B8B5; }
+
+            /* ======================= THEME: iOS Liquid Glass ======================= */
+            .dh-modal.dh-theme-glass {
+                background: radial-gradient(circle at 20% 20%, #3a1c71, #12071f 60%), linear-gradient(160deg, #1b0e30, #05030a);
+                border: 1px solid rgba(255,255,255,0.12);
+                border-radius: 28px;
+                overflow: hidden;
+                box-shadow: 0 8px 32px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.15);
+                color: rgba(255,255,255,0.96);
+                font-family: -apple-system, "SF Pro Text", "Helvetica Neue", Helvetica, sans-serif;
+            }
+            .dh-modal.dh-theme-glass .dh-titlebar {
+                background: rgba(255,255,255,0.10);
+                backdrop-filter: blur(24px) saturate(160%);
+                -webkit-backdrop-filter: blur(24px) saturate(160%);
+                border-bottom: 1px solid rgba(255,255,255,0.12);
+                border-radius: 28px 28px 0 0;
+                padding: 8px 14px;
+            }
+            .dh-modal.dh-theme-glass .dh-titlebar .dh-title-text {
+                color: rgba(255,255,255,0.96);
+                font-size: 14px;
+                font-weight: 600;
+            }
+            .dh-modal.dh-theme-glass .dh-win-btn {
+                background: rgba(255,255,255,0.10);
+                border: 1px solid rgba(255,255,255,0.12);
+                width: 22px;
+                height: 22px;
+                border-radius: 11px;
+                font-size: 10px;
+                color: rgba(255,255,255,0.8);
+                flex-shrink: 0;
+            }
+            .dh-modal.dh-theme-glass .dh-win-btn:hover { background: rgba(255,255,255,0.18); }
+            .dh-modal.dh-theme-glass .dh-win-btn.close:hover { background: rgba(255,69,58,0.6); color: #fff; }
+            .dh-modal.dh-theme-glass .dh-body {
+                background: transparent;
+            }
+            .dh-modal.dh-theme-glass .dh-tabs {
+                background: rgba(255,255,255,0.08);
+                backdrop-filter: blur(24px) saturate(160%);
+                -webkit-backdrop-filter: blur(24px) saturate(160%);
+                border-bottom: 1px solid rgba(255,255,255,0.12);
+                padding: 6px;
+                gap: 4px;
+            }
+            .dh-modal.dh-theme-glass .dh-tab {
+                background: transparent;
+                border: none;
+                border-radius: 9999px;
+                color: rgba(255,255,255,0.68);
+                font-weight: 500;
+                padding: 8px 16px;
+            }
+            .dh-modal.dh-theme-glass .dh-tab:hover { background: rgba(255,255,255,0.10); }
+            .dh-modal.dh-theme-glass .dh-tab.active {
+                background: rgba(255,255,255,0.18);
+                color: #fff;
+            }
+            .dh-modal.dh-theme-glass .dh-btn {
+                background: rgba(255,255,255,0.10);
+                border: 1px solid rgba(255,255,255,0.12);
+                border-radius: 20px;
+                color: rgba(255,255,255,0.96);
+                font-family: inherit;
+                backdrop-filter: blur(16px);
+                -webkit-backdrop-filter: blur(16px);
+                box-shadow: inset 0 1px 0 rgba(255,255,255,0.2);
+            }
+            .dh-modal.dh-theme-glass .dh-btn:hover { background: rgba(255,255,255,0.16); }
+            .dh-modal.dh-theme-glass .dh-btn-primary {
+                background: rgba(10,132,255,0.55);
+                border-color: rgba(10,132,255,0.7);
+                color: #fff;
+            }
+            .dh-modal.dh-theme-glass .dh-btn-primary:hover { background: rgba(10,132,255,0.7); }
+            .dh-modal.dh-theme-glass .dh-btn-danger {
+                background: rgba(255,69,58,0.5);
+                border-color: rgba(255,69,58,0.6);
+                color: #fff;
+            }
+            .dh-modal.dh-theme-glass .dh-input,
+            .dh-modal.dh-theme-glass .dh-num-input {
+                background: rgba(255,255,255,0.10);
+                border: 1px solid rgba(255,255,255,0.12);
+                border-radius: 12px;
+                color: rgba(255,255,255,0.96);
+                font-family: inherit;
+            }
+            .dh-modal.dh-theme-glass .dh-card,
+            .dh-modal.dh-theme-glass .dh-shop-card {
+                background: rgba(255,255,255,0.06);
+                border: 1px solid rgba(255,255,255,0.10);
+                border-radius: 16px;
+            }
+            .dh-modal.dh-theme-glass .dh-shop-card:hover { background: rgba(255,255,255,0.10); }
+            .dh-modal.dh-theme-glass .dh-shop-card .name { color: rgba(255,255,255,0.96); }
+            .dh-modal.dh-theme-glass .dh-shop-card .desc { color: rgba(255,255,255,0.68); }
+            .dh-modal.dh-theme-glass .dh-setting-row { border-bottom-color: rgba(255,255,255,0.10); }
+            .dh-modal.dh-theme-glass .dh-acc {
+                background: rgba(255,255,255,0.06);
+                border: 1px solid rgba(255,255,255,0.10);
+                border-radius: 16px;
+            }
+            .dh-modal.dh-theme-glass .dh-acc-head {
+                background: rgba(255,255,255,0.08);
+                border-radius: 16px;
+            }
+            .dh-modal.dh-theme-glass .dh-switch {
+                background: rgba(255,255,255,0.15);
+                border: 1px solid rgba(255,255,255,0.2);
+            }
+            .dh-modal.dh-theme-glass .dh-switch.on {
+                background: rgba(10,132,255,0.6);
+                border-color: rgba(10,132,255,0.8);
+            }
+            .dh-modal.dh-theme-glass .dh-footer {
+                background: rgba(255,255,255,0.08);
+                border-top: 1px solid rgba(255,255,255,0.12);
+                border-radius: 0 0 28px 28px;
+            }
+            .dh-modal.dh-theme-glass .dh-muted { color: rgba(255,255,255,0.68); }
+            .dh-modal.dh-theme-glass .dh-card-title { color: rgba(255,255,255,0.68); }
+            .dh-modal.dh-theme-glass .dh-setting-label { color: rgba(255,255,255,0.96); }
+            .dh-modal.dh-theme-glass .dh-setting-label small { color: rgba(255,255,255,0.55); }
+            .dh-modal.dh-theme-glass .dh-select {
+                background: rgba(255,255,255,0.10);
+                border-color: rgba(255,255,255,0.12);
+                border-radius: 12px;
+                color: rgba(255,255,255,0.96);
+            }
+            .dh-modal.dh-theme-glass .dh-select-options {
+                background: rgba(30,20,50,0.92);
+                border-color: rgba(255,255,255,0.12);
+                border-radius: 12px;
+                box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+            }
+            .dh-modal.dh-theme-glass .dh-select-option { color: rgba(255,255,255,0.9); }
+            .dh-modal.dh-theme-glass .dh-select-option:hover {
+                background: rgba(255,255,255,0.10);
+            }
+            .dh-modal.dh-theme-glass .dh-lb-row.me {
+                background: rgba(10,132,255,0.2);
+                box-shadow: inset 0 0 0 1.5px rgba(10,132,255,0.6);
+            }
+            .dh-modal.dh-theme-glass .dh-lb-row .gap.up { color: rgba(125,222,142,0.9); }
+            .dh-modal.dh-theme-glass .dh-lb-row .gap.down { color: rgba(255,105,98,0.9); }
+            .dh-modal.dh-theme-glass .dh-status-yes { color: rgba(125,222,142,0.9); }
+            .dh-modal.dh-theme-glass .dh-status-no { color: rgba(255,105,98,0.9); }
+            .dh-modal.dh-theme-glass.dh-min {
+                border-radius: 16px;
+            }
+            .dh-modal.dh-theme-glass.dh-min .dh-titlebar {
+                border-radius: 16px 16px 0 0;
+            }
         `;
     shadow.appendChild(style);
 
@@ -2810,7 +3320,7 @@
                 <div class="dh-setting-row">
                     <div class="dh-setting-label">
                         Тема окна
-                        <small>Win95 / WinXP / Vista / Win11 / MacOS / iOS old / Die my Darling</small>
+                        <small>Win95 / WinXP / Vista / Win11 / M3 Light / M3 Dark / Liquid Glass / MacOS / iOS old / Die my Darling</small>
                     </div>
                     <div class="dh-select" id="dh-set-theme" style="width:160px;flex:0 0 160px">
                         <span class="dh-select-text">Win95</span><span class="dh-select-arrow">▾</span>
@@ -2819,8 +3329,11 @@
                             <div class="dh-select-option" data-theme="xp">WinXP</div>
                             <div class="dh-select-option" data-theme="vista">Vista</div>
                             <div class="dh-select-option" data-theme="win11">Win11</div>
+                            <div class="dh-select-option" data-theme="m3l">Material 3 Light</div>
+                            <div class="dh-select-option" data-theme="m3d">Material 3 Dark</div>
                             <div class="dh-select-option" data-theme="macos">MacOS</div>
                             <div class="dh-select-option" data-theme="iosold">iOS old</div>
+                            <div class="dh-select-option" data-theme="glass">iOS Liquid Glass</div>
                             <div class="dh-select-option" data-theme="dmd">Die my Darling</div>
                         </div>
                     </div>
@@ -3055,7 +3568,7 @@
     els.modal.classList.remove(
       "dh-theme-xp", "dh-theme-vista", "dh-theme-win95",
       "dh-theme-macos", "dh-theme-iosold", "dh-theme-dmd",
-      "dh-theme-win11",
+      "dh-theme-win11", "dh-theme-m3l", "dh-theme-m3d", "dh-theme-glass",
     );
     els.modal.classList.add("dh-theme-" + theme);
     // уведомления тоже под тему
@@ -3064,7 +3577,7 @@
       nbox.className = "dh-notifs dh-theme-" + theme;
     }
     if (els.setThemeText) {
-      const labels = { xp: "WinXP", vista: "Vista", win95: "Win95", macos: "MacOS", iosold: "iOS old", dmd: "Die my Darling", win11: "Win11" };
+      const labels = { xp: "WinXP", vista: "Vista", win95: "Win95", macos: "MacOS", iosold: "iOS old", dmd: "Die my Darling", win11: "Win11", m3l: "Material 3 Light", m3d: "Material 3 Dark", glass: "iOS Liquid Glass" };
       els.setThemeText.textContent = labels[theme] || "Win95";
     }
     if (els.setThemeOpts && els.setThemeOpts.length) {
@@ -7415,7 +7928,7 @@
             <li>Неактивные друзья: streak, XP, массовые действия</li>
             <li>Защита сердец, короткие уроки, автосолвер</li>
             <li>Квесты, магазин, гемы, streak, лига, XP-буст</li>
-            <li>Темы: XP / Vista / Win95</li>
+            <li>Темы: Win95 / WinXP / Vista / Win11 / Material 3 / iOS Liquid Glass / MacOS / iOS old / Die my Darling</li>
           </ul>
           <p style="margin:0 0 10px">
             Часть механик (уроки, квесты, магазин, гемы, лига, XP)
