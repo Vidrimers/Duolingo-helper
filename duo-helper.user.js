@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Duolingo Helper
 // @namespace    https://github.com/Vidrimers/Duolingo-helper
-// @version      0.7.5
+// @version      0.7.7
 // @description  Проверка взаимной подписки на профилях Duolingo. Панель, бейджи, кеш.
 // @author       Vidrimers
 // @match        *://*.duolingo.com/*
@@ -140,9 +140,10 @@
     if (acc.me && String(acc.me.id) !== String(slotId)) {
       acc.me = prev.me && String(prev.me.id) === String(slotId) ? prev.me : null;
     }
-    // сохраняем jwt / username / updatedAt из предыдущего слота
+    // сохраняем jwt / username / label / updatedAt из предыдущего слота
     if (prev.jwt) acc.jwt = prev.jwt;
     if (prev.username) acc.username = prev.username;
+    if (prev.label) acc.label = prev.label;
     if (prev.updatedAt) acc.updatedAt = prev.updatedAt;
     store.accounts[slotId] = acc;
     GM_setValue(STORAGE_KEY, JSON.stringify(store));
@@ -3242,6 +3243,10 @@
                         <div style="margin-top:8px">
                             <div class="dh-setting-label" style="margin-bottom:4px">Аккаунты</div>
                             <div id="dh-acc-list" style="display:flex;flex-direction:column;gap:4px"></div>
+                        </div>
+                        <div style="margin-top:10px">
+                            <div class="dh-card-title">Дашборд</div>
+                            <div id="dh-acc-dashboard" style="display:flex;flex-direction:column;gap:6px"></div>
                         </div>
                     </div></div>
                 </div>
@@ -6429,7 +6434,7 @@
     }
     for (const id of ids) {
       const a = accounts[id];
-      const name = (a.me && a.me.username) || a.username || id;
+      const name = a.label || (a.me && a.me.username) || a.username || id;
       const row = document.createElement("div");
       row.className = "dh-setting-row";
       row.style.borderBottom = "none";
@@ -6446,6 +6451,143 @@
         b.addEventListener("click", () => switchToAccount(id));
       }
       box.appendChild(row);
+    }
+    renderDashboard();
+  }
+
+  /** Дашборд аккаунтов: карточки с информацией и удалением. */
+  function renderDashboard() {
+    const box = shadow && shadow.querySelector("#dh-acc-dashboard");
+    if (!box) return;
+    const store = DATA._store || { accounts: {} };
+    const accounts = store.accounts || {};
+    const curId = DATA._accountId || currentAccountId();
+    const ids = Object.keys(accounts).filter((k) => k !== "anon");
+    box.innerHTML = "";
+    if (!ids.length) {
+      box.innerHTML = '<div class="dh-muted">Нет аккаунтов</div>';
+      return;
+    }
+    for (const id of ids) {
+      const a = accounts[id];
+      const label = a.label || "";
+      const name = label || (a.me && a.me.username) || a.username || "—";
+      const displayName = (a.me && a.me.name) || "";
+      const isCur = id === curId;
+      const updated = a.updatedAt ? fmtTime(a.updatedAt) : "—";
+      const hasJwt = !!a.jwt;
+      // цветовая полоса: зелёная = активен (JWT есть и обновлён недавно), жёлтая = есть JWT но давно, красная = нет JWT
+      const age = a.updatedAt ? (Date.now() - a.updatedAt) / 86400000 : 999;
+      const statusColor = !hasJwt ? "#c0392b" : age < 7 ? "#58CC02" : age < 30 ? "#f39c12" : "#c0392b";
+      const statusText = !hasJwt ? "Нет JWT" : age < 7 ? "Активен" : age < 30 ? "Давно не заходил" : "Неактивен";
+
+      const card = document.createElement("div");
+      card.className = "dh-shop-card";
+      card.style.height = "auto";
+      card.style.padding = "0";
+      card.style.alignItems = "flex-start";
+      card.style.textAlign = "left";
+      card.style.flexDirection = "column";
+      card.style.overflow = "hidden";
+      card.innerHTML = `
+        <div style="width:100%;height:3px;background:${statusColor};flex-shrink:0"></div>
+        <div style="width:100%;padding:10px;display:flex;flex-direction:column;gap:6px">
+          <div style="display:flex;align-items:center;gap:8px;width:100%">
+            <div style="width:34px;height:34px;border-radius:50%;background:${isCur ? "#58CC02" : "#888"};color:#fff;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0">
+              ${name.charAt(0).toUpperCase()}
+            </div>
+            <div style="flex:1;min-width:0">
+              <div style="font-size:12px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${name}${isCur ? " ✓" : ""}</div>
+              ${displayName && displayName !== name ? `<div style="font-size:10px;opacity:0.6">${displayName}</div>` : ""}
+            </div>
+            ${isCur ? "" : `<button class="dh-btn dh-btn-danger" data-del="${id}" style="padding:3px 8px;font-size:10px;flex-shrink:0">✕</button>`}
+          </div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;width:100%">
+            <div style="flex:1;min-width:55px;background:rgba(128,128,128,0.08);border-radius:6px;padding:4px 6px">
+              <div style="font-size:9px;opacity:0.6">🔥 Streak</div>
+              <div style="font-size:13px;font-weight:700" data-streak="${id}">…</div>
+            </div>
+            <div style="flex:1;min-width:55px;background:rgba(128,128,128,0.08);border-radius:6px;padding:4px 6px">
+              <div style="font-size:9px;opacity:0.6">⚡ XP</div>
+              <div style="font-size:13px;font-weight:700" data-xp="${id}">…</div>
+            </div>
+            <div style="flex:1;min-width:55px;background:rgba(128,128,128,0.08);border-radius:6px;padding:4px 6px">
+              <div style="font-size:9px;opacity:0.6">📅 Обновлён</div>
+              <div style="font-size:10px;font-weight:600">${updated}</div>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;width:100%;flex-wrap:wrap">
+            <div style="font-size:9px;opacity:0.6;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">ID: ${id} · JWT: ${hasJwt ? "✓" : "✗"} · ${statusText}</div>
+            <button class="dh-btn" data-open="${id}" style="padding:3px 8px;font-size:10px;flex-shrink:0" title="Открыть профиль Duolingo">👤</button>
+            <button class="dh-btn" data-rename="${id}" style="padding:3px 8px;font-size:10px;flex-shrink:0" title="Переименовать">✏</button>
+            <button class="dh-btn" data-refresh="${id}" style="padding:3px 8px;font-size:10px;flex-shrink:0" title="Обновить данные">🔄</button>
+          </div>
+        </div>`;
+      box.appendChild(card);
+      // подгрузка streak / XP
+      loadAccountStats(id, card);
+      // кнопки
+      card.querySelector("[data-open]")?.addEventListener("click", () => {
+        window.open("https://www.duolingo.com/profile/" + name, "_blank");
+      });
+      card.querySelector("[data-rename]")?.addEventListener("click", async () => {
+        const newLabel = await showPromptPrompt("Ярлык аккаунта", a.label || name);
+        if (newLabel === null) return;
+        const store2 = DATA._store || {};
+        if (!store2.accounts[id]) return;
+        store2.accounts[id].label = newLabel.trim() || undefined;
+        GM_setValue(STORAGE_KEY, JSON.stringify(store2));
+        renderAccounts();
+        showToast("Ярлык обновлён");
+      });
+      card.querySelector("[data-refresh]")?.addEventListener("click", (e) => {
+        e.target.textContent = "…";
+        loadAccountStats(id, card, true);
+      });
+      const delBtn = card.querySelector("[data-del]");
+      if (delBtn) {
+        delBtn.addEventListener("click", async () => {
+          const ok = await showConfirm(
+            `Удалить аккаунт ${name} (${id})?\nДанные и JWT будут стёрты.`,
+            "Удаление аккаунта",
+          );
+          if (!ok) return;
+          delete store.accounts[id];
+          DATA._store = store;
+          GM_setValue(STORAGE_KEY, JSON.stringify(store));
+          renderAccounts();
+          showToast("Аккаунт удалён");
+        });
+      }
+    }
+  }
+
+  /** Загружает streak / XP аккаунта в карточку дашборда. */
+  async function loadAccountStats(id, card, force) {
+    const streakEl = card.querySelector(`[data-streak="${id}"]`);
+    const xpEl = card.querySelector(`[data-xp="${id}"]`);
+    try {
+      const res = await new Promise((resolve) => {
+        GM_xmlhttpRequest({
+          method: "GET",
+          url: `https://www.duolingo.com/2017-06-30/users/${id}?fields=streak,totalXp`,
+          headers: { accept: "application/json" },
+          timeout: 10000,
+          onload(r) {
+            try { resolve(JSON.parse(r.responseText || "{}")); } catch { resolve(null); }
+          },
+          onerror() { resolve(null); },
+          ontimeout() { resolve(null); },
+        });
+      });
+      if (!res) throw new Error("no data");
+      const streak = res.streak ?? (res.body && res.body.streak) ?? "—";
+      const xp = res.totalXp ?? (res.body && res.body.totalXp) ?? "—";
+      if (streakEl) streakEl.textContent = streak;
+      if (xpEl) xpEl.textContent = typeof xp === "number" ? xp.toLocaleString("ru") : xp;
+    } catch {
+      if (streakEl) streakEl.textContent = "—";
+      if (xpEl) xpEl.textContent = "—";
     }
   }
 
@@ -9664,6 +9806,7 @@
           id,
           username: (a.me && a.me.username) || a.username || "",
           displayName: (a.me && a.me.name) || (a.me && a.me.displayName) || "",
+          label: a.label || "",
           updatedAt: a.updatedAt || 0,
           data: {
             settings: a.settings || {},
@@ -10352,6 +10495,7 @@
       if (d.friendChangesUnread != null) acc.friendChangesUnread = Number(d.friendChangesUnread) || 0;
       if (d.userTags && typeof d.userTags === "object") acc.userTags = d.userTags;
       acc.username = entry.username || acc.username || "";
+      acc.label = entry.label || acc.label || "";
       acc.updatedAt = entry.updatedAt || Date.now();
 
       // JWT
@@ -10386,6 +10530,35 @@
   }
 
   /** Модалка ввода пароля. Возвращает строку или null (отмена). */
+  /** Модалка ввода текста. Возвращает строку или null (отмена). */
+  function showPromptPrompt(title, defaultValue) {
+    return new Promise((resolve) => {
+      if (!shadow) return resolve(null);
+      const theme = DATA.settings.theme || "win95";
+      const overlay = document.createElement("div");
+      overlay.className = "dh-confirm-overlay dh-theme-" + theme;
+      overlay.innerHTML = `
+        <div class="dh-confirm-box" style="width:340px">
+          <div class="dh-confirm-title">${title}</div>
+          <div class="dh-confirm-body">
+            <input class="dh-input" id="dh-prompt-input" type="text" style="width:100%" value="${(defaultValue || "").replace(/"/g, "&quot;")}" />
+          </div>
+          <div class="dh-confirm-actions">
+            <button class="dh-btn" data-prompt="cancel">Отмена</button>
+            <button class="dh-btn dh-btn-primary" data-prompt="ok">OK</button>
+          </div>
+        </div>`;
+      shadow.appendChild(overlay);
+      const input = overlay.querySelector("#dh-prompt-input");
+      if (input) { input.focus(); input.select(); }
+      const close = (val) => { overlay.remove(); resolve(val); };
+      overlay.addEventListener("click", (e) => { if (e.target === overlay) close(null); });
+      overlay.querySelector('[data-prompt="cancel"]').addEventListener("click", () => close(null));
+      overlay.querySelector('[data-prompt="ok"]').addEventListener("click", () => close(input ? input.value : ""));
+      if (input) input.addEventListener("keydown", (e) => { if (e.key === "Enter") close(input.value); });
+    });
+  }
+
   function showPasswordPrompt(title) {
     return new Promise((resolve) => {
       if (!shadow) return resolve(null);
