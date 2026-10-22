@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Duolingo Helper
 // @namespace    https://github.com/Vidrimers/Duolingo-helper
-// @version      0.7.7
+// @version      0.7.8
 // @description  Проверка взаимной подписки на профилях Duolingo. Панель, бейджи, кеш.
 // @author       Vidrimers
 // @match        *://*.duolingo.com/*
@@ -3248,6 +3248,15 @@
                             <div class="dh-card-title">Дашборд</div>
                             <div id="dh-acc-dashboard" style="display:flex;flex-direction:column;gap:6px"></div>
                         </div>
+                        <div style="margin-top:10px;padding-top:8px;border-top:1px solid rgba(128,128,128,0.25)">
+                            <div class="dh-setting-row" style="border-bottom:none;padding:4px 0">
+                                <div class="dh-setting-label">
+                                    Скрыть профиль
+                                    <small id="dh-privacy-status">Статус загружается…</small>
+                                </div>
+                                <div class="dh-switch" id="dh-set-privacy"></div>
+                            </div>
+                        </div>
                     </div></div>
                 </div>
 
@@ -3715,6 +3724,8 @@
       setSolver: modal.querySelector("#dh-set-solver"),
       setStories: modal.querySelector("#dh-set-stories"),
       setFreeSuper: modal.querySelector("#dh-set-freesuper"),
+      setPrivacy: modal.querySelector("#dh-set-privacy"),
+      privacyStatus: modal.querySelector("#dh-privacy-status"),
       solveNow: modal.querySelector("#dh-solve-now"),
       apCount: modal.querySelector("#dh-ap-count"),
       apStart: modal.querySelector("#dh-ap-start"),
@@ -6453,6 +6464,59 @@
       box.appendChild(row);
     }
     renderDashboard();
+  }
+
+  // ========== Приватность ==========
+  async function loadPrivacyStatus() {
+    const myId = getMyId();
+    if (!myId || !els.privacyStatus) return;
+    try {
+      const res = await new Promise((resolve) => {
+        GM_xmlhttpRequest({
+          method: "GET",
+          url: `https://www.duolingo.com/2023-05-23/users/${myId}/privacy-settings?fields=privacySettings`,
+          headers: { accept: "application/json" },
+          timeout: 10000,
+          onload(r) { try { resolve(JSON.parse(r.responseText || "{}")); } catch { resolve(null); } },
+          onerror() { resolve(null); },
+          ontimeout() { resolve(null); },
+        });
+      });
+      const ps = (res && (res.privacySettings || (res.body && res.body.privacySettings))) || {};
+      const hidden = !!ps.DISABLE_SOCIAL;
+      if (els.setPrivacy) els.setPrivacy.classList.toggle("on", hidden);
+      if (els.privacyStatus) els.privacyStatus.textContent = hidden ? "Профиль скрыт от других" : "Профиль виден всем";
+    } catch {
+      if (els.privacyStatus) els.privacyStatus.textContent = "Не удалось загрузить статус";
+    }
+  }
+
+  async function togglePrivacy() {
+    const myId = getMyId();
+    if (!myId) return;
+    const isOn = els.setPrivacy && els.setPrivacy.classList.contains("on");
+    const newVal = !isOn;
+    if (els.privacyStatus) els.privacyStatus.textContent = "Сохранение…";
+    try {
+      const res = await new Promise((resolve) => {
+        GM_xmlhttpRequest({
+          method: "PATCH",
+          url: `https://www.duolingo.com/2023-05-23/users/${myId}/privacy-settings?fields=privacySettings`,
+          headers: { accept: "application/json", "content-type": "application/json" },
+          data: JSON.stringify({ DISABLE_SOCIAL: newVal }),
+          timeout: 10000,
+          onload(r) { try { resolve(JSON.parse(r.responseText || "{}")); } catch { resolve(null); } },
+          onerror() { resolve(null); },
+          ontimeout() { resolve(null); },
+        });
+      });
+      if (els.setPrivacy) els.setPrivacy.classList.toggle("on", newVal);
+      if (els.privacyStatus) els.privacyStatus.textContent = newVal ? "Профиль скрыт от других" : "Профиль виден всем";
+      showToast(newVal ? "Профиль скрыт" : "Профиль открыт");
+    } catch {
+      if (els.privacyStatus) els.privacyStatus.textContent = "Ошибка сохранения";
+      showToast("Не удалось изменить приватность", true);
+    }
   }
 
   /** Дашборд аккаунтов: карточки с информацией и удалением. */
@@ -9979,6 +10043,7 @@
     syncSwitches();
     try { captureJWT(); } catch {}
     renderAccounts();
+    try { loadPrivacyStatus(); } catch {}
 
     els.setAuto.addEventListener("click", () => {
       DATA.settings.autoCheck = !DATA.settings.autoCheck;
@@ -10100,6 +10165,9 @@
             : "Free Max / Super выключен",
         );
       });
+    }
+    if (els.setPrivacy) {
+      els.setPrivacy.addEventListener("click", () => togglePrivacy());
     }
     if (els.solveNow) {
       els.solveNow.addEventListener("click", () => solveNow());
