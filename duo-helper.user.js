@@ -1467,6 +1467,166 @@
                 border-bottom-color: rgba(255,255,255,0.12);
                 text-shadow: none;
             }
+            /* Confirm buttons/inputs — Vista */
+            .dh-confirm-overlay.dh-theme-vista .dh-btn {
+                background: linear-gradient(to bottom, #FFFFFF, #E0E8F0);
+                border: 1px solid #A0B0C8;
+                border-radius: 4px;
+                color: #1A2A40;
+            }
+            .dh-confirm-overlay.dh-theme-vista .dh-btn-primary {
+                background: linear-gradient(to bottom, #5B9FE6, #3A7BD5);
+                border-color: #2A6BC5;
+                color: #fff;
+            }
+            /* Confirm buttons/inputs — Win95 already done */
+            /* Confirm buttons/inputs — MacOS */
+            .dh-confirm-overlay.dh-theme-macos .dh-btn {
+                background: linear-gradient(to bottom, #FFFFFF, #E8E8E8);
+                border: 1px solid #B0B0B0;
+                border-radius: 6px;
+                color: #333;
+                font-family: inherit;
+            }
+            .dh-confirm-overlay.dh-theme-macos .dh-btn-primary {
+                background: linear-gradient(to bottom, #5B9FE6, #3A7BD5);
+                border-color: #2A6BC5;
+                color: #fff;
+            }
+            .dh-confirm-overlay.dh-theme-macos .dh-input {
+                border: 1px solid #B0B0B0;
+                border-radius: 5px;
+                background: #fff;
+                color: #333;
+            }
+            .dh-confirm-overlay.dh-theme-macos .dh-setting-label { color: #333; }
+            /* Confirm buttons/inputs — iOS old */
+            .dh-confirm-overlay.dh-theme-iosold .dh-btn {
+                background: linear-gradient(to bottom, #F8F8F8, #D0D0D0);
+                border: 1px solid #A0A0A0;
+                border-radius: 10px;
+                color: #333;
+            }
+            .dh-confirm-overlay.dh-theme-iosold .dh-btn-primary {
+                background: linear-gradient(to bottom, #6AB0F0, #3080D0);
+                border-color: #2060A0;
+                color: #fff;
+            }
+            .dh-confirm-overlay.dh-theme-iosold .dh-input {
+                border: 1px solid #A0A0A0;
+                border-radius: 8px;
+                background: #fff;
+                color: #222;
+            }
+            .dh-confirm-overlay.dh-theme-iosold .dh-setting-label { color: #222; }
+            /* Confirm buttons/inputs — Die my Darling */
+            .dh-confirm-overlay.dh-theme-dmd .dh-btn {
+                background: #2A0808;
+                border: 1px solid #8B0000;
+                border-radius: 2px;
+                color: #FF6666;
+            }
+            .dh-confirm-overlay.dh-theme-dmd .dh-btn-primary {
+                background: #8B0000;
+                border-color: #FF2222;
+                color: #fff;
+            }
+            .dh-confirm-overlay.dh-theme-dmd .dh-input {
+                background: #2A0808;
+                border: 1px solid #8B0000;
+                border-radius: 2px;
+                color: #FFAAAA;
+            }
+            .dh-confirm-overlay.dh-theme-dmd .dh-setting-label { color: #CC9999; }
+            /* Confirm buttons/inputs — Win11 */
+            .dh-confirm-overlay.dh-theme-win11 .dh-btn {
+                background: #FFFFFF;
+                border: 1px solid #E5E5E5;
+                border-radius: 4px;
+                color: #1A1A1A;
+            }
+            .dh-confirm-overlay.dh-theme-win11 .dh-btn-primary {
+                background: #0067C0;
+                border-color: #0067C0;
+                color: #fff;
+            }
+            .dh-confirm-overlay.dh-theme-win11 .dh-input {
+                background: #FFFFFF;
+                border: 1px solid #E5E5E5;
+                border-radius: 4px;
+                color: #1A1A1A;
+            }
+            .dh-confirm-overlay.dh-theme-win11 .dh-setting-label { color: #1A1A1A; }
+            /* Confirm buttons/inputs — Material 3 Light */
+            .dh-confirm-overlay.dh-theme-m3l .dh-btn {
+                background: transparent;
+                border: 1px solid #79747E;
+                border-radius: 9999px;
+                color: #6750A4;
+                font-family: inherit;
+                font-weight: 500;
+            }
+            .dh-confirm-overlay.dh-theme-m3l .dh-btn-primary {
+                background: #6750A4;
+                border-color: #6750A4;
+                color: #fff;
+            }
+            .dh-confirm-overlay.dh-theme-m3l .dh-input {
+                background: #FFFFFF;
+                border: 1px solid #79747E;
+                border-radius: 4px 4px 0 0;
+                border-bottom: 2px solid #79747E;
+                color: #1D1B20;
+            }
+            .dh-confirm-overlay.dh-theme-m3l .dh-setting-label { color: #1D1B20; }
+            /* Confirm buttons/inputs — Material 3 Dark */
+            .dh-confirm-overlay.dh-theme-m3d .dh-btn {
+                background: transparent;
+                border: 1px solid #938F99;
+                border-radius: 9999px;
+                color: #D0BCFF;
+                font-family: inherit;
+                font-weight: 500;
+            }
+            .dh-confirm-overlay.dh-theme-m3d .dh-btn-primary {
+                background: #D0BCFF;
+                border-color: #D0BCFF;
+                color: #381E72;
+            }
+            .dh-confirm-overlay.dh-theme-m3d .dh-input {
+                background: #211F26;
+                border: 1px solid #938F99;
+                border-radius: 4px 4px 0 0;
+                border-bottom: 2px solid #938F99;
+                color: #E6E0E9;
+            }
+            .dh-confirm-overlay.dh-theme-m3d .dh-setting-label { color: #E6E0E9; }
+            /* Confirm buttons/inputs — iOS Liquid Glass */
+            .dh-confirm-overlay.dh-theme-glass {
+                background: rgba(0,0,0,0.25);
+                backdrop-filter: blur(12px);
+                -webkit-backdrop-filter: blur(12px);
+            }
+            .dh-confirm-overlay.dh-theme-glass .dh-btn {
+                background: rgba(255,255,255,0.10);
+                border: 1px solid rgba(255,255,255,0.12);
+                border-radius: 20px;
+                color: rgba(255,255,255,0.96);
+                font-family: inherit;
+            }
+            .dh-confirm-overlay.dh-theme-glass .dh-btn-primary {
+                background: rgba(10,132,255,0.55);
+                border-color: rgba(10,132,255,0.7);
+                color: #fff;
+            }
+            .dh-confirm-overlay.dh-theme-glass .dh-input {
+                background: rgba(255,255,255,0.10);
+                border: 1px solid rgba(255,255,255,0.12);
+                border-radius: 12px;
+                color: rgba(255,255,255,0.96);
+            }
+            .dh-confirm-overlay.dh-theme-glass .dh-setting-label { color: rgba(255,255,255,0.96); }
+            .dh-confirm-overlay.dh-theme-glass .dh-setting-label small { color: rgba(255,255,255,0.55); }
 
             /* ===== Accordion ===== */
             .dh-acc {
@@ -2765,7 +2925,9 @@
 
             /* ======================= THEME: iOS Liquid Glass ======================= */
             .dh-modal.dh-theme-glass {
-                background: radial-gradient(circle at 20% 20%, #3a1c71, #12071f 60%), linear-gradient(160deg, #1b0e30, #05030a);
+                background: rgba(255,255,255,0.06);
+                backdrop-filter: blur(32px) saturate(160%);
+                -webkit-backdrop-filter: blur(32px) saturate(160%);
                 border: 1px solid rgba(255,255,255,0.12);
                 border-radius: 28px;
                 overflow: hidden;
@@ -2774,9 +2936,7 @@
                 font-family: -apple-system, "SF Pro Text", "Helvetica Neue", Helvetica, sans-serif;
             }
             .dh-modal.dh-theme-glass .dh-titlebar {
-                background: rgba(255,255,255,0.10);
-                backdrop-filter: blur(24px) saturate(160%);
-                -webkit-backdrop-filter: blur(24px) saturate(160%);
+                background: rgba(255,255,255,0.08);
                 border-bottom: 1px solid rgba(255,255,255,0.12);
                 border-radius: 28px 28px 0 0;
                 padding: 8px 14px;
@@ -2802,9 +2962,7 @@
                 background: transparent;
             }
             .dh-modal.dh-theme-glass .dh-tabs {
-                background: rgba(255,255,255,0.08);
-                backdrop-filter: blur(24px) saturate(160%);
-                -webkit-backdrop-filter: blur(24px) saturate(160%);
+                background: rgba(255,255,255,0.06);
                 border-bottom: 1px solid rgba(255,255,255,0.12);
                 padding: 6px;
                 gap: 4px;
