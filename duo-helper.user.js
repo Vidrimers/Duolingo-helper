@@ -876,8 +876,11 @@
             /* ===== Shop cards ===== */
             .dh-shop-grid {
                 display: grid;
-                grid-template-columns: 1fr 1fr;
+                grid-template-columns: repeat(2, minmax(0, 1fr));
                 gap: 6px;
+                width: 100%;
+                min-width: 0;
+                box-sizing: border-box;
             }
             .dh-shop-card {
                 display: flex;
@@ -890,9 +893,13 @@
                 border-radius: 8px;
                 text-align: center;
                 transition: box-shadow 0.15s;
+                height: 130px;
+                box-sizing: border-box;
+                min-width: 0;
+                overflow: hidden;
             }
             .dh-shop-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
-            .dh-shop-card .icon { font-size: 22px; line-height: 1; }
+            .dh-shop-card .icon { font-size: 22px; line-height: 1; height: 24px; }
             .dh-shop-card .name {
                 font-size: 11px;
                 font-weight: 700;
@@ -901,16 +908,22 @@
                 text-overflow: ellipsis;
                 white-space: nowrap;
                 max-width: 100%;
+                height: 14px;
             }
             .dh-shop-card .desc {
                 font-size: 9px;
                 color: #777;
                 line-height: 1.2;
+                height: 22px;
+                overflow: hidden;
+                display: -webkit-box;
+                -webkit-line-clamp: 2;
+                -webkit-box-orient: vertical;
             }
             .dh-shop-card .dh-btn {
                 padding: 3px 10px;
                 font-size: 10px;
-                margin-top: 2px;
+                margin-top: auto;
             }
 
             /* ===== League table ===== */
@@ -2015,7 +2028,7 @@
                         </div>
                         <input class="dh-num-input" id="dh-shop-search" type="text" placeholder="Сначала загрузите список" style="width:100%;margin-bottom:4px;font-size:11px;opacity:0.5" disabled />
                         <div class="dh-muted dh-op-status" id="dh-shop-status"></div>
-                        <div id="dh-shop-list" style="margin-top:8px;display:flex;flex-direction:column;gap:6px;max-height:260px;overflow-y:auto"></div>
+                        <div id="dh-shop-list" style="margin-top:8px;display:flex;flex-direction:column;gap:6px"></div>
                     </div></div>
                 </div>
 
@@ -3637,30 +3650,52 @@
         '<div class="dh-muted">Нет незакрытых monthly-квестов</div>';
       return;
     }
+    const grid = document.createElement("div");
+    grid.className = "dh-shop-grid";
     for (const it of items) {
-      const row = document.createElement("div");
-      row.className = "dh-setting-row";
-      row.style.borderBottom = "none";
-      row.style.padding = "4px 0";
-      row.innerHTML =
-        `<div class="dh-setting-label" style="min-width:0">
-            <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${it.title}</div>
-            <small>${it.progress} / ${it.target} · ${it.metric}</small>
+      const pct = Math.min(100, Math.round((it.progress / Math.max(1, it.target)) * 100));
+      const emoji = questEmoji(it.metric);
+      const card = document.createElement("div");
+      card.className = "dh-shop-card";
+      card.innerHTML = `
+        <div class="icon">${emoji}</div>
+        <div class="name">${it.title}</div>
+        <div class="desc">${it.progress} / ${it.target} · ${it.metric}</div>
+        <div style="width:100%;height:4px;background:rgba(0,0,0,0.1);border-radius:2px;overflow:hidden;flex-shrink:0">
+          <div style="width:${pct}%;height:100%;background:#58CC02;border-radius:2px"></div>
         </div>
-        <button class="dh-btn" style="padding:4px 10px;font-size:11px">GET</button>`;
-      const b = row.querySelector("button");
+        <button class="dh-btn">Получить</button>`;
+      const b = card.querySelector("button");
       b.addEventListener("click", async () => {
         b.disabled = true;
         b.textContent = "…";
         const ok = await claimMonthlyOne(it);
-        b.textContent = ok ? "✓" : "ERR";
+        b.textContent = ok ? "✓ Получено" : "Ошибка";
         if (ok) {
           showToast("✓ " + it.title);
           setTimeout(() => loadMonthlyQuests(), 900);
+        } else {
+          setTimeout(() => {
+            b.disabled = false;
+            b.textContent = "Получить";
+          }, 2500);
         }
       });
-      els.questList.appendChild(row);
+      grid.appendChild(card);
     }
+    els.questList.appendChild(grid);
+  }
+
+  /** Эмодзи для метрики квеста. */
+  function questEmoji(metric) {
+    const m = String(metric).toUpperCase();
+    if (m === "XP") return "⚡";
+    if (m === "LESSONS") return "📚";
+    if (m === "QUESTS") return "📜";
+    if (m === "PERFECT_LESSONS") return "⭐";
+    if (m === "NINETY_ACCURACY_LESSONS") return "🎯";
+    if (m === "STREAK") return "🔥";
+    return "🏆";
   }
 
   function buildMonthlyItems(schema, progressRes) {
