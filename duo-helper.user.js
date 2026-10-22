@@ -6324,6 +6324,7 @@
     if (els.setDelay) els.setDelay.value = DATA.settings.requestDelay;
     if (els.setNotify) els.setNotify.value = DATA.settings.notifyHideSec || 5;
     if (els.setInactive) els.setInactive.value = DATA.settings.inactiveDays;
+    if (els.setFreeSuper) els.setFreeSuper.classList.toggle("on", !!DATA.settings.freeSuper);
   }
 
   /** Обновляет UI после смены аккаунта (тема, позиция, списки). */
