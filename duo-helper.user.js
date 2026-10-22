@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Duolingo Helper
 // @namespace    https://github.com/Vidrimers/Duolingo-helper
-// @version      0.6.8
+// @version      0.7.0
 // @description  Проверка взаимной подписки на профилях Duolingo. Панель, бейджи, кеш.
 // @author       Vidrimers
 // @match        *://*.duolingo.com/*
@@ -873,6 +873,95 @@
                 margin-top: 1px;
             }
 
+            /* ===== Shop cards ===== */
+            .dh-shop-grid {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 6px;
+            }
+            .dh-shop-card {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                gap: 4px;
+                padding: 10px 6px 8px;
+                background: #FDFCF5;
+                border: 1px solid #D6D2B8;
+                border-radius: 8px;
+                text-align: center;
+                transition: box-shadow 0.15s;
+            }
+            .dh-shop-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+            .dh-shop-card .icon { font-size: 22px; line-height: 1; }
+            .dh-shop-card .name {
+                font-size: 11px;
+                font-weight: 700;
+                color: #333;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+                max-width: 100%;
+            }
+            .dh-shop-card .desc {
+                font-size: 9px;
+                color: #777;
+                line-height: 1.2;
+            }
+            .dh-shop-card .dh-btn {
+                padding: 3px 10px;
+                font-size: 10px;
+                margin-top: 2px;
+            }
+
+            /* ===== League table ===== */
+            .dh-lb-table {
+                display: flex;
+                flex-direction: column;
+                gap: 2px;
+            }
+            .dh-lb-row {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                padding: 5px 8px;
+                border-radius: 6px;
+                font-size: 11px;
+                transition: background 0.15s;
+            }
+            .dh-lb-row:nth-child(odd) { background: rgba(0,0,0,0.03); }
+            .dh-lb-row.me {
+                background: rgba(88,204,2,0.15);
+                font-weight: 700;
+                box-shadow: inset 0 0 0 1.5px #58CC02;
+            }
+            .dh-lb-row .rank {
+                width: 32px;
+                text-align: center;
+                font-size: 14px;
+                flex-shrink: 0;
+            }
+            .dh-lb-row .name {
+                flex: 1;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+            }
+            .dh-lb-row .score {
+                flex-shrink: 0;
+                font-variant-numeric: tabular-nums;
+                font-weight: 700;
+            }
+            .dh-lb-row .gap {
+                flex-shrink: 0;
+                width: 52px;
+                text-align: right;
+                font-size: 10px;
+                color: #777;
+                font-variant-numeric: tabular-nums;
+            }
+            .dh-lb-row .gap.up { color: #1F7A1F; }
+            .dh-lb-row .gap.down { color: #B02A1E; }
+
             .dh-switch {
                 position: relative;
                 width: 40px;
@@ -1377,6 +1466,15 @@
                 background: linear-gradient(to bottom, #7EC27E, #2F7D3B);
                 border-color: #2A6B33;
             }
+            .dh-modal.dh-theme-vista .dh-shop-card {
+                background: #F7F9FC;
+                border-color: #B8CCE0;
+                border-radius: 10px;
+            }
+            .dh-modal.dh-theme-vista .dh-lb-row.me {
+                background: rgba(100,180,255,0.15);
+                box-shadow: inset 0 0 0 1.5px #4A90D9;
+            }
 
             /* ======================= THEME: Windows 95 ======================= */
             .dh-modal.dh-theme-win95 {
@@ -1607,6 +1705,20 @@
             .dh-modal.dh-theme-win95 .dh-status-no { color: #800000; }
             .dh-modal.dh-theme-win95 .dh-status-checking { color: #804000; }
             .dh-modal.dh-theme-win95 .dh-status-error { color: #804000; }
+            .dh-modal.dh-theme-win95 .dh-shop-card {
+                background: #C0C0C0;
+                border: 2px solid;
+                border-color: #FFF #808080 #808080 #FFF;
+                border-radius: 0;
+            }
+            .dh-modal.dh-theme-win95 .dh-shop-card .name { color: #000; }
+            .dh-modal.dh-theme-win95 .dh-shop-card .desc { color: #404040; }
+            .dh-modal.dh-theme-win95 .dh-lb-row.me {
+                background: #000080;
+                color: #fff;
+                box-shadow: none;
+            }
+            .dh-modal.dh-theme-win95 .dh-lb-row.me .gap { color: #ccc; }
         `;
     shadow.appendChild(style);
 
@@ -1901,6 +2013,7 @@
                             <button class="dh-btn dh-btn-primary" id="dh-shop-load">Загрузить</button>
                             <button class="dh-btn dh-btn-danger" id="dh-shop-super">Super 3 дня</button>
                         </div>
+                        <input class="dh-num-input" id="dh-shop-search" type="text" placeholder="Сначала загрузите список" style="width:100%;margin-bottom:4px;font-size:11px;opacity:0.5" disabled />
                         <div class="dh-muted dh-op-status" id="dh-shop-status"></div>
                         <div id="dh-shop-list" style="margin-top:8px;display:flex;flex-direction:column;gap:6px;max-height:260px;overflow-y:auto"></div>
                     </div></div>
@@ -2147,6 +2260,7 @@
       questList: modal.querySelector("#dh-quest-list"),
       shopLoad: modal.querySelector("#dh-shop-load"),
       shopSuper: modal.querySelector("#dh-shop-super"),
+      shopSearch: modal.querySelector("#dh-shop-search"),
       shopStatus: modal.querySelector("#dh-shop-status"),
       shopList: modal.querySelector("#dh-shop-list"),
       gemsOnce: modal.querySelector("#dh-gems-once"),
@@ -3693,6 +3807,21 @@
   // ⚠️ Выдача предметов isFree — чит, на свой страх и риск.
 
   /** Человекочитаемые названия предметов магазина + количество/цена. */
+  /** Эмодзи-иконка для предмета магазина. */
+  function shopEmoji(id) {
+    const s = String(id).toLowerCase();
+    if (s.includes("streak_freeze") || s.includes("streak_shield")) return "🧊";
+    if (s.includes("streak_repair")) return "🔧";
+    if (s.includes("xp_boost") || s.includes("double_xp")) return "⚡";
+    if (s.includes("health") || s.includes("heart")) return "❤️";
+    if (s.includes("gem") || s.includes("crystal")) return "💎";
+    if (s.includes("outfit") || s.includes("skin")) return "👕";
+    if (s.includes("immersive") || s.includes("super")) return "⭐";
+    if (s.includes("legendary")) return "🏆";
+    if (s.includes("quest")) return "📜";
+    return "📦";
+  }
+
   function describeShopItem(item) {
     const id = String(item.id || "");
     const idLow = id.toLowerCase();
@@ -3823,14 +3952,61 @@
     return status === 200 || status === 201;
   }
 
+  var shopCache = [];
+
+  /** Проверяет, появился ли предмет в shopItems пользователя. */
+  async function verifyShopItem(itemName) {
+    try {
+      const myId = getMyId();
+      if (!myId) return null;
+      const res = await new Promise((resolve) => {
+        GM_xmlhttpRequest({
+          method: "GET",
+          url: `https://www.duolingo.com/2023-05-23/users/${myId}?fields=shopItems`,
+          headers: { accept: "application/json" },
+          timeout: 10000,
+          onload(resp) {
+            try {
+              resolve(JSON.parse(resp.responseText || "{}"));
+            } catch {
+              resolve(null);
+            }
+          },
+          onerror() { resolve(null); },
+          ontimeout() { resolve(null); },
+        });
+      });
+      if (!res) return null;
+      const list = res.shopItems || (res.body && res.body.shopItems) || [];
+      return list.some((s) => {
+        const id = String(s.itemName || s.id || s.name || "").toLowerCase();
+        return id === String(itemName).toLowerCase() || id.includes(String(itemName).toLowerCase());
+      });
+    } catch {
+      return null;
+    }
+  }
+
   function renderShopItems(items) {
+    shopCache = items || [];
+    renderShopFiltered();
+  }
+  function renderShopFiltered() {
     if (!els.shopList) return;
+    const q = (els.shopSearch && els.shopSearch.value || "").trim().toLowerCase();
+    const items = shopCache;
     els.shopList.innerHTML = "";
     const valid = items.filter(
       (i) => (i.currencyType === "XGM" || !i.currencyType) && !(i.id || "").includes("gift"),
     );
-    if (!valid.length) {
-      els.shopList.innerHTML = '<div class="dh-muted">Нет предметов</div>';
+    const filtered = q
+      ? valid.filter((i) =>
+          (i.id || "").toLowerCase().includes(q) ||
+          (i.name || "").toLowerCase().includes(q)
+        )
+      : valid;
+    if (!filtered.length) {
+      els.shopList.innerHTML = '<div class="dh-muted">' + (q ? "Ничего не найдено" : "Нет предметов") + "</div>";
       return;
     }
     const order = [
@@ -3843,7 +4019,7 @@
     ];
     const used = new Set();
     for (const [label, pred] of order) {
-      const group = valid.filter((i) => {
+      const group = filtered.filter((i) => {
         if (used.has(i.id)) return false;
         if (!pred((i.id || "").toLowerCase(), i)) return false;
         used.add(i.id);
@@ -3855,31 +4031,48 @@
       head.style.marginTop = "6px";
       head.textContent = label;
       els.shopList.appendChild(head);
+      const grid = document.createElement("div");
+      grid.className = "dh-shop-grid";
       for (const item of group) {
         const info = describeShopItem(item);
-        const row = document.createElement("div");
-        row.className = "dh-setting-row";
-        row.style.borderBottom = "none";
-        row.style.padding = "3px 0";
-        row.innerHTML = `<div class="dh-setting-label" style="min-width:0">
-            <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${info.name}</div>
-            <small>${info.desc}</small>
-        </div>
-        <button class="dh-btn" style="padding:4px 10px;font-size:11px">GET</button>`;
-        const b = row.querySelector("button");
+        const card = document.createElement("div");
+        card.className = "dh-shop-card";
+        const emoji = shopEmoji(item.id || "");
+        card.innerHTML = `
+            <div class="icon">${emoji}</div>
+            <div class="name">${info.name}</div>
+            <div class="desc">${info.desc}</div>
+            <button class="dh-btn">Получить</button>`;
+        const b = card.querySelector("button");
         b.addEventListener("click", async () => {
           b.disabled = true;
           b.textContent = "…";
           const ok = await buyShopItem(item.id);
-          b.textContent = ok ? "✓" : "ERR";
-          showToast(ok ? "✓ " + info.name : "Не удалось: " + info.name, !ok);
+          if (!ok) {
+            b.textContent = "Ошибка";
+            showToast("Не удалось: " + info.name, true);
+            setTimeout(() => {
+              b.disabled = false;
+              b.textContent = "Получить";
+            }, 2500);
+            return;
+          }
+          const verified = await verifyShopItem(item.id);
+          if (verified === true) {
+            b.textContent = "✓ Получено";
+            showToast("✓ " + info.name);
+          } else {
+            b.textContent = "?";
+            showToast("? " + info.name + " — проверь в аккаунте");
+          }
           setTimeout(() => {
             b.disabled = false;
-            b.textContent = "GET";
+            b.textContent = "Получить";
           }, 2500);
         });
-        els.shopList.appendChild(row);
+        grid.appendChild(card);
       }
+      els.shopList.appendChild(grid);
     }
   }
 
@@ -3909,6 +4102,11 @@
       const items = (JSON.parse(res.text || "{}").shopItems) || [];
       renderShopItems(items);
       setShopStatus("Предметов: " + items.length);
+      if (els.shopSearch) {
+        els.shopSearch.disabled = false;
+        els.shopSearch.style.opacity = "1";
+        els.shopSearch.placeholder = "Поиск предметов…";
+      }
     } catch (e) {
       setShopStatus("Ошибка: " + (e && e.message));
       showToast(e && e.message ? e.message : "Ошибка магазина", true);
@@ -4427,23 +4625,23 @@
     rankings.forEach((u, i) => {
       const row = document.createElement("div");
       const me = String(u.user_id) === myId;
-      row.className = "dh-setting-row";
-      row.style.borderBottom = "none";
-      row.style.padding = "3px 0";
-      row.style.background = me ? "rgba(88,204,2,0.12)" : "transparent";
-      row.style.borderRadius = "6px";
+      row.className = "dh-lb-row" + (me ? " me" : "");
       const gap = Number(u.score || 0) - myScore;
-      const gapTxt = me
-        ? "это ты"
-        : gap > 0
-          ? "+" + gap
-          : String(gap);
-      row.innerHTML = `<div class="dh-setting-label" style="min-width:0">
-          <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
-            #${i + 1} ${u.display_name || u.name || u.username || u.user_id}
-          </div>
-          <small>${Number(u.score || 0)} XP · ${gapTxt}${u.is_promoted ? " · ↑" : ""}${u.is_demoted ? " · ↓" : ""}</small>
-        </div>`;
+      const medal = i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : "";
+      const rankTxt = medal || (i + 1);
+      let gapHtml = "";
+      if (me) {
+        gapHtml = '<span class="gap">ты</span>';
+      } else {
+        const g = gap > 0 ? "+" + gap : String(gap);
+        const cls = gap > 0 ? "up" : gap < 0 ? "down" : "";
+        gapHtml = `<span class="gap ${cls}">${g}</span>`;
+      }
+      row.innerHTML = `
+        <span class="rank">${rankTxt}</span>
+        <span class="name">${u.display_name || u.name || u.username || u.user_id}</span>
+        <span class="score">${Number(u.score || 0)}</span>
+        ${gapHtml}`;
       els.lbList.appendChild(row);
     });
 
@@ -8064,6 +8262,9 @@
 
     if (els.shopLoad) {
       els.shopLoad.addEventListener("click", () => loadShop());
+    }
+    if (els.shopSearch) {
+      els.shopSearch.addEventListener("input", () => renderShopFiltered());
     }
     if (els.shopSuper) {
       els.shopSuper.addEventListener("click", () => buySuper3Days());
