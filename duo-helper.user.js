@@ -1309,17 +1309,6 @@
                 color: #fff;
             }
 
-            .dh-placeholder {
-                color: #666;
-                font-size: 11px;
-                text-align: center;
-                padding: 16px 10px;
-                border: 1px dashed #B0A98C;
-                border-radius: 2px;
-                background: #F5F2E2;
-                font-family: Tahoma, sans-serif;
-            }
-
             /* ===== Update banner (XP) ===== */
             .dh-update-banner {
                 display: none;
@@ -2098,14 +2087,6 @@
             .dh-modal.dh-theme-win95 .dh-footer {
                 background: #C0C0C0;
                 border-top: 1px solid #808080;
-            }
-            .dh-modal.dh-theme-win95 .dh-placeholder {
-                background: #C0C0C0;
-                border: 2px solid;
-                border-color: #808080 #FFF #FFF #808080;
-                border-radius: 0;
-                color: #000;
-                font-family: inherit;
             }
             .dh-modal.dh-theme-win95 .dh-update-banner {
                 background: #C0C0C0;
@@ -3558,11 +3539,6 @@
                         <div class="dh-muted dh-op-status" id="dh-lb-status"></div>
                         <div id="dh-lb-list" style="margin-top:8px;display:flex;flex-direction:column;gap:4px"></div>
                     </div></div>
-                </div>
-
-                <div class="dh-placeholder">
-                    🔜 Дальше: Free Max,<br/>
-                    аккаунты, privacy
                 </div>
             </div>
 
