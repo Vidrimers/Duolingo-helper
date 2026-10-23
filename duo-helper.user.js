@@ -6668,12 +6668,12 @@
       const today = new Date(now).toISOString().slice(0, 10);
       const last = stats.lastSnapshot;
 
-      // записываем XP за день (разницу)
+      // записываем XP за день (накапливаем разницу)
       if (last && last.totalXp != null) {
         const delta = totalXp - last.totalXp;
         const existing = stats.xpLog.find((e) => e.date === today);
         if (existing) {
-          existing.xp = Math.max(0, delta);
+          existing.xp = Math.max(0, existing.xp + Math.max(0, delta));
         } else {
           stats.xpLog.push({ date: today, xp: Math.max(0, delta) });
         }
