@@ -3303,22 +3303,41 @@
                     </button>
                     <div class="dh-acc-body"><div class="dh-acc-inner">
                         <div id="dh-tags-form">
-                            <div class="dh-muted" id="dh-tags-user">Для текущего профиля</div>
-                            <div class="dh-setting-row" style="border-bottom:none;padding:4px 0">
-                                <div class="dh-setting-label">Текст метки</div>
-                                <input class="dh-input" id="dh-tag-label" maxlength="40" style="width:170px" />
+                            <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px">
+                                <span style="font-size:16px">🏷</span>
+                                <div class="dh-muted" id="dh-tags-user" style="font-size:11px">Метка для профиля</div>
                             </div>
-                            <div class="dh-setting-row" style="border-bottom:none;padding:4px 0">
-                                <div class="dh-setting-label">Цвет</div>
-                                <input type="color" id="dh-tag-color" class="dh-num-input" style="width:48px;height:32px;padding:2px" value="#58cc02" />
+                            <div style="margin-bottom:8px">
+                                <div style="font-size:10px;opacity:0.6;margin-bottom:3px">Текст</div>
+                                <input class="dh-input" id="dh-tag-label" maxlength="40" style="width:100%" />
                             </div>
-                            <div class="dh-setting-row" style="border-bottom:none;padding:4px 0">
-                                <div class="dh-setting-label">Заметка</div>
-                                <input class="dh-input" id="dh-tag-note" maxlength="120" style="width:170px" />
+                            <div style="display:flex;gap:8px;margin-bottom:10px">
+                                <div style="flex:1">
+                                    <div style="font-size:10px;opacity:0.6;margin-bottom:3px">Цвет</div>
+                                    <input type="hidden" id="dh-tag-color" value="#58cc02" />
+                                    <div id="dh-tag-palette" style="display:flex;flex-wrap:wrap;gap:5px">
+                                        <button type="button" data-color="#58CC02" class="dh-swatch active" style="width:22px;height:22px;border-radius:50%;background:#58CC02;border:2px solid #fff;box-shadow:0 0 0 1.5px #58CC02;cursor:pointer;padding:0"></button>
+                                        <button type="button" data-color="#1CB0F6" class="dh-swatch" style="width:22px;height:22px;border-radius:50%;background:#1CB0F6;border:2px solid #fff;box-shadow:0 0 0 1.5px transparent;cursor:pointer;padding:0"></button>
+                                        <button type="button" data-color="#CE82FF" class="dh-swatch" style="width:22px;height:22px;border-radius:50%;background:#CE82FF;border:2px solid #fff;box-shadow:0 0 0 1.5px transparent;cursor:pointer;padding:0"></button>
+                                        <button type="button" data-color="#FF4B4B" class="dh-swatch" style="width:22px;height:22px;border-radius:50%;background:#FF4B4B;border:2px solid #fff;box-shadow:0 0 0 1.5px transparent;cursor:pointer;padding:0"></button>
+                                        <button type="button" data-color="#FF9600" class="dh-swatch" style="width:22px;height:22px;border-radius:50%;background:#FF9600;border:2px solid #fff;box-shadow:0 0 0 1.5px transparent;cursor:pointer;padding:0"></button>
+                                        <button type="button" data-color="#FFC800" class="dh-swatch" style="width:22px;height:22px;border-radius:50%;background:#FFC800;border:2px solid #fff;box-shadow:0 0 0 1.5px transparent;cursor:pointer;padding:0"></button>
+                                        <button type="button" data-color="#FF6482" class="dh-swatch" style="width:22px;height:22px;border-radius:50%;background:#FF6482;border:2px solid #fff;box-shadow:0 0 0 1.5px transparent;cursor:pointer;padding:0"></button>
+                                        <button type="button" data-color="#00CCAA" class="dh-swatch" style="width:22px;height:22px;border-radius:50%;background:#00CCAA;border:2px solid #fff;box-shadow:0 0 0 1.5px transparent;cursor:pointer;padding:0"></button>
+                                        <button type="button" data-color="#0078D4" class="dh-swatch" style="width:22px;height:22px;border-radius:50%;background:#0078D4;border:2px solid #fff;box-shadow:0 0 0 1.5px transparent;cursor:pointer;padding:0"></button>
+                                        <button type="button" data-color="#8B5CF6" class="dh-swatch" style="width:22px;height:22px;border-radius:50%;background:#8B5CF6;border:2px solid #fff;box-shadow:0 0 0 1.5px transparent;cursor:pointer;padding:0"></button>
+                                        <button type="button" data-color="#6B7280" class="dh-swatch" style="width:22px;height:22px;border-radius:50%;background:#6B7280;border:2px solid #fff;box-shadow:0 0 0 1.5px transparent;cursor:pointer;padding:0"></button>
+                                        <button type="button" data-color="#1A1A1A" class="dh-swatch" style="width:22px;height:22px;border-radius:50%;background:#1A1A1A;border:2px solid #fff;box-shadow:0 0 0 1.5px transparent;cursor:pointer;padding:0"></button>
+                                    </div>
+                                </div>
+                                <div style="flex:1">
+                                    <div style="font-size:10px;opacity:0.6;margin-bottom:3px">Заметка</div>
+                                    <input class="dh-input" id="dh-tag-note" maxlength="120" style="width:100%" />
+                                </div>
                             </div>
+                            <button class="dh-btn dh-btn-primary" id="dh-tag-save" style="width:100%">Сохранить метку</button>
                         </div>
-                        <div class="dh-row" style="margin-top:6px">
-                            <button class="dh-btn dh-btn-primary" id="dh-tag-save">Сохранить метку</button>
+                        <div class="dh-row" style="margin-top:8px">
                             <button type="button" id="dh-tags-open" style="background:none;border:none;color:#888;cursor:pointer;font:inherit;font-size:11px;padding:0;text-decoration:underline">Люди с метками<span id="dh-tags-badge" style="display:none;margin-left:3px;color:#888;font-size:11px;font-weight:400;text-decoration:none"></span></button>
                             <button type="button" id="dh-tags-back" style="display:none;background:none;border:none;color:#888;cursor:pointer;font:inherit;font-size:11px;padding:0;text-decoration:underline">← Назад</button>
                         </div>
@@ -8962,28 +8981,41 @@ function savePage() {
     const theme = DATA.settings.theme || "win95";
     const id = String(user.userId || "");
     const cur = findTagByUser(user.userId, user.username) || {};
-    // ключ сохранения: userId если есть, иначе username
     const saveKey = id || String(user.username || "").toLowerCase().replace(/^@/, "");
     const overlay = document.createElement("div");
     overlay.className = "dh-confirm-overlay dh-theme-" + theme;
     overlay.innerHTML = `
       <div class="dh-confirm-box" style="width:380px">
-        <div class="dh-confirm-title">Метка</div>
+        <div class="dh-confirm-title">🏷 Метка</div>
         <div class="dh-confirm-body">
-          <div class="dh-muted" style="margin-bottom:8px">
+          <div class="dh-muted" style="margin-bottom:10px;font-size:11px">
             ${user.name || user.username || id}
           </div>
-          <div class="dh-setting-row" style="border-bottom:none;padding:4px 0">
-            <div class="dh-setting-label">Текст метки</div>
-            <input class="dh-input" data-tag="label" maxlength="40" style="width:180px" />
+          <div style="margin-bottom:8px">
+            <div style="font-size:10px;opacity:0.6;margin-bottom:3px">Текст</div>
+            <input class="dh-input" data-tag="label" maxlength="40" style="width:100%" />
           </div>
-          <div class="dh-setting-row" style="border-bottom:none;padding:4px 0">
-            <div class="dh-setting-label">Цвет</div>
-            <input type="color" data-tag="color" class="dh-num-input" style="width:48px;height:32px;padding:2px" />
+          <div style="margin-bottom:8px">
+            <div style="font-size:10px;opacity:0.6;margin-bottom:3px">Цвет</div>
+            <input type="hidden" data-tag="color" value="#58CC02" />
+            <div data-tag="palette" style="display:flex;flex-wrap:wrap;gap:5px">
+              <button type="button" data-color="#58CC02" style="width:22px;height:22px;border-radius:50%;background:#58CC02;border:2px solid #fff;box-shadow:0 0 0 1.5px #58CC02;cursor:pointer;padding:0"></button>
+              <button type="button" data-color="#1CB0F6" style="width:22px;height:22px;border-radius:50%;background:#1CB0F6;border:2px solid #fff;box-shadow:0 0 0 1.5px transparent;cursor:pointer;padding:0"></button>
+              <button type="button" data-color="#CE82FF" style="width:22px;height:22px;border-radius:50%;background:#CE82FF;border:2px solid #fff;box-shadow:0 0 0 1.5px transparent;cursor:pointer;padding:0"></button>
+              <button type="button" data-color="#FF4B4B" style="width:22px;height:22px;border-radius:50%;background:#FF4B4B;border:2px solid #fff;box-shadow:0 0 0 1.5px transparent;cursor:pointer;padding:0"></button>
+              <button type="button" data-color="#FF9600" style="width:22px;height:22px;border-radius:50%;background:#FF9600;border:2px solid #fff;box-shadow:0 0 0 1.5px transparent;cursor:pointer;padding:0"></button>
+              <button type="button" data-color="#FFC800" style="width:22px;height:22px;border-radius:50%;background:#FFC800;border:2px solid #fff;box-shadow:0 0 0 1.5px transparent;cursor:pointer;padding:0"></button>
+              <button type="button" data-color="#FF6482" style="width:22px;height:22px;border-radius:50%;background:#FF6482;border:2px solid #fff;box-shadow:0 0 0 1.5px transparent;cursor:pointer;padding:0"></button>
+              <button type="button" data-color="#00CCAA" style="width:22px;height:22px;border-radius:50%;background:#00CCAA;border:2px solid #fff;box-shadow:0 0 0 1.5px transparent;cursor:pointer;padding:0"></button>
+              <button type="button" data-color="#0078D4" style="width:22px;height:22px;border-radius:50%;background:#0078D4;border:2px solid #fff;box-shadow:0 0 0 1.5px transparent;cursor:pointer;padding:0"></button>
+              <button type="button" data-color="#8B5CF6" style="width:22px;height:22px;border-radius:50%;background:#8B5CF6;border:2px solid #fff;box-shadow:0 0 0 1.5px transparent;cursor:pointer;padding:0"></button>
+              <button type="button" data-color="#6B7280" style="width:22px;height:22px;border-radius:50%;background:#6B7280;border:2px solid #fff;box-shadow:0 0 0 1.5px transparent;cursor:pointer;padding:0"></button>
+              <button type="button" data-color="#1A1A1A" style="width:22px;height:22px;border-radius:50%;background:#1A1A1A;border:2px solid #fff;box-shadow:0 0 0 1.5px transparent;cursor:pointer;padding:0"></button>
+            </div>
           </div>
-          <div class="dh-setting-row" style="border-bottom:none;padding:4px 0">
-            <div class="dh-setting-label">Заметка</div>
-            <input class="dh-input" data-tag="note" maxlength="120" style="width:180px" />
+          <div style="margin-bottom:4px">
+            <div style="font-size:10px;opacity:0.6;margin-bottom:3px">Заметка</div>
+            <input class="dh-input" data-tag="note" maxlength="120" style="width:100%" />
           </div>
         </div>
         <div class="dh-confirm-actions">
@@ -8996,9 +9028,28 @@ function savePage() {
     const labelIn = overlay.querySelector('[data-tag="label"]');
     const colorIn = overlay.querySelector('[data-tag="color"]');
     const noteIn = overlay.querySelector('[data-tag="note"]');
+    const paletteEl = overlay.querySelector('[data-tag="palette"]');
     labelIn.value = cur.label || "";
-    colorIn.value = cur.color || "#58cc02";
+    colorIn.value = cur.color || "#58CC02";
     noteIn.value = cur.note || "";
+
+    // синхронизация палитры
+    function syncPal() {
+      if (!paletteEl) return;
+      paletteEl.querySelectorAll("[data-color]").forEach((s) => {
+        const isActive = s.dataset.color === colorIn.value;
+        s.style.boxShadow = isActive ? `0 0 0 1.5px ${colorIn.value}` : "0 0 0 1.5px transparent";
+      });
+    }
+    syncPal();
+    if (paletteEl) {
+      paletteEl.addEventListener("click", (e) => {
+        const btn = e.target.closest("[data-color]");
+        if (!btn) return;
+        colorIn.value = btn.dataset.color;
+        syncPal();
+      });
+    }
 
     const close = () => overlay.remove();
     overlay.addEventListener("click", (e) => {
@@ -9092,17 +9143,32 @@ function savePage() {
     const uname = getProfileUsername();
     if (!els.tagLabel) return;
     if (!uname) {
-      if (els.tagsUser) els.tagsUser.textContent = "Открой профиль пользователя";
+      if (els.tagsUser) els.tagsUser.textContent = "Метка для профиля";
       els.tagLabel.value = "";
       els.tagNote.value = "";
-      els.tagColor.value = "#58cc02";
+      els.tagColor.value = "#58CC02";
+      syncTagPalette("#58CC02");
       return;
     }
     const tag = findTagByUser(null, uname) || {};
-    if (els.tagsUser) els.tagsUser.textContent = "Профиль @" + uname;
+    if (els.tagsUser) els.tagsUser.textContent = "Метка для @" + uname;
     els.tagLabel.value = tag.label || "";
     els.tagNote.value = tag.note || "";
-    els.tagColor.value = tag.color || "#58cc02";
+    els.tagColor.value = tag.color || "#58CC02";
+    syncTagPalette(els.tagColor.value);
+  }
+
+  /** Подсвечивает активный цвет в палитре. */
+  function syncTagPalette(color) {
+    const palette = shadow && shadow.querySelector("#dh-tag-palette");
+    if (!palette) return;
+    palette.querySelectorAll(".dh-swatch").forEach((s) => {
+      const isActive = s.dataset.color === color;
+      s.classList.toggle("active", isActive);
+      s.style.boxShadow = isActive
+        ? `0 0 0 1.5px ${color}`
+        : "0 0 0 1.5px transparent";
+    });
   }
 
   function saveTagFromForm() {
@@ -10810,6 +10876,23 @@ function savePage() {
     }
     if (els.tagSave) {
       els.tagSave.addEventListener("click", () => saveTagFromForm());
+    }
+    // палитра цветов метки
+    const palette = shadow && shadow.querySelector("#dh-tag-palette");
+    if (palette) {
+      palette.addEventListener("click", (e) => {
+        const btn = e.target.closest("[data-color]");
+        if (!btn) return;
+        const color = btn.dataset.color;
+        if (els.tagColor) els.tagColor.value = color;
+        palette.querySelectorAll(".dh-swatch").forEach((s) => {
+          const isActive = s === btn;
+          s.classList.toggle("active", isActive);
+          s.style.boxShadow = isActive
+            ? `0 0 0 1.5px ${color}`
+            : "0 0 0 1.5px transparent";
+        });
+      });
     }
     if (els.historyOpen) {
       els.historyOpen.addEventListener("click", () => showHistoryView());
