@@ -3648,7 +3648,6 @@
                 <div class="dh-setting-row">
                     <div class="dh-setting-label">
                         Тема окна
-                        <small>Win95 / WinXP / Vista / Win11 / M3 Light / M3 Dark / Liquid Glass / MacOS / iOS old / Die my Darling</small>
                     </div>
                     <div class="dh-select" id="dh-set-theme" style="width:160px;flex:0 0 160px">
                         <span class="dh-select-text">Win95</span><span class="dh-select-arrow">▾</span>
@@ -9088,33 +9087,49 @@ function savePage() {
     }
     for (const u of list) {
       const row = document.createElement("div");
-      row.className = "dh-setting-row";
-      row.style.borderBottom = "none";
-      row.style.padding = "5px 2px";
-      row.style.cursor = "pointer";
+      row.style.cssText = "display:flex;align-items:flex-start;gap:8px;padding:8px;border-radius:8px;background:rgba(128,128,128,0.06);cursor:pointer;transition:background 0.15s";
+      row.addEventListener("mouseenter", () => { row.style.background = "rgba(128,128,128,0.12)"; });
+      row.addEventListener("mouseleave", () => { row.style.background = "rgba(128,128,128,0.06)"; });
       const swatch = u.color || "#58cc02";
-      row.innerHTML = `<div class="dh-setting-label" style="min-width:0">
-          <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
-            <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${swatch};margin-right:6px"></span>
-            ${u.label || "без метки"} · ${u.name}
-          </div>
-          <small>${u.username ? "@" + u.username : ""}${u.note ? " · " + u.note : ""}</small>
+      row.innerHTML = `
+        <div style="width:28px;height:28px;border-radius:50%;background:${swatch};color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0;margin-top:1px">
+          ${(u.name || u.username || "?").charAt(0).toUpperCase()}
         </div>
-        <button class="dh-btn" data-tag-edit="1" title="Изменить метку" style="padding:4px 8px;font-size:11px">✏</button>`;
+        <div style="flex:1;min-width:0">
+          <div style="font-size:12px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${u.name || "—"}${u.username ? ` · <span style="opacity:0.6;font-weight:400">@${u.username}</span>` : ""}</div>
+          ${u.label ? `<div style="font-size:11px;margin-top:2px"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${swatch};margin-right:5px;vertical-align:middle"></span>${u.label}</div>` : ""}
+          ${u.note ? `<div style="font-size:10px;opacity:0.6;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">📝 ${u.note}</div>` : ""}
+        </div>
+        <div style="display:flex;flex-direction:column;gap:3px;flex-shrink:0">
+          <button class="dh-btn" data-tag-edit="1" title="Изменить метку" style="padding:3px 7px;font-size:10px">✏</button>
+          <button class="dh-btn dh-btn-danger" data-tag-del="1" title="Удалить метку" style="padding:3px 7px;font-size:10px">✕</button>
+        </div>`;
       row.addEventListener("click", (e) => {
-        if (e.target && e.target.closest && e.target.closest("[data-tag-edit]")) return;
+        if (e.target && e.target.closest && e.target.closest("[data-tag-edit],[data-tag-del]")) return;
         if (u.username) {
-          window.open(
-            "https://www.duolingo.com/profile/" + encodeURIComponent(u.username),
-            "_blank",
-          );
+          window.open("https://www.duolingo.com/profile/" + encodeURIComponent(u.username), "_blank");
         }
       });
-      const b = row.querySelector("[data-tag-edit]");
-      if (b) {
-        b.addEventListener("click", (e) => {
+      const editBtn = row.querySelector("[data-tag-edit]");
+      if (editBtn) {
+        editBtn.addEventListener("click", (e) => {
           e.stopPropagation();
           showTagEditor(u);
+        });
+      }
+      const delBtn = row.querySelector("[data-tag-del]");
+      if (delBtn) {
+        delBtn.addEventListener("click", async (e) => {
+          e.stopPropagation();
+          const ok = await showConfirm(
+            `Удалить метку с ${u.name || u.username || "?"}?`,
+            "Удаление метки",
+          );
+          if (!ok) return;
+          upsertTag({ userId: u.userId, username: u.username, name: u.name }, { label: "", note: "", color: "#58cc02" });
+          renderFriends();
+          renderTagsList();
+          showToast("Метка удалена");
         });
       }
       els.tagsList.appendChild(row);
@@ -9177,7 +9192,14 @@ function savePage() {
       showToast("Сначала открой профиль пользователя", true);
       return;
     }
-    upsertTag({ username: uname, name: uname }, {
+    // ищем реальное имя из кеша друзей / подписок
+    let realName = uname;
+    try {
+      const rows = (friendsCache && friendsCache.rows) || [];
+      const found = rows.find((r) => (r.username || "").toLowerCase() === uname.toLowerCase());
+      if (found) realName = found.displayName || found.name || found.username || uname;
+    } catch {}
+    upsertTag({ username: uname, name: realName }, {
       label: (els.tagLabel && els.tagLabel.value.trim()) || "",
       note: (els.tagNote && els.tagNote.value.trim()) || "",
       color: (els.tagColor && els.tagColor.value) || "#58cc02",
