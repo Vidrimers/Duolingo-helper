@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Duolingo Helper
 // @namespace    https://github.com/Vidrimers/Duolingo-helper
-// @version      0.8.1
+// @version      0.8.2
 // @description  Проверка взаимной подписки на профилях Duolingo. Панель, бейджи, кеш.
 // @author       Vidrimers
 // @match        *://*.duolingo.com/*
@@ -49,6 +49,7 @@
     "friendChanges",
     "friendChangesUnread",
     "userTags",
+    "stats",
   ];
 
   function defaultSettings() {
@@ -91,6 +92,7 @@
       friendChanges: [],
       friendChangesUnread: 0,
       userTags: {},
+      stats: { xpLog: [], leagueLog: [], lastSnapshot: null },
     };
   }
 
@@ -3223,13 +3225,49 @@
                     </button>
                     <div class="dh-acc-body"><div class="dh-acc-inner">
                         <div class="dh-muted" id="dh-me-info">Определение…</div>
-                        <div style="margin-top:8px">
-                            <div class="dh-setting-label" style="margin-bottom:4px">Аккаунты</div>
-                            <div id="dh-acc-list" style="display:flex;flex-direction:column;gap:4px"></div>
+                        <div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(128,128,128,0.25)">
+                            <button type="button" class="dh-sub-toggle" id="dh-acc-toggle" style="width:100%;display:flex;align-items:center;justify-content:space-between;background:none;border:none;cursor:pointer;padding:6px 0;font:inherit;color:inherit">
+                                <span class="dh-card-title" style="margin:0">Аккаунты</span>
+                                <span class="dh-sub-arrow">▸</span>
+                            </button>
+                            <div id="dh-acc-list-wrap" style="display:none;margin-top:6px">
+                                <div id="dh-acc-list" style="display:flex;flex-direction:column;gap:4px"></div>
+                            </div>
                         </div>
-                        <div style="margin-top:10px">
-                            <div class="dh-card-title">Дашборд</div>
-                            <div id="dh-acc-dashboard" style="display:flex;flex-direction:column;gap:6px"></div>
+                        <div style="margin-top:10px;padding-top:8px;border-top:1px solid rgba(128,128,128,0.25)">
+                            <button type="button" class="dh-sub-toggle" id="dh-stats-toggle" style="width:100%;display:flex;align-items:center;justify-content:space-between;background:none;border:none;cursor:pointer;padding:6px 0;font:inherit;color:inherit">
+                                <span class="dh-card-title" style="margin:0">📊 Статистика</span>
+                                <span class="dh-sub-arrow">▸</span>
+                            </button>
+                            <div id="dh-stats-body" style="display:none;margin-top:6px">
+                                <div style="display:flex;gap:6px;margin-bottom:8px">
+                                    <div style="flex:1;background:rgba(128,128,128,0.08);border-radius:8px;padding:8px 6px;text-align:center">
+                                        <div style="font-size:9px;opacity:0.6">⚡ Сегодня</div>
+                                        <div style="font-size:15px;font-weight:700" id="dh-stat-today">…</div>
+                                    </div>
+                                    <div style="flex:1;background:rgba(128,128,128,0.08);border-radius:8px;padding:8px 6px;text-align:center">
+                                        <div style="font-size:9px;opacity:0.6">📅 Неделя</div>
+                                        <div style="font-size:15px;font-weight:700" id="dh-stat-week">…</div>
+                                    </div>
+                                    <div style="flex:1;background:rgba(128,128,128,0.08);border-radius:8px;padding:8px 6px;text-align:center">
+                                        <div style="font-size:9px;opacity:0.6">🔥 Streak</div>
+                                        <div style="font-size:15px;font-weight:700" id="dh-stat-streak">…</div>
+                                    </div>
+                                </div>
+                                <div style="margin-bottom:8px">
+                                    <div style="font-size:9px;opacity:0.6;margin-bottom:3px">XP за 7 дней</div>
+                                    <div id="dh-stat-chart" style="display:flex;align-items:flex-end;gap:3px;height:36px"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div style="margin-top:4px;padding-top:8px;border-top:1px solid rgba(128,128,128,0.25)">
+                            <button type="button" class="dh-sub-toggle" id="dh-dash-toggle" style="width:100%;display:flex;align-items:center;justify-content:space-between;background:none;border:none;cursor:pointer;padding:6px 0;font:inherit;color:inherit">
+                                <span class="dh-card-title" style="margin:0">Дашборд</span>
+                                <span class="dh-sub-arrow">▸</span>
+                            </button>
+                            <div id="dh-dash-body" style="display:none;margin-top:6px">
+                                <div id="dh-acc-dashboard" style="display:flex;flex-direction:column;gap:6px"></div>
+                            </div>
                         </div>
                         <div style="margin-top:10px;padding-top:8px;border-top:1px solid rgba(128,128,128,0.25)">
                             <div class="dh-setting-row" style="border-bottom:none;padding:4px 0">
@@ -3809,6 +3847,16 @@
       importBtn: modal.querySelector("#dh-import"),
       importFile: modal.querySelector("#dh-import-file"),
       licenseLink: modal.querySelector("#dh-license-link"),
+      statsToggle: modal.querySelector("#dh-stats-toggle"),
+      statsBody: modal.querySelector("#dh-stats-body"),
+      dashToggle: modal.querySelector("#dh-dash-toggle"),
+      dashBody: modal.querySelector("#dh-dash-body"),
+      accToggle: modal.querySelector("#dh-acc-toggle"),
+      accListWrap: modal.querySelector("#dh-acc-list-wrap"),
+      statToday: modal.querySelector("#dh-stat-today"),
+      statWeek: modal.querySelector("#dh-stat-week"),
+      statStreak: modal.querySelector("#dh-stat-streak"),
+      statChart: modal.querySelector("#dh-stat-chart"),
       updateBanner: modal.querySelector("#dh-update-banner"),
       updateText: modal.querySelector("#dh-update-text"),
       updateBtn: modal.querySelector("#dh-update-btn"),
@@ -6512,6 +6560,88 @@
     }
   }
 
+  // ========== Статистика аккаунта ==========
+  async function collectStats() {
+    const myId = getMyId();
+    if (!myId) return;
+    try {
+      const res = await new Promise((resolve) => {
+        GM_xmlhttpRequest({
+          method: "GET",
+          url: `https://www.duolingo.com/2017-06-30/users/${myId}?fields=totalXp,streak`,
+          headers: { accept: "application/json" },
+          timeout: 10000,
+          onload(r) { try { resolve(JSON.parse(r.responseText || "{}")); } catch { resolve(null); } },
+          onerror() { resolve(null); },
+          ontimeout() { resolve(null); },
+        });
+      });
+      if (!res) return;
+      const totalXp = res.totalXp ?? (res.body && res.body.totalXp) ?? null;
+      const streak = res.streak ?? (res.body && res.body.streak) ?? null;
+      if (totalXp === null) return;
+
+      const stats = DATA.stats || { xpLog: [], leagueLog: [], lastSnapshot: null };
+      const now = Date.now();
+      const today = new Date(now).toISOString().slice(0, 10);
+      const last = stats.lastSnapshot;
+
+      // записываем XP за день (разницу)
+      if (last && last.totalXp != null) {
+        const delta = totalXp - last.totalXp;
+        const existing = stats.xpLog.find((e) => e.date === today);
+        if (existing) {
+          existing.xp = Math.max(0, delta);
+        } else {
+          stats.xpLog.push({ date: today, xp: Math.max(0, delta) });
+        }
+        // обрезаем до 90 дней
+        const cutoff = new Date(now - 90 * 86400000).toISOString().slice(0, 10);
+        stats.xpLog = stats.xpLog.filter((e) => e.date >= cutoff);
+      }
+
+      stats.lastSnapshot = { ts: now, totalXp, streak: streak ?? (last && last.streak) };
+      DATA.stats = stats;
+      saveData();
+      if (typeof renderStats === "function") renderStats();
+    } catch {}
+  }
+
+  function renderStats() {
+    const stats = DATA.stats || { xpLog: [], leagueLog: [], lastSnapshot: null };
+    const today = new Date().toISOString().slice(0, 10);
+
+    // сегодня / неделя
+    const todayXp = stats.xpLog.find((e) => e.date === today);
+    const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
+    const weekXp = stats.xpLog.filter((e) => e.date >= weekAgo).reduce((s, e) => s + (e.xp || 0), 0);
+    const streak = (stats.lastSnapshot && stats.lastSnapshot.streak) ?? "—";
+
+    if (els.statToday) els.statToday.textContent = "+" + (todayXp ? todayXp.xp : 0).toLocaleString("ru");
+    if (els.statWeek) els.statWeek.textContent = "+" + weekXp.toLocaleString("ru");
+    if (els.statStreak) els.statStreak.textContent = streak;
+
+    // график 7 дней
+    if (els.statChart) {
+      const days = [];
+      for (let i = 6; i >= 0; i--) {
+        const d = new Date(Date.now() - i * 86400000).toISOString().slice(0, 10);
+        const entry = stats.xpLog.find((e) => e.date === d);
+        days.push({ date: d, xp: entry ? entry.xp : 0 });
+      }
+      const maxXp = Math.max(1, ...days.map((d) => d.xp));
+      els.statChart.innerHTML = days.map((d) => {
+        const pct = Math.round((d.xp / maxXp) * 100);
+        const label = d.date.slice(8, 10);
+        return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px">
+          <div style="width:100%;height:${Math.max(3, pct * 0.3)}px;background:#58CC02;border-radius:2px 2px 0 0;opacity:${d.xp > 0 ? 1 : 0.2}"></div>
+          <div style="font-size:8px;opacity:0.5">${label}</div>
+        </div>`;
+      }).join("");
+    }
+
+  }
+
   /** Дашборд аккаунтов: карточки с информацией и удалением. */
   function renderDashboard() {
     const box = shadow && shadow.querySelector("#dh-acc-dashboard");
@@ -6691,6 +6821,8 @@
         renderFriends();
       }
       if (typeof renderAccounts === "function") renderAccounts();
+      if (typeof renderStats === "function") renderStats();
+      if (typeof collectStats === "function") collectStats();
     } catch (e) {
       console.warn("[DuoHelper] refreshUiForAccount", e);
     }
@@ -10010,6 +10142,7 @@
             friendChanges: a.friendChanges || [],
             friendChangesUnread: a.friendChangesUnread || 0,
             userTags: a.userTags || {},
+            stats: a.stats || { xpLog: [], leagueLog: [], lastSnapshot: null },
           },
         };
         if (includeJwt && a.jwt) {
@@ -10582,6 +10715,23 @@
       });
     }
 
+    // вложенные секции: Аккаунты / Статистика / Дашборд
+    function toggleSub(toggleEl, bodyEl, onOpen) {
+      if (!toggleEl || !bodyEl) return;
+      toggleEl.addEventListener("click", () => {
+        const open = bodyEl.style.display !== "none";
+        bodyEl.style.display = open ? "none" : "";
+        const arrow = toggleEl.querySelector(".dh-sub-arrow");
+        if (arrow) arrow.textContent = open ? "▸" : "▾";
+        if (!open && onOpen) onOpen();
+      });
+    }
+    toggleSub(els.accToggle, els.accListWrap);
+    toggleSub(els.statsToggle, els.statsBody, () => {
+      try { renderStats(); collectStats(); } catch {}
+    });
+    toggleSub(els.dashToggle, els.dashBody);
+
     // ===== Import =====
     if (els.importBtn && els.importFile) {
       els.importBtn.addEventListener("click", () => els.importFile.click());
@@ -10700,6 +10850,7 @@
       if (Array.isArray(d.friendChanges)) acc.friendChanges = d.friendChanges;
       if (d.friendChangesUnread != null) acc.friendChangesUnread = Number(d.friendChangesUnread) || 0;
       if (d.userTags && typeof d.userTags === "object") acc.userTags = d.userTags;
+      if (d.stats && typeof d.stats === "object") acc.stats = d.stats;
       acc.username = entry.username || acc.username || "";
       acc.label = entry.label || acc.label || "";
       acc.updatedAt = entry.updatedAt || Date.now();
