@@ -1,5 +1,6 @@
 temp/
 scripts/
+bot/node_modules/
 
 tasks.txt
 tasks.md
