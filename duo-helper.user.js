@@ -6524,8 +6524,9 @@
           ontimeout() { resolve(null); },
         });
       });
-      const ps = (res && (res.privacySettings || (res.body && res.body.privacySettings))) || {};
-      const hidden = !!ps.DISABLE_SOCIAL;
+      const list = (res && (res.privacySettings || (res.body && res.body.privacySettings))) || [];
+      const item = Array.isArray(list) ? list.find((x) => x.id === "disable_social") : null;
+      const hidden = !!(item && item.enabled);
       if (els.setPrivacy) els.setPrivacy.classList.toggle("on", hidden);
       if (els.privacyStatus) els.privacyStatus.textContent = hidden ? "Профиль скрыт от других" : "Профиль виден всем";
     } catch {
@@ -6540,16 +6541,19 @@
     const newVal = !isOn;
     if (els.privacyStatus) els.privacyStatus.textContent = "Сохранение…";
     try {
-      const res = await new Promise((resolve) => {
+      await new Promise((resolve) => {
         GM_xmlhttpRequest({
           method: "PATCH",
           url: `https://www.duolingo.com/2023-05-23/users/${myId}/privacy-settings?fields=privacySettings`,
           headers: { accept: "application/json", "content-type": "application/json" },
           data: JSON.stringify({ DISABLE_SOCIAL: newVal }),
           timeout: 10000,
-          onload(r) { try { resolve(JSON.parse(r.responseText || "{}")); } catch { resolve(null); } },
-          onerror() { resolve(null); },
-          ontimeout() { resolve(null); },
+          onload(r) {
+            console.log("[DH-PRIVACY] PATCH status=" + r.status, "resp:", (r.responseText || "").substring(0, 200));
+            resolve();
+          },
+          onerror() { resolve(); },
+          ontimeout() { resolve(); },
         });
       });
       if (els.setPrivacy) els.setPrivacy.classList.toggle("on", newVal);
@@ -6925,6 +6929,7 @@ function savePage() {
       if (typeof renderAccounts === "function") renderAccounts();
       if (typeof renderStats === "function") renderStats();
       if (typeof collectStats === "function") collectStats();
+      if (typeof loadPrivacyStatus === "function") loadPrivacyStatus();
     } catch (e) {
       console.warn("[DuoHelper] refreshUiForAccount", e);
     }
@@ -10406,6 +10411,7 @@ function savePage() {
     try { captureJWT(); } catch {}
     renderAccounts();
     try { loadPrivacyStatus(); } catch {}
+    setTimeout(() => { try { loadPrivacyStatus(); } catch {} }, 3000);
 
     els.setAuto.addEventListener("click", () => {
       DATA.settings.autoCheck = !DATA.settings.autoCheck;
