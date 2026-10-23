@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Duolingo Helper
 // @namespace    https://github.com/Vidrimers/Duolingo-helper
-// @version      0.8.2
+// @version      0.8.3
 // @description  Проверка взаимной подписки на профилях Duolingo. Панель, бейджи, кеш.
 // @author       Vidrimers
 // @match        *://*.duolingo.com/*
@@ -6708,6 +6708,7 @@
             <div style="font-size:9px;opacity:0.6;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">ID: ${id} · JWT: ${hasJwt ? "✓" : "✗"} · ${statusText}</div>
             <button class="dh-btn" data-open="${id}" style="padding:3px 8px;font-size:10px;flex-shrink:0" title="Открыть профиль Duolingo">👤</button>
             <button class="dh-btn" data-rename="${id}" style="padding:3px 8px;font-size:10px;flex-shrink:0" title="Переименовать">✏</button>
+            <button class="dh-btn" data-export="${id}" style="padding:3px 8px;font-size:10px;flex-shrink:0" title="Статистика (HTML)">📥</button>
             <button class="dh-btn" data-refresh="${id}" style="padding:3px 8px;font-size:10px;flex-shrink:0" title="Обновить данные">🔄</button>
           </div>
         </div>`;
@@ -6731,6 +6732,11 @@
       card.querySelector("[data-refresh]")?.addEventListener("click", (e) => {
         e.target.textContent = "…";
         loadAccountStats(id, card, true);
+      });
+      card.querySelector("[data-export]")?.addEventListener("click", async (e) => {
+        e.target.textContent = "…";
+        await exportVocabHtml(id, name);
+        e.target.textContent = "📥";
       });
       const delBtn = card.querySelector("[data-del]");
       if (delBtn) {
@@ -6777,6 +6783,101 @@
       if (streakEl) streakEl.textContent = "—";
       if (xpEl) xpEl.textContent = "—";
     }
+  }
+
+  /** HTML-экспорт словаря и прогресса аккаунта. */
+  /** HTML-экспорт статистики и прогресса аккаунта. */
+  async function exportVocabHtml(accId, accName) {
+    showToast("Загрузка данных…");
+    const fetchJson = (url) => new Promise((resolve) => {
+      GM_xmlhttpRequest({
+        method: "GET", url,
+        headers: { accept: "application/json" },
+        timeout: 15000,
+        onload(r) { try { resolve(JSON.parse(r.responseText || "{}")); } catch { resolve(null); } },
+        onerror() { resolve(null); },
+        ontimeout() { resolve(null); },
+      });
+    });
+    const d = await fetchJson("https://www.duolingo.com/2017-06-30/users/" + accId + "?fields=totalXp,streak,name,username") || {};
+    const totalXp = d.totalXp ?? 0;
+    const streak = d.streak ?? 0;
+    const displayName = d.name || accName || "";
+    const username = d.username || "";
+    const today = new Date().toLocaleDateString("ru", { day: "numeric", month: "long", year: "numeric" });
+
+    const html = `<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Duolingo — Статистика · ${displayName}</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'Segoe UI',system-ui,sans-serif; background:#F3F3F3; color:#1A1A1A; }
+  .page { max-width:700px; margin:0 auto; padding:32px 20px 60px; }
+  .header { text-align:center; margin-bottom:32px; }
+  .header h1 { font-size:28px; font-weight:800; color:#58CC02; margin-bottom:4px; }
+  .header .sub { font-size:14px; color:#888; }
+  .section { background:#fff; border-radius:12px; padding:24px; margin-bottom:20px; box-shadow:0 1px 4px rgba(0,0,0,0.06); }
+  .section h2 { font-size:18px; font-weight:700; margin-bottom:16px; }
+  .stats-grid { display:flex; gap:12px; }
+  .stat-box { flex:1; background:#F8F8F8; border-radius:10px; padding:20px 16px; text-align:center; }
+  .stat-box .value { font-size:32px; font-weight:800; color:#58CC02; }
+  .stat-box .label { font-size:12px; color:#888; margin-top:6px; }
+  .footer { text-align:center; font-size:11px; color:#AAA; margin-top:32px; }
+  .save-btn { display:inline-block; margin:24px auto 0; padding:12px 32px; background:#58CC02; color:#fff; border:none; border-radius:10px; font-size:15px; font-weight:700; cursor:pointer; }
+  .save-btn:hover { background:#4CAF00; }
+  .print-btn { display:inline-block; margin:24px auto 0 8px; padding:12px 32px; background:#E5E5E5; color:#333; border:none; border-radius:10px; font-size:15px; font-weight:700; cursor:pointer; }
+  .print-btn:hover { background:#D0D0D0; }
+  .center { text-align:center; }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="header">
+    <h1>🦉 Duolingo — Статистика</h1>
+    <div class="sub">${displayName}${username ? " · @" + username : ""} · ${today}</div>
+  </div>
+  <div class="section">
+    <h2>📊 Общая статистика</h2>
+    <div class="stats-grid">
+      <div class="stat-box">
+        <div class="value">${Number(totalXp).toLocaleString("ru")}</div>
+        <div class="label">⚡ Всего XP</div>
+      </div>
+      <div class="stat-box">
+        <div class="value">🔥 ${streak}</div>
+        <div class="label">Серия дней</div>
+      </div>
+    </div>
+  </div>
+  <div class="center">
+    <button class="save-btn" onclick="savePage()">💾 Сохранить страницу</button>
+    <button class="print-btn" onclick="window.print()">🖨 Печать</button>
+  </div>
+  <div class="footer">
+    Создано Duolingo Helper · Лицензия CC BY-NC-ND 4.0
+  </div>
+</div>
+<script>
+function savePage() {
+  var blob = new Blob(['<!DOCTYPE html>\\n' + document.documentElement.outerHTML], { type: 'text/html' });
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'duolingo-stats-${(username || accName || "export").replace(/[^a-zA-Z0-9_-]/g, "")}-${new Date().toISOString().slice(0, 10)}.html';
+  a.click();
+  setTimeout(function() { URL.revokeObjectURL(a.href); }, 1000);
+}
+</script>
+</body>
+</html>`;
+
+    const blob = new Blob([html], { type: "text/html" });
+    const url = URL.createObjectURL(blob);
+    window.open(url, "_blank");
+    setTimeout(() => URL.revokeObjectURL(url), 30000);
+    showToast("✓ Статистика открыта в новой вкладке");
   }
 
   /** Переключение на другой аккаунт (JWT swap + reload). */
