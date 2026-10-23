@@ -165,9 +165,10 @@
     if (!store.accounts[id]) store.accounts[id] = emptyAccount();
     const acc = store.accounts[id];
     DATA.settings = { ...defaultSettings(), ...(acc.settings || {}) };
+    const def = emptyAccount();
     for (const k of ACCOUNT_FIELDS) {
       if (k === "settings") continue;
-      DATA[k] = acc[k];
+      DATA[k] = acc[k] !== undefined ? acc[k] : def[k];
     }
     DATA.me = (acc.me && String(acc.me.id) === id) ? acc.me : (id === "anon" ? null : { id });
     DATA._accountId = id;
@@ -7351,6 +7352,8 @@
 
   /** Сравнивает снапшоты и пишет изменения. */
   function diffFriendSnapshots(following, followers) {
+    // защита: не сравниваем, если данные могли быть от другого аккаунта
+    if (DATA._accountId && DATA._accountId !== currentAccountId()) return;
     const now = Date.now();
     DATA.friendSnapshots = DATA.friendSnapshots || [];
     DATA.friendChanges = DATA.friendChanges || [];
@@ -8011,6 +8014,8 @@
         scannedAt: null,
       };
       syncUnfollowInactiveButton();
+      // синхронизируем аккаунт перед diff, чтобы не смешать снапшоты
+      try { switchAccount(currentAccountId()); } catch {}
       diffFriendSnapshots(following, followers);
       updateChangesBadge();
       renderFriends();
