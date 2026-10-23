@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Duolingo Helper
 // @namespace    https://github.com/Vidrimers/Duolingo-helper
-// @version      0.8.0
+// @version      0.8.1
 // @description  Проверка взаимной подписки на профилях Duolingo. Панель, бейджи, кеш.
 // @author       Vidrimers
 // @match        *://*.duolingo.com/*
@@ -75,6 +75,7 @@
       fakeXpBoost: false,
       xpBoostMins: 15,
       notifyHideSec: 5,
+    lbGapRefresh: 2,
     };
   }
 
@@ -3623,6 +3624,13 @@
                 </div>
                 <div class="dh-setting-row">
                     <div class="dh-setting-label">
+                        Обновление рейтинга, сек
+                        <small>Как часто обновляются разрывы XP на странице рейтингов (leaderboard) (1–60)</small>
+                    </div>
+                    <input class="dh-num-input" id="dh-set-lbgap" type="number" min="1" max="60" />
+                </div>
+                <div class="dh-setting-row">
+                    <div class="dh-setting-label">
                         Версия скрипта
                         <small id="dh-current-version">…</small>
                     </div>
@@ -3771,6 +3779,7 @@
       setCache: modal.querySelector("#dh-set-cache"),
       setDelay: modal.querySelector("#dh-set-delay"),
       setNotify: modal.querySelector("#dh-set-notify"),
+      setLbGap: modal.querySelector("#dh-set-lbgap"),
       setInactive: modal.querySelector("#dh-set-inactive"),
       scanActivity: modal.querySelector("#dh-scan-activity"),
       scanStop: modal.querySelector("#dh-scan-stop"),
@@ -6408,6 +6417,7 @@
     if (els.setCache) els.setCache.value = DATA.settings.cacheMinutes;
     if (els.setDelay) els.setDelay.value = DATA.settings.requestDelay;
     if (els.setNotify) els.setNotify.value = DATA.settings.notifyHideSec || 5;
+    if (els.setLbGap) els.setLbGap.value = DATA.settings.lbGapRefresh || 2;
     if (els.setInactive) els.setInactive.value = DATA.settings.inactiveDays;
     if (els.setFreeSuper) els.setFreeSuper.classList.toggle("on", !!DATA.settings.freeSuper);
   }
@@ -8256,9 +8266,10 @@
       }
     }
 
+    var gapMs = Math.max(1, Math.min(60, (DATA.settings && DATA.settings.lbGapRefresh) || 2)) * 1000;
     setInterval(function() {
       try { injectGaps(); } catch (e) { console.warn("[DH-LB] error", e); }
-    }, 2000);
+    }, gapMs);
     setTimeout(injectGaps, 1000);
   }
 
@@ -10541,6 +10552,11 @@
     bindNumSetting(els.setNotify, (el) => {
       const v = Math.max(1, Math.min(30, parseInt(el.value, 10) || 5));
       DATA.settings.notifyHideSec = v;
+      el.value = v;
+    });
+    bindNumSetting(els.setLbGap, (el) => {
+      const v = Math.max(1, Math.min(60, parseInt(el.value, 10) || 2));
+      DATA.settings.lbGapRefresh = v;
       el.value = v;
     });
     if (els.scanActivity) {
