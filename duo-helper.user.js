@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Duolingo Helper
 // @namespace    https://github.com/Vidrimers/Duolingo-helper
-// @version      0.7.9
+// @version      0.8.0
 // @description  Проверка взаимной подписки на профилях Duolingo. Панель, бейджи, кеш.
 // @author       Vidrimers
 // @match        *://*.duolingo.com/*
@@ -3814,6 +3814,7 @@
     initFabDrag();
     applyWinPos();
     applyFabPos();
+    uiReady = true;
     // при resize окна/открытии devtools — подтягиваем элементы в экран
     window.addEventListener("resize", () => {
       if (els.modal && els.modal.classList.contains("open")) applyWinPos();
@@ -3824,7 +3825,9 @@
 
   // ========== Theme ==========
   function applyTheme() {
-    if (!els.modal) return;
+    try {
+      if (!els || !els.modal) return;
+    } catch { return; }
     const theme = DATA.settings.theme || "win95";
     els.modal.classList.remove(
       "dh-theme-xp", "dh-theme-vista", "dh-theme-win95",
@@ -6659,7 +6662,10 @@
     location.reload();
   }
 
+  var uiReady = false;
+
   function refreshUiForAccount() {
+    if (!uiReady) return;
     try {
       applyTheme();
       applyWinPos();
@@ -8191,6 +8197,69 @@
         ? "фейк-буст: x2 · " + (DATA.settings.xpBoostMins || 15) + " мин"
         : "",
     );
+  }
+
+  // ========== Leaderboard: показать разрыв XP ==========
+  function installLeaderboardGaps() {
+    if (window.__dhLbGaps) return;
+    window.__dhLbGaps = true;
+
+    function injectGaps() {
+      if (location.pathname.indexOf("/leaderboard") === -1) return;
+      if (!window.__dhLbDebug) {
+        window.__dhLbDebug = true;
+      }
+      // строки лидерборда: A._3kvGS с h=64, текст вида "N...Name...XP очков"
+      var rows = document.querySelectorAll("a._3kvGS, a[class*='_3kvGS']");
+      if (rows.length < 3) return;
+
+      var entries = [];
+      for (var i = 0; i < rows.length; i++) {
+        var el = rows[i];
+        var t = (el.textContent || "").replace(/\s+/g, " ").trim();
+        // XP — число перед "очков"
+        var xpM = t.match(/(\d[\d\s]*)\s*очков?/);
+        if (!xpM) continue;
+        var xp = parseInt(xpM[1].replace(/\s/g, ""), 10);
+        if (isNaN(xp)) continue;
+        // «я» — класс MytTp
+        var isMe = (el.className || "").indexOf("MytTp") !== -1;
+        entries.push({ el: el, xp: xp, isMe: isMe });
+      }
+
+      if (entries.length < 2) return;
+
+      var myXp = null;
+      for (var j = 0; j < entries.length; j++) {
+        if (entries[j].isMe) { myXp = entries[j].xp; break; }
+      }
+      if (myXp === null) return;
+
+      // убираем старые
+      var old = document.querySelectorAll(".dh-lb-gap");
+      for (var b = 0; b < old.length; b++) old[b].remove();
+
+      // вставляем бейджи
+      for (var m = 0; m < entries.length; m++) {
+        var e = entries[m];
+        if (e.isMe) continue;
+        var gap = e.xp - myXp;
+        if (gap === 0) continue;
+        var badge = document.createElement("span");
+        badge.className = "dh-lb-gap";
+        badge.textContent = (gap > 0 ? "+" : "") + gap.toLocaleString("ru");
+        badge.style.cssText = "margin-left:8px;padding:1px 6px;border-radius:8px;font-size:11px;font-weight:700;white-space:nowrap;vertical-align:middle;pointer-events:none;" +
+          (gap > 0
+            ? "background:rgba(88,204,2,0.15);color:#1F7A1F;"
+            : "background:rgba(192,57,43,0.12);color:#B02A1E;");
+        e.el.appendChild(badge);
+      }
+    }
+
+    setInterval(function() {
+      try { injectGaps(); } catch (e) { console.warn("[DH-LB] error", e); }
+    }, 2000);
+    setTimeout(injectGaps, 1000);
   }
 
   function installXpBoostHook() {
@@ -10724,6 +10793,7 @@
     syncHeartsFlag();
     installLessonTools();
     syncLessonFlags();
+    try { installLeaderboardGaps(); } catch (e) { console.warn("[DH-LB] install failed", e); }
     installXpBoostHook();
     syncXpBoostFlag();
     updateChangesBadge();
