@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Duolingo Helper
 // @namespace    https://github.com/Vidrimers/Duolingo-helper
-// @version      0.7.8
+// @version      0.7.9
 // @description  Проверка взаимной подписки на профилях Duolingo. Панель, бейджи, кеш.
 // @author       Vidrimers
 // @match        *://*.duolingo.com/*
@@ -3656,6 +3656,8 @@
         </div>
         <div class="dh-footer">
             <a class="dh-donate-link" href="https://vidrimers.online/donate" target="_blank" rel="noopener">Поддержать проект</a>
+            <span style="opacity:0.4;margin:0 6px">·</span>
+            <a class="dh-donate-link" id="dh-license-link" href="#" style="cursor:pointer">Лицензия</a>
         </div>
         <input type="file" id="dh-import-file" accept="application/json,.json" style="display:none" />
     `;
@@ -3797,6 +3799,7 @@
       exportBtn: modal.querySelector("#dh-export"),
       importBtn: modal.querySelector("#dh-import"),
       importFile: modal.querySelector("#dh-import-file"),
+      licenseLink: modal.querySelector("#dh-license-link"),
       updateBanner: modal.querySelector("#dh-update-banner"),
       updateText: modal.querySelector("#dh-update-text"),
       updateBtn: modal.querySelector("#dh-update-btn"),
@@ -8539,6 +8542,43 @@
     shadow.appendChild(overlay);
   }
 
+  function showLicense() {
+    if (!shadow) return;
+    const theme = DATA.settings.theme || "win95";
+    const overlay = document.createElement("div");
+    overlay.className = "dh-confirm-overlay dh-theme-" + theme;
+    overlay.innerHTML = `
+      <div class="dh-confirm-box" style="width:400px">
+        <div class="dh-confirm-title">Лицензия</div>
+        <div class="dh-confirm-body" style="line-height:1.55">
+          <p style="margin:0 0 10px">
+            <strong>CC BY-NC-ND 4.0</strong><br/>
+            Creative Commons Attribution-NonCommercial-NoDerivatives 4.0 International
+          </p>
+          <div style="margin:0 0 10px;font-size:12px">
+            <div style="margin:3px 0">✅ Использовать бесплатно</div>
+            <div style="margin:3px 0">✅ Делиться с указанием автора</div>
+            <div style="margin:3px 0">❌ Коммерческое использование</div>
+            <div style="margin:3px 0">❌ Переделки и производные</div>
+          </div>
+          <p style="margin:0 0 10px;font-size:11px;color:#888">
+            Для коммерческого использования свяжитесь с автором для получения лицензии.
+          </p>
+        </div>
+        <div class="dh-confirm-actions">
+          <button class="dh-btn" data-license="full">Полный текст</button>
+          <button class="dh-btn dh-btn-primary" data-license="close">Понятно</button>
+        </div>
+      </div>`;
+    shadow.appendChild(overlay);
+    const close = () => overlay.remove();
+    overlay.addEventListener("click", (e) => { if (e.target === overlay) close(); });
+    overlay.querySelector('[data-license="close"]').addEventListener("click", close);
+    overlay.querySelector('[data-license="full"]').addEventListener("click", () => {
+      window.open("https://github.com/Vidrimers/Duolingo-helper/blob/master/LICENSE", "_blank");
+    });
+  }
+
   function showTagEditor(user) {
     if (!shadow) return;
     const theme = DATA.settings.theme || "win95";
@@ -10450,6 +10490,12 @@
     els.refreshPage.addEventListener("click", () => location.reload());
 
     els.exportBtn.addEventListener("click", () => showExportModal());
+    if (els.licenseLink) {
+      els.licenseLink.addEventListener("click", (e) => {
+        e.preventDefault();
+        showLicense();
+      });
+    }
 
     // ===== Import =====
     if (els.importBtn && els.importFile) {
