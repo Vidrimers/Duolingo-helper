@@ -7230,14 +7230,45 @@ function savePage() {
   }
 
   function tagListUsers() {
-    return Object.entries(DATA.userTags || {}).map(([userId, t]) => ({
-      userId,
-      username: t.username || "",
-      name: t.name || t.username || userId,
-      label: t.label || "",
-      color: t.color || "#58cc02",
-      note: t.note || "",
-    }));
+    // строим индекс username -> displayName из кешей
+    const nameMap = {};
+    try {
+      const rows = (friendsCache && friendsCache.rows) || [];
+      for (const r of rows) {
+        const un = (r.username || "").toLowerCase();
+        const dn = r.displayName || r.name || "";
+        if (un && dn && dn.toLowerCase() !== un) nameMap[un] = dn;
+      }
+    } catch {}
+    // также из followCache (theirName)
+    try {
+      const fc = DATA.followCache || {};
+      for (const key of Object.keys(fc)) {
+        const entry = fc[key];
+        if (entry && entry.theirName) {
+          const un = key.toLowerCase();
+          const dn = entry.theirName;
+          if (un && dn && dn.toLowerCase() !== un && !nameMap[un]) nameMap[un] = dn;
+        }
+      }
+    } catch {}
+    return Object.entries(DATA.userTags || {}).map(([userId, t]) => {
+      const uname = t.username || "";
+      // если name совпадает с username — ищем реальное имя в кеше
+      let name = t.name || uname || userId;
+      if (uname && name.toLowerCase().replace(/^@/, "") === uname.toLowerCase().replace(/^@/, "")) {
+        const real = nameMap[uname.toLowerCase().replace(/^@/, "")];
+        if (real) name = real;
+      }
+      return {
+        userId,
+        username: uname,
+        name,
+        label: t.label || "",
+        color: t.color || "#58cc02",
+        note: t.note || "",
+      };
+    });
   }
 
   function updateTagsBadge() {
@@ -9097,7 +9128,7 @@ function savePage() {
         </div>
         <div style="flex:1;min-width:0">
           <div style="font-size:12px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${u.name || "—"}${u.username ? ` · <span style="opacity:0.6;font-weight:400">@${u.username}</span>` : ""}</div>
-          ${u.label ? `<div style="font-size:11px;margin-top:2px"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${swatch};margin-right:5px;vertical-align:middle"></span>${u.label}</div>` : ""}
+          ${u.label ? `<div style="font-size:11px;margin-top:2px">${u.label}</div>` : ""}
           ${u.note ? `<div style="font-size:10px;opacity:0.6;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">📝 ${u.note}</div>` : ""}
         </div>
         <div style="display:flex;flex-direction:column;gap:3px;flex-shrink:0">
@@ -9442,6 +9473,7 @@ function savePage() {
     return true;
   }
 
+  var tagRetryTimer = null;
   function mountInlineTag(username) {
     const old = document.getElementById("dh-inline-tag");
     const tag = findTagByUser(null, username);
@@ -9449,7 +9481,21 @@ function savePage() {
     if (!tag || !tag.label) return;
 
     const nameEl = findNameEl(username);
-    if (!nameEl) return;
+    if (!nameEl) {
+      // имя ещё не отрисовано — пробуем снова
+      if (tagRetryTimer) clearInterval(tagRetryTimer);
+      var attempts = 0;
+      tagRetryTimer = setInterval(() => {
+        attempts++;
+        const el2 = findNameEl(username);
+        if (el2 || attempts > 20) {
+          clearInterval(tagRetryTimer);
+          tagRetryTimer = null;
+          if (el2) mountInlineTag(username);
+        }
+      }, 500);
+      return;
+    }
 
     const el = document.createElement("span");
     el.id = "dh-inline-tag";
@@ -9531,6 +9577,7 @@ function savePage() {
           setBadge(lastBadge.state, lastBadge.title, lastBadge.sub);
         }
       }
+      mountInlineTag(u);
       return;
     }
 
@@ -9544,6 +9591,7 @@ function savePage() {
     if (lastBadge && lastBadge.username === u) {
       setBadge(lastBadge.state, lastBadge.title, lastBadge.sub);
     }
+    mountInlineTag(u);
   }
 
   function hideBadge() {
@@ -9735,6 +9783,7 @@ function savePage() {
       els.userInput.value = u || "";
       if (u && isOwnProfile(u)) {
         hideBadge();
+        mountInlineTag(u);
         setStatus(
           "idle",
           "Это твой профиль",
@@ -9752,6 +9801,7 @@ function savePage() {
           setBadge("checking", `@${u}`, "автопроверка выключена");
         }
       }
+      mountInlineTag(u);
     } else {
       hideBadge();
       setStatus(
@@ -11248,6 +11298,10 @@ function savePage() {
     updateListBadges();
     updateTagsBadge();
     syncTagFormFromProfile();
+    try {
+      const _u = getProfileUsername();
+      if (_u && isProfilePage()) mountInlineTag(_u);
+    } catch {}
     watchHeartsUi();
 
     // страховка: сохранить настройки при уходе со страницы
