@@ -8218,7 +8218,7 @@
         var el = rows[i];
         var t = (el.textContent || "").replace(/\s+/g, " ").trim();
         // XP — число перед "очков"
-        var xpM = t.match(/(\d[\d\s]*)\s*очков?/);
+        var xpM = t.match(/(\d[\d\s]*)\s*очк/);
         if (!xpM) continue;
         var xp = parseInt(xpM[1].replace(/\s/g, ""), 10);
         if (isNaN(xp)) continue;
