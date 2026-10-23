@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Duolingo Helper
 // @namespace    https://github.com/Vidrimers/Duolingo-helper
-// @version      0.8.3
+// @version      0.8.4
 // @description  Проверка взаимной подписки на профилях Duolingo. Панель, бейджи, кеш.
 // @author       Vidrimers
 // @match        *://*.duolingo.com/*
@@ -50,6 +50,7 @@
     "friendChangesUnread",
     "userTags",
     "stats",
+    "privacySnapshot",
   ];
 
   function defaultSettings() {
@@ -1745,6 +1746,18 @@
             }
             .dh-acc.open .dh-acc-inner { padding-bottom: 12px; }
 
+            /* Sub-accordion (inside My Account) */
+            .dh-sub-body {
+                display: grid;
+                grid-template-rows: 0fr;
+                transition: grid-template-rows 0.28s ease;
+            }
+            .dh-sub-body.open { grid-template-rows: 1fr; }
+            .dh-sub-inner {
+                overflow: hidden;
+                min-height: 0;
+            }
+
             /* XP card accents by theme */
             .dh-modal.dh-theme-vista .dh-acc {
                 border-color: rgba(120,160,210,0.35);
@@ -3230,7 +3243,7 @@
                                 <span class="dh-card-title" style="margin:0">📊 Статистика</span>
                                 <span class="dh-sub-arrow">▸</span>
                             </button>
-                            <div id="dh-stats-body" style="display:none;margin-top:6px">
+                            <div class="dh-sub-body" id="dh-stats-body"><div class="dh-sub-inner" style="margin-top:6px">
                                 <div style="display:flex;gap:6px;margin-bottom:8px">
                                     <div style="flex:1;background:rgba(128,128,128,0.08);border-radius:8px;padding:8px 6px;text-align:center">
                                         <div style="font-size:9px;opacity:0.6">⚡ Сегодня</div>
@@ -3249,35 +3262,36 @@
                                     <div style="font-size:9px;opacity:0.6;margin-bottom:3px">XP за 7 дней</div>
                                     <div id="dh-stat-chart" style="display:flex;align-items:flex-end;gap:3px;height:36px"></div>
                                 </div>
-                            </div>
+                            </div></div>
                         </div>
                         <div style="margin-top:4px;padding-top:8px;border-top:1px solid rgba(128,128,128,0.25)">
                             <button type="button" class="dh-sub-toggle" id="dh-dash-toggle" style="width:100%;display:flex;align-items:center;justify-content:space-between;background:none;border:none;cursor:pointer;padding:6px 0;font:inherit;color:inherit">
-                                <span class="dh-card-title" style="margin:0">Дашборд</span>
+                                <span class="dh-card-title" style="margin:0">📋 Дашборд</span>
                                 <span class="dh-sub-arrow">▸</span>
                             </button>
-                            <div id="dh-dash-body" style="display:none;margin-top:6px">
+                            <div class="dh-sub-body" id="dh-dash-body"><div class="dh-sub-inner" style="margin-top:6px">
                                 <div id="dh-acc-dashboard" style="display:flex;flex-direction:column;gap:6px"></div>
-                            </div>
+                            </div></div>
                         </div>
                         <div style="margin-top:4px;padding-top:8px;border-top:1px solid rgba(128,128,128,0.25)">
                             <button type="button" class="dh-sub-toggle" id="dh-acc-toggle" style="width:100%;display:flex;align-items:center;justify-content:space-between;background:none;border:none;cursor:pointer;padding:6px 0;font:inherit;color:inherit">
-                                <span class="dh-card-title" style="margin:0">Аккаунты</span>
+                                <span class="dh-card-title" style="margin:0">👥 Аккаунты</span>
                                 <span class="dh-sub-arrow">▸</span>
                             </button>
-                            <div id="dh-acc-list-wrap" style="display:none;margin-top:6px">
+                            <div class="dh-sub-body" id="dh-acc-list-wrap"><div class="dh-sub-inner" style="margin-top:6px">
                                 <div class="dh-muted" style="margin-bottom:6px;font-size:10px">Чтобы второй аккаунт появился в списке — залогинься под ним на сайте Duolingo. После этого можно переключаться без повторного входа.</div>
                                 <div id="dh-acc-list" style="display:flex;flex-direction:column;gap:4px"></div>
-                            </div>
+                            </div></div>
                         </div>
-                        <div style="margin-top:10px;padding-top:8px;border-top:1px solid rgba(128,128,128,0.25)">
-                            <div class="dh-setting-row" style="border-bottom:none;padding:4px 0">
-                                <div class="dh-setting-label">
-                                    Скрыть профиль
-                                    <small id="dh-privacy-status">Статус загружается…</small>
-                                </div>
-                                <div class="dh-switch" id="dh-set-privacy"></div>
-                            </div>
+                        <div style="margin-top:4px;padding-top:8px;border-top:1px solid rgba(128,128,128,0.25)">
+                            <button type="button" class="dh-sub-toggle" id="dh-privacy-toggle" style="width:100%;display:flex;align-items:center;justify-content:space-between;background:none;border:none;cursor:pointer;padding:6px 0;font:inherit;color:inherit">
+                                <span class="dh-card-title" style="margin:0">🔒 Приватность</span>
+                                <span class="dh-sub-arrow">▸</span>
+                            </button>
+                            <div class="dh-sub-body" id="dh-privacy-body"><div class="dh-sub-inner" style="margin-top:6px">
+                                <div class="dh-muted" style="margin-bottom:6px;font-size:10px">Настройки приватности Duolingo. Состояние загружается с сервера.</div>
+                                <div id="dh-privacy-list"></div>
+                            </div></div>
                         </div>
                     </div></div>
                 </div>
@@ -3750,8 +3764,9 @@
       setSolver: modal.querySelector("#dh-set-solver"),
       setStories: modal.querySelector("#dh-set-stories"),
       setFreeSuper: modal.querySelector("#dh-set-freesuper"),
-      setPrivacy: modal.querySelector("#dh-set-privacy"),
-      privacyStatus: modal.querySelector("#dh-privacy-status"),
+      privacyToggle: modal.querySelector("#dh-privacy-toggle"),
+      privacyBody: modal.querySelector("#dh-privacy-body"),
+      privacyList: modal.querySelector("#dh-privacy-list"),
       solveNow: modal.querySelector("#dh-solve-now"),
       apCount: modal.querySelector("#dh-ap-count"),
       apStart: modal.querySelector("#dh-ap-start"),
@@ -6509,9 +6524,25 @@
   }
 
   // ========== Приватность ==========
+  // ========== Приватность ==========
+  const PRIVACY_SETTINGS = [
+    { id: "disable_social", label: "Скрыть профиль", desc: "Подписки и активность не видны другим" },
+    { id: "disable_leaderboards", label: "Скрыть из лидербордов", desc: "Не показывать в таблицах" },
+    { id: "disable_friends_quests", label: "Без квестов с друзьями", desc: "Отключить совместные квесты" },
+    { id: "disable_shared_streak", label: "Без общего streak", desc: "Отключить общий streak с друзьями" },
+    { id: "disable_kudos", label: "Без лайков", desc: "Отключить получение kudos" },
+    { id: "disable_clubs", label: "Без клубов", desc: "Отключить функцию клубов" },
+    { id: "disable_personalized_ads", label: "Без персональной рекламы", desc: "Отключить таргетинг" },
+    { id: "disable_third_party_tracking", label: "Без сторонней аналитики", desc: "Отключить трекинг третьих лиц" },
+    { id: "disable_stream", label: "Скрыть стрим", desc: "Не показывать ленту активности" },
+    { id: "disable_profile_country", label: "Скрыть страну", desc: "Страна не видна в профиле" },
+    { id: "disable_mature_words", label: "Взрослые слова", desc: "Показывать лексику для взрослых" },
+    { id: "disable_feed_card_public_visibility", label: "Скрыть карточки в ленте", desc: "Профиль не в публичной ленте" },
+  ];
+
   async function loadPrivacyStatus() {
     const myId = getMyId();
-    if (!myId || !els.privacyStatus) return;
+    if (!myId || !els.privacyList) return;
     try {
       const res = await new Promise((resolve) => {
         GM_xmlhttpRequest({
@@ -6525,40 +6556,71 @@
         });
       });
       const list = (res && (res.privacySettings || (res.body && res.body.privacySettings))) || [];
-      const item = Array.isArray(list) ? list.find((x) => x.id === "disable_social") : null;
-      const hidden = !!(item && item.enabled);
-      if (els.setPrivacy) els.setPrivacy.classList.toggle("on", hidden);
-      if (els.privacyStatus) els.privacyStatus.textContent = hidden ? "Профиль скрыт от других" : "Профиль виден всем";
+      const map = {};
+      if (Array.isArray(list)) {
+        for (const x of list) map[x.id] = !!x.enabled;
+      }
+      DATA.privacySnapshot = map;
+      renderPrivacyList(map);
     } catch {
-      if (els.privacyStatus) els.privacyStatus.textContent = "Не удалось загрузить статус";
+      els.privacyList.innerHTML = '<div class="dh-muted">Не удалось загрузить настройки</div>';
     }
   }
 
-  async function togglePrivacy() {
+  function renderPrivacyList(stateMap) {
+    if (!els.privacyList) return;
+    els.privacyList.innerHTML = "";
+    for (const item of PRIVACY_SETTINGS) {
+      const isOn = !!stateMap[item.id];
+      const row = document.createElement("div");
+      row.className = "dh-setting-row";
+      row.style.borderBottom = "none";
+      row.style.padding = "3px 0";
+      row.innerHTML = `
+        <div class="dh-setting-label" style="min-width:0">
+          <div style="font-size:11px">${item.label}</div>
+          <small>${item.desc}</small>
+        </div>
+        <div class="dh-switch${isOn ? " on" : ""}" data-privacy="${item.id}"></div>`;
+      const sw = row.querySelector("[data-privacy]");
+      if (sw) {
+        sw.addEventListener("click", async () => {
+          const currentlyOn = sw.classList.contains("on");
+          const newVal = !currentlyOn;
+          sw.style.opacity = "0.5";
+          const ok = await setPrivacyValue(item.id, newVal);
+          sw.style.opacity = "";
+          if (ok) {
+            sw.classList.toggle("on", newVal);
+            showToast(item.label + (newVal ? " — включено" : " — выключено"));
+          } else {
+            showToast("Не удалось сохранить: " + item.label, true);
+          }
+        });
+      }
+      els.privacyList.appendChild(row);
+    }
+  }
+
+  async function setPrivacyValue(settingId, enabled) {
     const myId = getMyId();
-    if (!myId) return;
-    const isOn = els.setPrivacy && els.setPrivacy.classList.contains("on");
-    const newVal = !isOn;
-    if (els.privacyStatus) els.privacyStatus.textContent = "Сохранение…";
+    if (!myId) return false;
     try {
-      await new Promise((resolve) => {
+      const status = await new Promise((resolve) => {
         GM_xmlhttpRequest({
           method: "PATCH",
           url: `https://www.duolingo.com/2023-05-23/users/${myId}/privacy-settings?fields=privacySettings`,
           headers: { accept: "application/json", "content-type": "application/json" },
-          data: JSON.stringify({ DISABLE_SOCIAL: newVal }),
+          data: JSON.stringify({ [settingId.toUpperCase()]: enabled }),
           timeout: 10000,
-          onload(r) { resolve(); },
-          onerror() { resolve(); },
-          ontimeout() { resolve(); },
+          onload(r) { resolve(r.status); },
+          onerror() { resolve(0); },
+          ontimeout() { resolve(0); },
         });
       });
-      if (els.setPrivacy) els.setPrivacy.classList.toggle("on", newVal);
-      if (els.privacyStatus) els.privacyStatus.textContent = newVal ? "Профиль скрыт от других" : "Профиль виден всем";
-      showToast(newVal ? "Профиль скрыт" : "Профиль открыт");
+      return status === 200 || status === 201;
     } catch {
-      if (els.privacyStatus) els.privacyStatus.textContent = "Ошибка сохранения";
-      showToast("Не удалось изменить приватность", true);
+      return false;
     }
   }
 
@@ -10247,6 +10309,7 @@ function savePage() {
             friendChangesUnread: a.friendChangesUnread || 0,
             userTags: a.userTags || {},
             stats: a.stats || { xpLog: [], leagueLog: [], lastSnapshot: null },
+            privacySnapshot: a.privacySnapshot || {},
           },
         };
         if (includeJwt && a.jwt) {
@@ -10530,9 +10593,6 @@ function savePage() {
             : "Free Max / Super выключен",
         );
       });
-    }
-    if (els.setPrivacy) {
-      els.setPrivacy.addEventListener("click", () => togglePrivacy());
     }
     if (els.solveNow) {
       els.solveNow.addEventListener("click", () => solveNow());
@@ -10820,22 +10880,32 @@ function savePage() {
       });
     }
 
-    // вложенные секции: Аккаунты / Статистика / Дашборд
-    function toggleSub(toggleEl, bodyEl, onOpen) {
-      if (!toggleEl || !bodyEl) return;
-      toggleEl.addEventListener("click", () => {
-        const open = bodyEl.style.display !== "none";
-        bodyEl.style.display = open ? "none" : "";
-        const arrow = toggleEl.querySelector(".dh-sub-arrow");
-        if (arrow) arrow.textContent = open ? "▸" : "▾";
-        if (!open && onOpen) onOpen();
+    // вложенные секции: Статистика / Дашборд / Аккаунты / Приватность
+    // один открытый, плавное открытие через grid-template-rows
+    const subToggles = [
+      { btn: els.statsToggle, body: els.statsBody, onOpen: () => { try { renderStats(); collectStats(); } catch {} } },
+      { btn: els.dashToggle, body: els.dashBody },
+      { btn: els.accToggle, body: els.accListWrap },
+      { btn: els.privacyToggle, body: els.privacyBody, onOpen: () => { try { loadPrivacyStatus(); } catch {} } },
+    ];
+    for (const item of subToggles) {
+      if (!item.btn || !item.body) continue;
+      item.btn.addEventListener("click", () => {
+        const wasOpen = item.body.classList.contains("open");
+        // закрываем все
+        for (const s of subToggles) {
+          if (s.body) s.body.classList.remove("open");
+          if (s.btn) { const a = s.btn.querySelector(".dh-sub-arrow"); if (a) a.textContent = "▸"; }
+        }
+        // открываем эту, если была закрыта
+        if (!wasOpen) {
+          item.body.classList.add("open");
+          const arrow = item.btn.querySelector(".dh-sub-arrow");
+          if (arrow) arrow.textContent = "▾";
+          if (item.onOpen) item.onOpen();
+        }
       });
     }
-    toggleSub(els.accToggle, els.accListWrap);
-    toggleSub(els.statsToggle, els.statsBody, () => {
-      try { renderStats(); collectStats(); } catch {}
-    });
-    toggleSub(els.dashToggle, els.dashBody);
 
     // ===== Import =====
     if (els.importBtn && els.importFile) {
@@ -10956,6 +11026,7 @@ function savePage() {
       if (d.friendChangesUnread != null) acc.friendChangesUnread = Number(d.friendChangesUnread) || 0;
       if (d.userTags && typeof d.userTags === "object") acc.userTags = d.userTags;
       if (d.stats && typeof d.stats === "object") acc.stats = d.stats;
+      if (d.privacySnapshot && typeof d.privacySnapshot === "object") acc.privacySnapshot = d.privacySnapshot;
       acc.username = entry.username || acc.username || "";
       acc.label = entry.label || acc.label || "";
       acc.updatedAt = entry.updatedAt || Date.now();
