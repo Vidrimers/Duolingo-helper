@@ -3226,15 +3226,6 @@
                     <div class="dh-acc-body"><div class="dh-acc-inner">
                         <div class="dh-muted" id="dh-me-info">Определение…</div>
                         <div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(128,128,128,0.25)">
-                            <button type="button" class="dh-sub-toggle" id="dh-acc-toggle" style="width:100%;display:flex;align-items:center;justify-content:space-between;background:none;border:none;cursor:pointer;padding:6px 0;font:inherit;color:inherit">
-                                <span class="dh-card-title" style="margin:0">Аккаунты</span>
-                                <span class="dh-sub-arrow">▸</span>
-                            </button>
-                            <div id="dh-acc-list-wrap" style="display:none;margin-top:6px">
-                                <div id="dh-acc-list" style="display:flex;flex-direction:column;gap:4px"></div>
-                            </div>
-                        </div>
-                        <div style="margin-top:10px;padding-top:8px;border-top:1px solid rgba(128,128,128,0.25)">
                             <button type="button" class="dh-sub-toggle" id="dh-stats-toggle" style="width:100%;display:flex;align-items:center;justify-content:space-between;background:none;border:none;cursor:pointer;padding:6px 0;font:inherit;color:inherit">
                                 <span class="dh-card-title" style="margin:0">📊 Статистика</span>
                                 <span class="dh-sub-arrow">▸</span>
@@ -3267,6 +3258,16 @@
                             </button>
                             <div id="dh-dash-body" style="display:none;margin-top:6px">
                                 <div id="dh-acc-dashboard" style="display:flex;flex-direction:column;gap:6px"></div>
+                            </div>
+                        </div>
+                        <div style="margin-top:4px;padding-top:8px;border-top:1px solid rgba(128,128,128,0.25)">
+                            <button type="button" class="dh-sub-toggle" id="dh-acc-toggle" style="width:100%;display:flex;align-items:center;justify-content:space-between;background:none;border:none;cursor:pointer;padding:6px 0;font:inherit;color:inherit">
+                                <span class="dh-card-title" style="margin:0">Аккаунты</span>
+                                <span class="dh-sub-arrow">▸</span>
+                            </button>
+                            <div id="dh-acc-list-wrap" style="display:none;margin-top:6px">
+                                <div class="dh-muted" style="margin-bottom:6px;font-size:10px">Чтобы второй аккаунт появился в списке — залогинься под ним на сайте Duolingo. После этого можно переключаться без повторного входа.</div>
+                                <div id="dh-acc-list" style="display:flex;flex-direction:column;gap:4px"></div>
                             </div>
                         </div>
                         <div style="margin-top:10px;padding-top:8px;border-top:1px solid rgba(128,128,128,0.25)">
