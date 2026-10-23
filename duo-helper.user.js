@@ -6717,8 +6717,18 @@
   }
   let friendFilter = "all";
 
-  function setFriendsStatus(t) {
-    if (els.friendsStatus) els.friendsStatus.textContent = t;
+  function setFriendsStatus(t, onClear) {
+    if (!els.friendsStatus) return;
+    if (!onClear) {
+      els.friendsStatus.textContent = t;
+      els.friendsStatus.style.cssText = "";
+      return;
+    }
+    els.friendsStatus.style.cssText = "display:flex;align-items:center;justify-content:space-between;gap:8px";
+    els.friendsStatus.innerHTML =
+      `<span>${t}</span><button class="dh-btn dh-btn-ghost" id="dh-clear-list" style="padding:2px 8px;font-size:10px;text-decoration:underline;background:none;border:none;cursor:pointer;color:inherit;opacity:0.7">Очистить</button>`;
+    const btn = els.friendsStatus.querySelector("#dh-clear-list");
+    if (btn) btn.addEventListener("click", onClear);
   }
 
   function openUserProfile(username, userId) {
@@ -7252,7 +7262,14 @@
     if (els.historyBack) els.historyBack.style.display = "";
     updateListBadges();
     renderHistory();
-    setFriendsStatus("История действий");
+    setFriendsStatus("История действий", async () => {
+      const ok = await showConfirm("Очистить всю историю действий?", "История");
+      if (!ok) return;
+      DATA.actionLog = [];
+      saveData();
+      renderHistory();
+      showToast("История очищена");
+    });
   }
 
   function updateChangesBadge() {
@@ -7324,7 +7341,16 @@
       });
       els.changesList.appendChild(row);
     }
-    setFriendsStatus("Изменений: " + changes.length);
+    setFriendsStatus("Изменений: " + changes.length, async () => {
+      const ok = await showConfirm("Очистить все изменения?", "Изменения");
+      if (!ok) return;
+      DATA.friendChanges = [];
+      DATA.friendChangesUnread = 0;
+      saveData();
+      renderChanges();
+      updateChangesBadge();
+      showToast("Изменения очищены");
+    });
   }
 
   function showChangesView() {
