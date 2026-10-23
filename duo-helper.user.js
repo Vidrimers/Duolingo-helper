@@ -6548,10 +6548,7 @@
           headers: { accept: "application/json", "content-type": "application/json" },
           data: JSON.stringify({ DISABLE_SOCIAL: newVal }),
           timeout: 10000,
-          onload(r) {
-            console.log("[DH-PRIVACY] PATCH status=" + r.status, "resp:", (r.responseText || "").substring(0, 200));
-            resolve();
-          },
+          onload(r) { resolve(); },
           onerror() { resolve(); },
           ontimeout() { resolve(); },
         });
