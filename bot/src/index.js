@@ -1,4 +1,6 @@
 import { Bot } from "grammy";
+import { createServer } from "http";
+import { randomBytes } from "crypto";
 import { config } from "./config.js";
 import db from "./db.js";
 
@@ -128,10 +130,75 @@ function handleLinkCode(ctx, code) {
   );
 }
 
+// HTTP API для скрипта (генерация кодов линковки)
+const httpServer = createServer((req, res) => {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+
+  if (req.method === "OPTIONS") {
+    res.writeHead(204);
+    res.end();
+    return;
+  }
+
+  if (req.method === "POST" && req.url === "/api/link-code") {
+    let body = "";
+    req.on("data", (chunk) => { body += chunk; });
+    req.on("end", () => {
+      try {
+        const { duolingoUserId, duolingoUsername } = JSON.parse(body || "{}");
+        if (!duolingoUserId) {
+          res.writeHead(400, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: "duolingoUserId required" }));
+          return;
+        }
+
+        // генерируем код
+        const code = randomBytes(8).toString("hex");
+        const expiresAt = Date.now() + 10 * 60 * 1000; // 10 минут
+
+        // сохраняем в БД
+        db.prepare(`
+          INSERT INTO link_codes (code, duolingo_user_id, expires_at)
+          VALUES (?, ?, ?)
+        `).run(code, String(duolingoUserId), expiresAt);
+
+        // TODO: сохранить username если передан
+
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({
+          code,
+          deepLink: `https://t.me/Duolingo_Helperbot?start=${code}`,
+          expiresAt,
+        }));
+      } catch (e) {
+        res.writeHead(500, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: e.message }));
+      }
+    });
+    return;
+  }
+
+  if (req.method === "GET" && req.url === "/api/health") {
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ ok: true }));
+    return;
+  }
+
+  res.writeHead(404, { "Content-Type": "application/json" });
+  res.end(JSON.stringify({ error: "not found" }));
+});
+
+const HTTP_PORT = Number(process.env.BOT_HTTP_PORT) || 3777;
+
 // запуск
 bot.start({
   onStart: (me) => {
     console.log(`[bot] Started as @${me.username}`);
     console.log(`[bot] Admin: ${config.adminTgId}`);
+    httpServer.listen(HTTP_PORT, () => {
+      console.log(`[bot] HTTP API on port ${HTTP_PORT}`);
+    });
   },
 });

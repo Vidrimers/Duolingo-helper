@@ -18,6 +18,7 @@
 // @connect      www.duolingo.com
 // @connect      stories.duolingo.com
 // @connect      duolingo-leaderboards-prod.duolingo.com
+// @connect      localhost
 // @run-at       document-end
 // @noframes
 // @updateURL    https://raw.githubusercontent.com/Vidrimers/Duolingo-helper/refs/heads/master/duo-helper.user.js
@@ -6537,6 +6538,22 @@
         b.addEventListener("click", () => switchToAccount(id));
       }
       box.appendChild(row);
+
+      // кнопка привязки Telegram — только у активного профиля
+      if (isCur) {
+        const tgRow = document.createElement("div");
+        tgRow.style.cssText = "padding:4px 0 8px 0;display:flex;align-items:center;gap:6px";
+        tgRow.innerHTML = `
+          <span style="font-size:12px">🔗</span>
+          <button class="dh-btn" id="dh-tg-link-btn" style="padding:3px 10px;font-size:10px">Привязать Telegram</button>
+          <span class="dh-muted" id="dh-tg-link-status" style="font-size:10px"></span>`;
+        box.appendChild(tgRow);
+        const linkBtn = tgRow.querySelector("#dh-tg-link-btn");
+        const linkStatus = tgRow.querySelector("#dh-tg-link-status");
+        if (linkBtn) {
+          linkBtn.addEventListener("click", () => startTelegramLink(linkBtn, linkStatus));
+        }
+      }
     }
     renderDashboard();
   }
@@ -6722,6 +6739,48 @@
       }).join("");
     }
 
+  }
+
+  /** Линковка Telegram: генерация кода и показ ссылки. */
+  async function startTelegramLink(btn, statusEl) {
+    const myId = getMyId();
+    if (!myId) { showToast("Не удалось определить аккаунт", true); return; }
+    btn.disabled = true;
+    btn.textContent = "…";
+    try {
+      const res = await new Promise((resolve) => {
+        GM_xmlhttpRequest({
+          method: "POST",
+          url: "http://localhost:3777/api/link-code",
+          headers: { "content-type": "application/json" },
+          data: JSON.stringify({ duolingoUserId: myId }),
+          timeout: 10000,
+          onload(r) {
+            try { resolve(JSON.parse(r.responseText || "{}")); } catch { resolve(null); }
+          },
+          onerror() { resolve(null); },
+          ontimeout() { resolve(null); },
+        });
+      });
+      if (!res || !res.deepLink) {
+        btn.disabled = false;
+        btn.textContent = "Привязать Telegram";
+        if (statusEl) statusEl.textContent = "Сервер недоступен";
+        showToast("Сервер линковки недоступен", true);
+        return;
+      }
+      // показываем ссылку
+      if (statusEl) {
+        statusEl.innerHTML =
+          `<a href="${res.deepLink}" target="_blank" style="color:#58cc02;text-decoration:underline">Нажми для привязки →</a>`;
+      }
+      btn.textContent = "Ссылка создана";
+      showToast("Открой ссылку в Telegram для привязки");
+    } catch {
+      btn.disabled = false;
+      btn.textContent = "Привязать Telegram";
+      showToast("Ошибка генерации кода", true);
+    }
   }
 
   /** Дашборд аккаунтов: карточки с информацией и удалением. */
