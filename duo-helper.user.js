@@ -19,6 +19,7 @@
 // @connect      stories.duolingo.com
 // @connect      duolingo-leaderboards-prod.duolingo.com
 // @connect      localhost
+// @connect      89.124.70.156
 // @run-at       document-end
 // @noframes
 // @updateURL    https://raw.githubusercontent.com/Vidrimers/Duolingo-helper/refs/heads/master/duo-helper.user.js
@@ -6751,8 +6752,8 @@
       const res = await new Promise((resolve) => {
         GM_xmlhttpRequest({
           method: "POST",
-          url: "http://localhost:3777/api/link-code",
-          headers: { "content-type": "application/json" },
+          url: "http://89.124.70.156:3777/api/link-code",
+          headers: { "content-type": "application/json", "x-api-secret": "575859711373480667f2fb7d32f224903150de90f13f8d3c" },
           data: JSON.stringify({ duolingoUserId: myId }),
           timeout: 10000,
           onload(r) {

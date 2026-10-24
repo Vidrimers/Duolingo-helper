@@ -16,4 +16,6 @@ for (const key of required) {
 export const config = {
   tgBotToken: process.env.TG_BOT_TOKEN,
   adminTgId: Number(process.env.ADMIN_TG_ID),
+  apiSecret: process.env.API_SECRET || "",
+  httpPort: Number(process.env.BOT_HTTP_PORT) || 3777,
 };

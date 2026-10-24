@@ -143,6 +143,13 @@ const httpServer = createServer((req, res) => {
   }
 
   if (req.method === "POST" && req.url === "/api/link-code") {
+    // проверка секретного токена
+    const auth = req.headers["x-api-secret"] || "";
+    if (!config.apiSecret || auth !== config.apiSecret) {
+      res.writeHead(401, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "unauthorized" }));
+      return;
+    }
     let body = "";
     req.on("data", (chunk) => { body += chunk; });
     req.on("end", () => {
@@ -190,7 +197,7 @@ const httpServer = createServer((req, res) => {
   res.end(JSON.stringify({ error: "not found" }));
 });
 
-const HTTP_PORT = Number(process.env.BOT_HTTP_PORT) || 3777;
+const HTTP_PORT = config.httpPort;
 
 // запуск
 bot.start({
