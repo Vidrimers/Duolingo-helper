@@ -6,6 +6,19 @@ import db from "./db.js";
 
 const bot = new Bot(config.tgBotToken);
 
+// обновляем tg_username при каждом обращении
+bot.use((ctx, next) => {
+  if (ctx.from && ctx.from.id) {
+    try {
+      const existing = db.prepare("SELECT id FROM users WHERE tg_user_id = ?").get(ctx.from.id);
+      if (existing) {
+        db.prepare("UPDATE users SET tg_username = ? WHERE tg_user_id = ?").run(ctx.from.username || "", ctx.from.id);
+      }
+    } catch {}
+  }
+  return next();
+});
+
 // /start
 bot.command("start", (ctx) => {
   const startPayload = ctx.match;
@@ -213,11 +226,34 @@ const httpServer = createServer((req, res) => {
     const user = db.prepare("SELECT tg_username, tg_user_id, linked_at FROM users WHERE duolingo_user_id = ?").get(String(duoId));
     if (user) {
       res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ linked: true, tgUsername: user.tg_username, linkedAt: user.linked_at }));
+      res.end(JSON.stringify({ linked: true, tgUsername: user.tg_username, tgUserId: user.tg_user_id, linkedAt: user.linked_at }));
     } else {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ linked: false }));
     }
+    return;
+  }
+
+  if (req.method === "POST" && req.url === "/api/unlink") {
+    let body = "";
+    req.on("data", (chunk) => { body += chunk; });
+    req.on("end", () => {
+      try {
+        const { duolingoUserId } = JSON.parse(body || "{}");
+        if (!duolingoUserId) {
+          res.writeHead(400, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: "duolingoUserId required" }));
+          return;
+        }
+        db.prepare("DELETE FROM users WHERE duolingo_user_id = ?").run(String(duolingoUserId));
+        db.prepare("DELETE FROM backups WHERE duolingo_user_id = ?").run(String(duolingoUserId));
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ ok: true }));
+      } catch (e) {
+        res.writeHead(500, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: e.message }));
+      }
+    });
     return;
   }
 

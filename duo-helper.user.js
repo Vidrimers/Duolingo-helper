@@ -6523,38 +6523,36 @@
     for (const id of ids) {
       const a = accounts[id];
       const name = a.label || (a.me && a.me.username) || a.username || id;
-      const row = document.createElement("div");
-      row.className = "dh-setting-row";
-      row.style.borderBottom = "none";
-      row.style.padding = "3px 0";
       const isCur = id === curId;
+      const row = document.createElement("div");
+      row.style.cssText = "display:flex;align-items:center;gap:8px;padding:5px 0";
       row.innerHTML = `
-        <div class="dh-setting-label" style="min-width:0;${isCur ? "font-weight:700" : ""}">
-          <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${name}${isCur ? " ✓" : ""}</div>
-          <small>id: ${id}</small>
+        <div style="flex:1;min-width:0;${isCur ? "font-weight:700" : ""}">
+          <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px">${name}${isCur ? " ✓" : ""} <span style="opacity:0.5;font-weight:400;font-size:10px">· id: ${id}</span></div>
+          ${isCur ? '<div id="dh-tg-link-status" style="font-size:10px;opacity:0.7;margin-top:1px"></div>' : ""}
         </div>
-        ${isCur ? "" : '<button class="dh-btn" data-switch="' + id + '" style="padding:3px 10px;font-size:10px">Переключить</button>'}`;
+        ${isCur
+          ? '<button class="dh-btn" id="dh-tg-link-btn" style="padding:3px 10px;font-size:10px;flex-shrink:0">…</button>'
+          : '<button class="dh-btn" data-switch="' + id + '" style="padding:3px 10px;font-size:10px;flex-shrink:0">Переключить</button>'}`;
       const b = row.querySelector("[data-switch]");
       if (b) {
         b.addEventListener("click", () => switchToAccount(id));
       }
       box.appendChild(row);
 
-      // кнопка привязки Telegram — только у активного профиля
+      // обработчик кнопки Telegram — только у активного профиля
       if (isCur) {
-        const tgRow = document.createElement("div");
-        tgRow.style.cssText = "padding:4px 0 8px 0;display:flex;align-items:center;gap:6px";
-        tgRow.innerHTML = `
-          <span style="font-size:12px">🔗</span>
-          <button class="dh-btn" id="dh-tg-link-btn" style="padding:3px 10px;font-size:10px">Проверка…</button>
-          <span class="dh-muted" id="dh-tg-link-status" style="font-size:10px"></span>`;
-        box.appendChild(tgRow);
-        const linkBtn = tgRow.querySelector("#dh-tg-link-btn");
-        const linkStatus = tgRow.querySelector("#dh-tg-link-status");
+        const linkBtn = row.querySelector("#dh-tg-link-btn");
+        const linkStatus = row.querySelector("#dh-tg-link-status");
         if (linkBtn) {
-          linkBtn.addEventListener("click", () => startTelegramLink(linkBtn, linkStatus));
+          linkBtn.addEventListener("click", () => {
+            if (linkBtn.dataset.mode === "unlink") {
+              unlinkTelegram(id, linkBtn, linkStatus);
+            } else {
+              startTelegramLink(linkBtn, linkStatus);
+            }
+          });
         }
-        // проверяем текущий статус привязки
         checkLinkStatus(id, linkBtn, linkStatus);
       }
     }
@@ -6802,14 +6800,65 @@
         });
       });
       if (res && res.linked) {
-        if (btn) { btn.textContent = "✓ Привязан"; btn.disabled = true; }
-        if (statusEl) statusEl.textContent = "К @" + (res.tgUsername || "telegram");
+        if (btn) {
+          btn.textContent = "Отвязать";
+          btn.disabled = false;
+          btn.dataset.mode = "unlink";
+          btn.classList.add("dh-btn-danger");
+        }
+        if (statusEl) statusEl.textContent = "Telegram привязан: @" + (res.tgUsername || "telegram") + (res.tgUserId ? " · id: " + res.tgUserId : "");
       } else {
-        if (btn) { btn.textContent = "Привязать Telegram"; btn.disabled = false; }
+        if (btn) {
+          btn.textContent = "🔗 Привязать";
+          btn.disabled = false;
+          btn.dataset.mode = "link";
+          btn.classList.remove("dh-btn-danger");
+        }
         if (statusEl) statusEl.textContent = "";
       }
     } catch {
-      if (btn) { btn.textContent = "Привязать Telegram"; btn.disabled = false; }
+      if (btn) { btn.textContent = "🔗 Привязать"; btn.disabled = false; btn.dataset.mode = "link"; }
+    }
+  }
+
+  /** Отвязка Telegram. */
+  async function unlinkTelegram(duoId, btn, statusEl) {
+    const ok = await showConfirm(
+      "Отвязать Telegram?\nСвязь между Duolingo и Telegram будет удалена.",
+      "Отвязка Telegram",
+    );
+    if (!ok) return;
+    btn.disabled = true;
+    btn.textContent = "…";
+    try {
+      const res = await new Promise((resolve) => {
+        GM_xmlhttpRequest({
+          method: "POST",
+          url: "http://89.124.70.156:3777/api/unlink",
+          headers: { "content-type": "application/json" },
+          data: JSON.stringify({ duolingoUserId: duoId }),
+          timeout: 10000,
+          onload(r) { try { resolve(JSON.parse(r.responseText || "{}")); } catch { resolve(null); } },
+          onerror() { resolve(null); },
+          ontimeout() { resolve(null); },
+        });
+      });
+      if (res && res.ok) {
+        btn.textContent = "🔗 Привязать";
+        btn.disabled = false;
+        btn.dataset.mode = "link";
+        btn.classList.remove("dh-btn-danger");
+        if (statusEl) statusEl.textContent = "";
+        showToast("✓ Telegram отвязан");
+      } else {
+        btn.textContent = "Отвязать";
+        btn.disabled = false;
+        showToast("Ошибка отвязки", true);
+      }
+    } catch {
+      btn.textContent = "Отвязать";
+      btn.disabled = false;
+      showToast("Ошибка отвязки", true);
     }
   }
 
@@ -6834,8 +6883,13 @@
           });
         });
         if (res && res.linked) {
-          if (btn) { btn.textContent = "✓ Привязан"; btn.disabled = true; }
-          if (statusEl) statusEl.textContent = "К @" + (res.tgUsername || "telegram");
+          if (btn) {
+            btn.textContent = "Отвязать";
+            btn.disabled = false;
+            btn.dataset.mode = "unlink";
+            btn.classList.add("dh-btn-danger");
+          }
+          if (statusEl) statusEl.textContent = "Telegram привязан: @" + (res.tgUsername || "telegram") + (res.tgUserId ? " · id: " + res.tgUserId : "");
           showToast("✓ Telegram привязан");
           return;
         }
