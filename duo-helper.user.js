@@ -6546,7 +6546,7 @@
         tgRow.style.cssText = "padding:4px 0 8px 0;display:flex;align-items:center;gap:6px";
         tgRow.innerHTML = `
           <span style="font-size:12px">🔗</span>
-          <button class="dh-btn" id="dh-tg-link-btn" style="padding:3px 10px;font-size:10px">Привязать Telegram</button>
+          <button class="dh-btn" id="dh-tg-link-btn" style="padding:3px 10px;font-size:10px">Проверка…</button>
           <span class="dh-muted" id="dh-tg-link-status" style="font-size:10px"></span>`;
         box.appendChild(tgRow);
         const linkBtn = tgRow.querySelector("#dh-tg-link-btn");
@@ -6554,6 +6554,8 @@
         if (linkBtn) {
           linkBtn.addEventListener("click", () => startTelegramLink(linkBtn, linkStatus));
         }
+        // проверяем текущий статус привязки
+        checkLinkStatus(id, linkBtn, linkStatus);
       }
     }
     renderDashboard();
@@ -6783,6 +6785,31 @@
       btn.disabled = false;
       btn.textContent = "Привязать Telegram";
       showToast("Ошибка генерации кода", true);
+    }
+  }
+
+  /** Разовая проверка статуса привязки Telegram. */
+  async function checkLinkStatus(duoId, btn, statusEl) {
+    try {
+      const res = await new Promise((resolve) => {
+        GM_xmlhttpRequest({
+          method: "GET",
+          url: "http://89.124.70.156:3777/api/link-status?duolingoUserId=" + encodeURIComponent(duoId),
+          timeout: 10000,
+          onload(r) { try { resolve(JSON.parse(r.responseText || "{}")); } catch { resolve(null); } },
+          onerror() { resolve(null); },
+          ontimeout() { resolve(null); },
+        });
+      });
+      if (res && res.linked) {
+        if (btn) { btn.textContent = "✓ Привязан"; btn.disabled = true; }
+        if (statusEl) statusEl.textContent = "К @" + (res.tgUsername || "telegram");
+      } else {
+        if (btn) { btn.textContent = "Привязать Telegram"; btn.disabled = false; }
+        if (statusEl) statusEl.textContent = "";
+      }
+    } catch {
+      if (btn) { btn.textContent = "Привязать Telegram"; btn.disabled = false; }
     }
   }
 
