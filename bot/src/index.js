@@ -202,6 +202,25 @@ const httpServer = createServer((req, res) => {
     return;
   }
 
+  if (req.method === "GET" && req.url.startsWith("/api/link-status")) {
+    const url = new URL(req.url, `http://${req.headers.host}`);
+    const duoId = url.searchParams.get("duolingoUserId");
+    if (!duoId) {
+      res.writeHead(400, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "duolingoUserId required" }));
+      return;
+    }
+    const user = db.prepare("SELECT tg_username, tg_user_id, linked_at FROM users WHERE duolingo_user_id = ?").get(String(duoId));
+    if (user) {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ linked: true, tgUsername: user.tg_username, linkedAt: user.linked_at }));
+    } else {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ linked: false }));
+    }
+    return;
+  }
+
   res.writeHead(404, { "Content-Type": "application/json" });
   res.end(JSON.stringify({ error: "not found" }));
 });

@@ -6770,18 +6770,51 @@
         showToast("Сервер линковки недоступен", true);
         return;
       }
-      // показываем ссылку
+      // показываем ссылку и начинаем поллинг статуса
       if (statusEl) {
         statusEl.innerHTML =
           `<a href="${res.deepLink}" target="_blank" style="color:#58cc02;text-decoration:underline">Нажми для привязки →</a>`;
       }
-      btn.textContent = "Ссылка создана";
+      btn.textContent = "Ожидание…";
       showToast("Открой ссылку в Telegram для привязки");
+      // поллинг статуса
+      pollLinkStatus(myId, btn, statusEl);
     } catch {
       btn.disabled = false;
       btn.textContent = "Привязать Telegram";
       showToast("Ошибка генерации кода", true);
     }
+  }
+
+  /** Поллинг статуса привязки Telegram. */
+  function pollLinkStatus(duoId, btn, statusEl, attempts) {
+    attempts = attempts || 0;
+    if (attempts > 60) {
+      if (btn) { btn.textContent = "Привязать Telegram"; btn.disabled = false; }
+      if (statusEl) statusEl.textContent = "Время ожидания истекло";
+      return;
+    }
+    setTimeout(async () => {
+      try {
+        const res = await new Promise((resolve) => {
+          GM_xmlhttpRequest({
+            method: "GET",
+            url: "http://89.124.70.156:3777/api/link-status?duolingoUserId=" + encodeURIComponent(duoId),
+            timeout: 10000,
+            onload(r) { try { resolve(JSON.parse(r.responseText || "{}")); } catch { resolve(null); } },
+            onerror() { resolve(null); },
+            ontimeout() { resolve(null); },
+          });
+        });
+        if (res && res.linked) {
+          if (btn) { btn.textContent = "✓ Привязан"; btn.disabled = true; }
+          if (statusEl) statusEl.textContent = "К @" + (res.tgUsername || "telegram");
+          showToast("✓ Telegram привязан");
+          return;
+        }
+      } catch {}
+      pollLinkStatus(duoId, btn, statusEl, attempts + 1);
+    }, 3000);
   }
 
   /** Дашборд аккаунтов: карточки с информацией и удалением. */
