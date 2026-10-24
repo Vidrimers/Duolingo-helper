@@ -6753,7 +6753,7 @@
         GM_xmlhttpRequest({
           method: "POST",
           url: "http://89.124.70.156:3777/api/link-code",
-          headers: { "content-type": "application/json", "x-api-secret": "575859711373480667f2fb7d32f224903150de90f13f8d3c" },
+          headers: { "content-type": "application/json" },
           data: JSON.stringify({ duolingoUserId: myId }),
           timeout: 10000,
           onload(r) {

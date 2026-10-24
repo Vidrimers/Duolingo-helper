@@ -130,6 +130,9 @@ function handleLinkCode(ctx, code) {
   );
 }
 
+// rate limiting
+const rateLimitMap = new Map();
+
 // HTTP API для скрипта (генерация кодов линковки)
 const httpServer = createServer((req, res) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -143,13 +146,19 @@ const httpServer = createServer((req, res) => {
   }
 
   if (req.method === "POST" && req.url === "/api/link-code") {
-    // проверка секретного токена
-    const auth = req.headers["x-api-secret"] || "";
-    if (!config.apiSecret || auth !== config.apiSecret) {
-      res.writeHead(401, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ error: "unauthorized" }));
+    // rate limiting: 5 запросов в минуту с одного IP
+    const ip = req.headers["x-forwarded-for"] || req.socket.remoteAddress || "unknown";
+    const now = Date.now();
+    if (!rateLimitMap.has(ip)) rateLimitMap.set(ip, []);
+    const requests = rateLimitMap.get(ip).filter((t) => now - t < 60000);
+    if (requests.length >= 5) {
+      res.writeHead(429, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "rate limit" }));
       return;
     }
+    requests.push(now);
+    rateLimitMap.set(ip, requests);
+
     let body = "";
     req.on("data", (chunk) => { body += chunk; });
     req.on("end", () => {
