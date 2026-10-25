@@ -28,25 +28,128 @@ bot.command("start", (ctx) => {
     handleLinkCode(ctx, startPayload);
     return;
   }
-  ctx.reply(
-    "🦉 Duolingo Helper Bot\n\n" +
-    "Команды:\n" +
-    "/start — это сообщение\n" +
-    "/help — справка\n\n" +
-    "Для привязки аккаунта используй кнопку в скрипте Duolingo Helper."
-  );
+  showMainMenu(ctx);
+});
+
+// === Меню ===
+function mainMenuKeyboard(isAdmin) {
+  const rows = [
+    [
+      { text: "📊 Статистика", callback_data: "action_stats" },
+      { text: "👥 Друзья", callback_data: "action_friends" },
+    ],
+    [
+      { text: "🏆 Лига", callback_data: "action_league" },
+      { text: "🏷 Метки", callback_data: "action_tags" },
+    ],
+    [{ text: "⚙️ Настройки", callback_data: "menu_settings" }],
+  ];
+  if (isAdmin) {
+    rows.push([{ text: "🔧 Админ-панель", callback_data: "menu_admin" }]);
+  }
+  return { inline_keyboard: rows };
+}
+
+function settingsMenuKeyboard() {
+  return {
+    inline_keyboard: [
+      [
+        { text: "🔔 Уведомления", callback_data: "settings_notify" },
+        { text: "☁️ Бэкап", callback_data: "settings_backup" },
+      ],
+      [
+        { text: "🔗 Линковка", callback_data: "settings_link" },
+        { text: "📋 Помощь", callback_data: "settings_help" },
+      ],
+      [{ text: "← Назад", callback_data: "menu_main" }],
+    ],
+  };
+}
+
+function adminMenuKeyboard() {
+  return {
+    inline_keyboard: [
+      [
+        { text: "📊 Статистика бота", callback_data: "admin_stats" },
+        { text: "👥 Пользователи", callback_data: "admin_users" },
+      ],
+      [
+        { text: "🗑 Очистка данных", callback_data: "admin_cleanup" },
+        { text: "📋 Логи", callback_data: "admin_logs" },
+      ],
+      [{ text: "← Назад", callback_data: "menu_main" }],
+    ],
+  };
+}
+
+function showMainMenu(ctx) {
+  const isAdmin = ctx.from.id === config.adminTgId;
+  ctx.reply("🦉 Duolingo Helper\n\nВыберите действие:", {
+    reply_markup: mainMenuKeyboard(isAdmin),
+  });
+}
+
+// обработка инлайн-кнопок
+bot.on("callback_query", async (ctx) => {
+  const data = ctx.callbackQuery.data;
+  const isAdmin = ctx.from.id === config.adminTgId;
+
+  // навигация по меню
+  if (data === "menu_main") {
+    await ctx.editMessageText("🦉 Duolingo Helper\n\nВыберите действие:", {
+      reply_markup: mainMenuKeyboard(isAdmin),
+    });
+    return;
+  }
+  if (data === "menu_settings") {
+    await ctx.editMessageText("⚙️ Настройки\n\nВыберите раздел:", {
+      reply_markup: settingsMenuKeyboard(),
+    });
+    return;
+  }
+  if (data === "menu_admin") {
+    if (!isAdmin) {
+      await ctx.answerCallbackQuery("⛔ Нет доступа");
+      return;
+    }
+    await ctx.editMessageText("🔧 Админ-панель\n\nВыберите раздел:", {
+      reply_markup: adminMenuKeyboard(),
+    });
+    return;
+  }
+
+  // заглушки — «в разработке»
+  const stubs = {
+    action_stats: "📊 Статистика",
+    action_friends: "👥 Друзья",
+    action_league: "🏆 Лига",
+    action_tags: "🏷 Метки",
+    settings_notify: "🔔 Уведомления",
+    settings_backup: "☁️ Бэкап",
+    settings_link: "🔗 Линковка",
+    settings_help: "📋 Помощь",
+    admin_stats: "📊 Статистика бота",
+    admin_users: "👥 Пользователи",
+    admin_cleanup: "🗑 Очистка данных",
+    admin_logs: "📋 Логи",
+  };
+  if (stubs[data]) {
+    await ctx.editMessageText(stubs[data] + "\n\n⏳ В разработке…", {
+      reply_markup: { inline_keyboard: [[{ text: "← Назад", callback_data: "menu_main" }]] },
+    });
+    return;
+  }
+
+  await ctx.answerCallbackQuery();
 });
 
 // /help
 bot.command("help", (ctx) => {
   ctx.reply(
-    "📋 Доступные команды:\n\n" +
-    "/start — приветствие / линковка аккаунта\n" +
-    "/help — эта справка\n" +
-    "/status — статус привязки\n" +
-    "/unlink — отвязать аккаунт\n\n" +
-    "Админ-команды:\n" +
-    "/admin — панель администратора"
+    "📋 Duolingo Helper Bot\n\n" +
+    "Привяжи аккаунт через скрипт Duolingo Helper,\n" +
+    "затем используй кнопки меню.",
+    { reply_markup: mainMenuKeyboard(ctx.from.id === config.adminTgId) }
   );
 });
 
@@ -86,15 +189,9 @@ bot.command("admin", (ctx) => {
     ctx.reply("⛔ Нет доступа.");
     return;
   }
-  const userCount = db.prepare("SELECT COUNT(*) as n FROM users").get().n;
-  const backupCount = db.prepare("SELECT COUNT(*) as n FROM backups").get().n;
-  const codeCount = db.prepare("SELECT COUNT(*) as n FROM link_codes WHERE used = 0 AND expires_at > ?").get(Date.now()).n;
-  ctx.reply(
-    `🔧 Админ-панель\n\n` +
-    `Пользователей: ${userCount}\n` +
-    `Бэкапов: ${backupCount}\n` +
-    `Активных кодов: ${codeCount}`
-  );
+  ctx.reply("🔧 Админ-панель\n\nВыберите раздел:", {
+    reply_markup: adminMenuKeyboard(),
+  });
 });
 
 // обработка кода линковки из deep link
