@@ -133,15 +133,42 @@
   }
 
   function saveToSlot(slotId) {
-    const store = DATA._store;
-    if (!store) return;
-    store.accounts = store.accounts || {};
-    const prev = store.accounts[slotId] || {};
+    if (!slotId) return;
+    // перечитываем актуальный store из GM — чтобы не затереть данные других вкладок
+    let freshStore = { accounts: {} };
+    try {
+      const raw = GM_getValue(STORAGE_KEY, null);
+      if (raw) freshStore = JSON.parse(raw) || { accounts: {} };
+    } catch {}
+    freshStore.accounts = freshStore.accounts || {};
+    const prev = freshStore.accounts[slotId] || {};
     const acc = { settings: DATA.settings };
     for (const k of ACCOUNT_FIELDS) {
       if (k === "settings") continue;
       acc[k] = DATA[k];
     }
+    // мержим userTags — побеждает более свежий таймстемп
+    const localTags = DATA.userTags || {};
+    const prevTags = (prev.userTags && typeof prev.userTags === "object") ? prev.userTags : {};
+    const merged = {};
+    const allKeys = new Set([...Object.keys(prevTags), ...Object.keys(localTags)]);
+    for (const key of allKeys) {
+      const a = prevTags[key];
+      const b = localTags[key];
+      const aTime = (a && (a.updatedAt || a.deletedAt)) || 0;
+      const bTime = (b && (b.updatedAt || b.deletedAt)) || 0;
+      if (!a) merged[key] = b;
+      else if (!b) merged[key] = a;
+      else merged[key] = bTime >= aTime ? b : a;
+    }
+    // убираем tombstones старше 30 дней
+    const cutoff = Date.now() - 30 * 86400000;
+    for (const key of Object.keys(merged)) {
+      if (merged[key].deleted && (merged[key].deletedAt || 0) < cutoff) {
+        delete merged[key];
+      }
+    }
+    acc.userTags = merged;
     // не пишем чужое me — если id не совпадает со слотом
     if (acc.me && String(acc.me.id) !== String(slotId)) {
       acc.me = prev.me && String(prev.me.id) === String(slotId) ? prev.me : null;
@@ -151,8 +178,9 @@
     if (prev.username) acc.username = prev.username;
     if (prev.label) acc.label = prev.label;
     if (prev.updatedAt) acc.updatedAt = prev.updatedAt;
-    store.accounts[slotId] = acc;
-    GM_setValue(STORAGE_KEY, JSON.stringify(store));
+    freshStore.accounts[slotId] = acc;
+    DATA._store = freshStore;
+    GM_setValue(STORAGE_KEY, JSON.stringify(freshStore));
   }
 
   function saveData() {
@@ -7330,12 +7358,13 @@ function savePage() {
 
   function getTag(userId) {
     if (!userId) return null;
-    return (DATA.userTags || {})[String(userId)] || null;
+    const t = (DATA.userTags || {})[String(userId)];
+    return t && !t.deleted ? t : null;
   }
 
   function findTagByUser(userId, username) {
     const byId = getTag(userId);
-    if (byId) return byId;
+    if (byId && !byId.deleted) return byId;
     const uname = String(username || "").toLowerCase().replace(/^@/, "");
     if (!uname) return null;
     const tags = DATA.userTags || {};
@@ -7343,6 +7372,7 @@ function savePage() {
       const t = tags[key];
       if (
         t &&
+        !t.deleted &&
         t.username &&
         String(t.username).toLowerCase().replace(/^@/, "") === uname
       ) {
@@ -7357,10 +7387,16 @@ function savePage() {
     DATA.userTags = DATA.userTags || {};
     const id = String(userId);
     const prev = DATA.userTags[id] || {};
-    const next = { ...prev, ...patch };
+    const now = Date.now();
+    const next = { ...prev, ...patch, updatedAt: now };
     if (!next.label && !next.note) {
-      delete DATA.userTags[id];
+      // tombstone — помечаем удалённым, чтобы мерж не воскресил тег
+      next.deleted = true;
+      next.deletedAt = now;
+      DATA.userTags[id] = next;
     } else {
+      delete next.deleted;
+      delete next.deletedAt;
       DATA.userTags[id] = next;
     }
     saveData();
@@ -7426,7 +7462,7 @@ function savePage() {
         }
       }
     } catch {}
-    return Object.entries(DATA.userTags || {}).map(([userId, t]) => {
+    return Object.entries(DATA.userTags || {}).filter(([, t]) => !t.deleted).map(([userId, t]) => {
       const uname = t.username || "";
       // если name совпадает с username — ищем реальное имя в кеше
       let name = t.name || uname || userId;
@@ -7447,7 +7483,7 @@ function savePage() {
 
   function updateTagsBadge() {
     if (!els.tagsBadge) return;
-    const n = Object.keys(DATA.userTags || {}).length;
+    const n = Object.values(DATA.userTags || {}).filter((t) => !t.deleted).length;
     if (n > 0) {
       els.tagsBadge.style.display = "inline";
       els.tagsBadge.textContent = "(" + (n > 99 ? "99+" : n) + ")";
