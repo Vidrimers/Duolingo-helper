@@ -277,7 +277,8 @@ function cleanupOldLinkCodes() {
   }
 }
 cleanupOldLinkCodes();
-setInterval(cleanupOldLinkCodes, 30 * 24 * 60 * 60 * 1000);
+// проверяем раз в день (30 дней не влезает в 32-битный setInterval)
+setInterval(cleanupOldLinkCodes, 24 * 60 * 60 * 1000);
 
 // запуск
 bot.start({
