@@ -263,6 +263,17 @@ const httpServer = createServer((req, res) => {
 
 const HTTP_PORT = config.httpPort;
 
+// автоочистка старых кодов линковки (раз в 30 дней)
+function cleanupOldLinkCodes() {
+  const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
+  const result = db.prepare("DELETE FROM link_codes WHERE expires_at < ?").run(cutoff);
+  if (result.changes > 0) {
+    console.log(`[bot] Cleaned ${result.changes} old link codes`);
+  }
+}
+cleanupOldLinkCodes();
+setInterval(cleanupOldLinkCodes, 30 * 24 * 60 * 60 * 1000);
+
 // запуск
 bot.start({
   onStart: (me) => {
