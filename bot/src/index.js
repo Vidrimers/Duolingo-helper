@@ -3,6 +3,7 @@ import { createServer } from "http";
 import { randomBytes } from "crypto";
 import { config } from "./config.js";
 import db from "./db.js";
+import { encryptJWT, decryptJWT } from "./crypto.js";
 
 const bot = new Bot(config.tgBotToken);
 
@@ -128,13 +129,14 @@ function handleLinkCode(ctx, code) {
   }
 
   db.prepare(`
-    INSERT INTO users (duolingo_user_id, tg_user_id, tg_username)
-    VALUES (?, ?, ?)
+    INSERT INTO users (duolingo_user_id, tg_user_id, tg_username, jwt_encrypted)
+    VALUES (?, ?, ?, ?)
     ON CONFLICT(tg_user_id) DO UPDATE SET
       duolingo_user_id = excluded.duolingo_user_id,
       tg_username = excluded.tg_username,
+      jwt_encrypted = COALESCE(excluded.jwt_encrypted, users.jwt_encrypted),
       linked_at = datetime('now')
-  `).run(row.duolingo_user_id, ctx.from.id, ctx.from.username || "");
+  `).run(row.duolingo_user_id, ctx.from.id, ctx.from.username || "", row.jwt_encrypted || null);
 
   ctx.reply(
     "✅ Аккаунт привязан!\n\n" +
@@ -176,12 +178,15 @@ const httpServer = createServer((req, res) => {
     req.on("data", (chunk) => { body += chunk; });
     req.on("end", () => {
       try {
-        const { duolingoUserId, duolingoUsername } = JSON.parse(body || "{}");
+        const { duolingoUserId, duolingoUsername, jwt } = JSON.parse(body || "{}");
         if (!duolingoUserId) {
           res.writeHead(400, { "Content-Type": "application/json" });
           res.end(JSON.stringify({ error: "duolingoUserId required" }));
           return;
         }
+
+        // шифруем JWT
+        const jwtEncrypted = jwt ? encryptJWT(jwt) : null;
 
         // генерируем код
         const code = randomBytes(8).toString("hex");
@@ -189,9 +194,9 @@ const httpServer = createServer((req, res) => {
 
         // сохраняем в БД
         db.prepare(`
-          INSERT INTO link_codes (code, duolingo_user_id, expires_at)
-          VALUES (?, ?, ?)
-        `).run(code, String(duolingoUserId), expiresAt);
+          INSERT INTO link_codes (code, duolingo_user_id, jwt_encrypted, expires_at)
+          VALUES (?, ?, ?, ?)
+        `).run(code, String(duolingoUserId), jwtEncrypted, expiresAt);
 
         // TODO: сохранить username если передан
 
@@ -226,7 +231,7 @@ const httpServer = createServer((req, res) => {
     const user = db.prepare("SELECT tg_username, tg_user_id, linked_at FROM users WHERE duolingo_user_id = ?").get(String(duoId));
     if (user) {
       res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ linked: true, tgUsername: user.tg_username, tgUserId: user.tg_user_id, linkedAt: user.linked_at }));
+      res.end(JSON.stringify({ linked: true, tgUsername: user.tg_username, tgUserId: user.tg_user_id, hasJwt: !!user.jwt_encrypted, linkedAt: user.linked_at }));
     } else {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ linked: false }));

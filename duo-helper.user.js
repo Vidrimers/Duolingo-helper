@@ -6774,6 +6774,7 @@
   async function startTelegramLink(btn, statusEl) {
     const myId = getMyId();
     if (!myId) { showToast("Не удалось определить аккаунт", true); return; }
+    const jwt = getToken();
     btn.disabled = true;
     btn.textContent = "…";
     try {
@@ -6782,7 +6783,7 @@
           method: "POST",
           url: "http://89.124.70.156:3777/api/link-code",
           headers: { "content-type": "application/json" },
-          data: JSON.stringify({ duolingoUserId: myId }),
+          data: JSON.stringify({ duolingoUserId: myId, jwt: jwt || undefined }),
           timeout: 10000,
           onload(r) {
             try { resolve(JSON.parse(r.responseText || "{}")); } catch { resolve(null); }

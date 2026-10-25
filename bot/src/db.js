@@ -16,6 +16,7 @@ db.exec(`
     duolingo_username TEXT,
     tg_user_id INTEGER UNIQUE,
     tg_username TEXT,
+    jwt_encrypted TEXT,
     linked_at TEXT DEFAULT (datetime('now')),
     created_at TEXT DEFAULT (datetime('now'))
   );
@@ -23,6 +24,7 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS link_codes (
     code TEXT PRIMARY KEY,
     duolingo_user_id TEXT NOT NULL,
+    jwt_encrypted TEXT,
     expires_at INTEGER NOT NULL,
     attempts INTEGER DEFAULT 0,
     used INTEGER DEFAULT 0,
@@ -41,5 +43,13 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_users_duo ON users(duolingo_user_id);
   CREATE INDEX IF NOT EXISTS idx_backups_user ON backups(duolingo_user_id);
 `);
+
+// миграция: добавляем jwt_encrypted если нет
+try {
+  db.exec(`ALTER TABLE users ADD COLUMN jwt_encrypted TEXT`);
+} catch {}
+try {
+  db.exec(`ALTER TABLE link_codes ADD COLUMN jwt_encrypted TEXT`);
+} catch {}
 
 export default db;
