@@ -347,11 +347,26 @@ bot.on("callback_query", async (ctx) => {
     }
 
     async function addXp(amount) {
-      // XP через stories (как в скрипте)
+      // XP через stories (полный формат из скрипта)
       const res = await fetch("https://stories.duolingo.com/api2/stories/fr-en-le-passeport/complete", {
         method: "POST",
-        headers: { "content-type": "application/json", cookie: `jwt_token=${jwt}`, authorization: `Bearer ${jwt}` },
-        body: JSON.stringify({ awardXp: true, maxXp: amount }),
+        headers: {
+          "Content-Type": "application/json",
+          accept: "application/json",
+          authorization: "Bearer " + (jwt || ""),
+          cookie: `jwt_token=${jwt}`,
+        },
+        body: JSON.stringify({
+          awardXp: true,
+          completedBonusChallenge: true,
+          fromLanguage: "fr",
+          learningLanguage: "en",
+          hasXpBoost: true,
+          illustrationFormat: "svg",
+          isFeaturedStoryInPracticeHub: true,
+          isLegendaryMode: true,
+          isV2Redo: false,
+        }),
       });
       return res.ok;
     }
