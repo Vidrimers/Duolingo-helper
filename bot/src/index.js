@@ -257,16 +257,31 @@ bot.on("callback_query", async (ctx) => {
       const myScore = myIdx >= 0 ? rankings[myIdx].score : 0;
 
       const medals = ["🥇", "🥈", "🥉"];
-      let table = "🏆 <b>Лига</b>\n\n";
+      // таблица в моноширинном шрифте — колонки выровнены
+      const maxName = 18;
+      let table = "🏆 <b>Лига</b>\n\n<pre>";
       for (let i = 0; i < Math.min(rankings.length, 15); i++) {
         const r = rankings[i];
         const isMe = String(r.user_id) === myId;
         const gap = r.score - myScore;
-        const gapStr = isMe ? "← ты" : gap > 0 ? "🟢 +" + Number(gap).toLocaleString("ru") : gap < 0 ? "🔴 " + Number(gap).toLocaleString("ru") : "0";
         const medal = medals[i] || (i + 1) + ".";
-        table += `${medal} <b>${r.display_name || r.user_id}</b> <b><code>${Number(r.score).toLocaleString("ru")}</code></b> <i>${gapStr}</i>\n`;
+        const rawName = r.display_name || r.user_id || "—";
+        const name = rawName.length > maxName ? rawName.slice(0, maxName - 1) + "…" : rawName;
+        const scoreStr = Number(r.score).toLocaleString("ru");
+        const gapStr = isMe
+          ? "← ты"
+          : gap > 0
+            ? "↑ +" + Number(gap).toLocaleString("ru")
+            : gap < 0
+              ? "↓ " + Number(gap).toLocaleString("ru")
+              : "  0";
+        // выравнивание: имя — влево, счёт и gap — вправо
+        const namePad = name.padEnd(maxName);
+        const scorePad = scoreStr.padStart(7);
+        const gapPad = gapStr.padStart(9);
+        table += `${medal} ${namePad}${scorePad}  ${gapPad}\n`;
       }
-      table += `\nТвоё место: <b>${myIdx >= 0 ? myIdx + 1 : "—"}</b>`;
+      table += "</pre>\nТвоё место: <b>" + (myIdx >= 0 ? myIdx + 1 : "—") + "</b>";
 
       await ctx.editMessageText(table, {
         parse_mode: "HTML",
@@ -304,17 +319,21 @@ bot.on("callback_query", async (ctx) => {
       const myRank = myIdx >= 0 ? myIdx + 1 : 0;
 
       // кнопки только мест выше текущего
+      const medals = ["🥇", "🥈", "🥉"];
       const rows = [];
       const btns = [];
       for (let i = 1; i < myRank; i++) {
-        btns.push({ text: String(i), callback_data: "farm_target_" + i });
+        const label = i <= 3 ? medals[i - 1] + " " + i : String(i);
+        btns.push({ text: label, callback_data: "farm_target_" + i });
         if (btns.length === 5) { rows.push(btns.splice(0)); }
       }
       if (btns.length) rows.push(btns);
       rows.push([{ text: "← Назад", callback_data: "action_league" }]);
 
       await ctx.editMessageText(
-        `🎯 <b>Фарм до места</b>\n\nТвоё место: <b>${myRank}</b>\nВыберите целевое место:`,
+        `🎯 <b>Фарм до места</b>\n\n` +
+        `Эта функция поможет тебе подняться в лиге — бот будет накручивать XP, пока не достигнешь выбранного места.\n\n` +
+        `Твоё место: <b>${myRank}</b>\nВыберите целевое место:`,
         { parse_mode: "HTML", reply_markup: { inline_keyboard: rows } }
       );
     } catch {
@@ -382,15 +401,29 @@ bot.on("callback_query", async (ctx) => {
       if (myRank > 0 && myRank <= targetRank) {
         // цель достигнута
         const medals = ["🥇", "🥈", "🥉"];
-        let table = `✅ <b>Цель достигнута!</b> Место: <b>${myRank}</b>\n\n🏆 <b>Лига</b>\n\n`;
+        const maxName = 18;
+        let table = `✅ <b>Цель достигнута!</b> Место: <b>${myRank}</b>\n\n🏆 <b>Лига</b>\n\n<pre>`;
         for (let i = 0; i < Math.min(rankings.length, 15); i++) {
           const r = rankings[i];
           const isMe = String(r.user_id) === myId;
           const gap = r.score - (myIdx >= 0 ? rankings[myIdx].score : 0);
-          const gapStr = isMe ? "← ты" : gap > 0 ? "🟢 +" + Number(gap).toLocaleString("ru") : gap < 0 ? "🔴 " + Number(gap).toLocaleString("ru") : "0";
           const medal = medals[i] || (i + 1) + ".";
-          table += `${medal} <b>${r.display_name || r.user_id}</b> <b><code>${Number(r.score).toLocaleString("ru")}</code></b> <i>${gapStr}</i>\n`;
+          const rawName = r.display_name || r.user_id || "—";
+          const name = rawName.length > maxName ? rawName.slice(0, maxName - 1) + "…" : rawName;
+          const scoreStr = Number(r.score).toLocaleString("ru");
+          const gapStr = isMe
+            ? "← ты"
+            : gap > 0
+              ? "↑ +" + Number(gap).toLocaleString("ru")
+              : gap < 0
+                ? "↓ " + Number(gap).toLocaleString("ru")
+                : "  0";
+          const namePad = name.padEnd(maxName);
+          const scorePad = scoreStr.padStart(7);
+          const gapPad = gapStr.padStart(9);
+          table += `${medal} ${namePad}${scorePad}  ${gapPad}\n`;
         }
+        table += "</pre>";
         await ctx.editMessageText(table, {
           parse_mode: "HTML",
           reply_markup: { inline_keyboard: [[{ text: "← Назад", callback_data: "action_league" }]] },
