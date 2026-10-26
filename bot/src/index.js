@@ -704,6 +704,7 @@ bot.on("callback_query", async (ctx) => {
     const bugId = parseInt(data.replace("bug_accept_", ""), 10);
     const bug = db.prepare("SELECT * FROM bug_reports WHERE id = ?").get(bugId);
     if (!bug) { await ctx.answerCallbackQuery("Багрепорт не найден"); return; }
+    if (bug.status !== "received") { await ctx.answerCallbackQuery("Уже обработан"); return; }
     db.prepare("UPDATE bug_reports SET status = 'in_progress', updated_at = datetime('now') WHERE id = ?").run(bugId);
     await ctx.answerCallbackQuery("✅ Принято в работу");
     await ctx.editMessageReplyMarkup({
@@ -722,6 +723,9 @@ bot.on("callback_query", async (ctx) => {
   if (data.startsWith("bug_reject_")) {
     if (ctx.from.id !== config.adminTgId) { await ctx.answerCallbackQuery("⛔ Нет доступа"); return; }
     const bugId = parseInt(data.replace("bug_reject_", ""), 10);
+    const bugR = db.prepare("SELECT * FROM bug_reports WHERE id = ?").get(bugId);
+    if (!bugR) { await ctx.answerCallbackQuery("Багрепорт не найден"); return; }
+    if (bugR.status !== "received") { await ctx.answerCallbackQuery("Уже обработан"); return; }
     db.prepare("UPDATE bug_reports SET status = 'rejected', updated_at = datetime('now') WHERE id = ?").run(bugId);
     await ctx.answerCallbackQuery("❌ Отклонено");
     await ctx.editMessageReplyMarkup({
@@ -735,6 +739,8 @@ bot.on("callback_query", async (ctx) => {
     if (ctx.from.id !== config.adminTgId) { await ctx.answerCallbackQuery("⛔ Нет доступа"); return; }
     const bugId = parseInt(data.replace("bug_complete_", ""), 10);
     const bug = db.prepare("SELECT * FROM bug_reports WHERE id = ?").get(bugId);
+    if (!bug) { await ctx.answerCallbackQuery("Багрепорт не найден"); return; }
+    if (bug.status !== "in_progress") { await ctx.answerCallbackQuery("Нельзя выполнить — не в работе"); return; }
     db.prepare("UPDATE bug_reports SET status = 'completed', updated_at = datetime('now') WHERE id = ?").run(bugId);
     await ctx.answerCallbackQuery("✅ Выполнено");
     if (bug) {
@@ -776,50 +782,50 @@ bot.on("callback_query", async (ctx) => {
     const p = Math.max(1, Math.min(page, totalPages));
     const rows = db.prepare("SELECT * FROM bug_reports WHERE status = ? ORDER BY updated_at DESC LIMIT " + perPage + " OFFSET " + ((p - 1) * perPage)).all(status);
 
-    let text = `🐛 <b>${statusLabels[status] || status}</b> (${total})\n\n`;
-    if (!rows.length) {
-      text += "Нет записей.";
-    }
-    const kb = [];
-    for (let idx = 0; idx < rows.length; idx++) {
-      const r = rows[idx];
-      const name = r.tg_username || r.tg_user_id;
-      text += `<b>${idx + 1}.</b> 📝 <b>${(r.message || "").substring(0, 80)}${(r.message || "").length > 80 ? "…" : ""}</b>\n`;
-      text += `   @${name} · ${r.created_at}\n`;
-      if (r.admin_reply) text += `   💬 ${r.admin_reply.substring(0, 50)}…\n`;
-      text += "\n";
-      // кнопки сразу под каждым багом
-      if (status === "received") {
-        kb.push([
-          { text: "✅ Принять " + (idx + 1), callback_data: "bug_accept_" + r.id },
-          { text: "❌ Отклонить " + (idx + 1), callback_data: "bug_reject_" + r.id },
-        ]);
-      } else if (status === "in_progress") {
-        kb.push([
-          { text: "✅ Выполнено " + (idx + 1), callback_data: "bug_complete_" + r.id },
-          { text: "💬 Ответить " + (idx + 1), callback_data: "bug_reply_" + r.id },
-        ]);
-      }
-    }
-    // фильтры статусов
-    kb.push([
+    // заголовок с фильтрами и пагинацией
+    const headerKb = [];
+    headerKb.push([
       { text: "📥", callback_data: "bugs_received_1" },
       { text: "🔄", callback_data: "bugs_in_progress_1" },
       { text: "✅", callback_data: "bugs_completed_1" },
       { text: "❌", callback_data: "bugs_rejected_1" },
     ]);
-    // пагинация
     const nav = [];
     if (p > 1) nav.push({ text: "← Назад", callback_data: "bugs_" + status + "_" + (p - 1) });
-    nav.push({ text: `${p}/${totalPages}`, callback_data: "noop" });
+    nav.push({ text: p + "/" + totalPages, callback_data: "noop" });
     if (p < totalPages) nav.push({ text: "Вперёд →", callback_data: "bugs_" + status + "_" + (p + 1) });
-    if (nav.length) kb.push(nav);
-    kb.push([{ text: "← В админку", callback_data: "menu_admin" }]);
+    if (nav.length) headerKb.push(nav);
+    headerKb.push([{ text: "← В админку", callback_data: "menu_admin" }]);
 
-    await ctx.editMessageText(text, {
-      parse_mode: "HTML",
-      reply_markup: { inline_keyboard: kb },
-    }).catch(() => {});
+    await ctx.editMessageText(
+      "🐛 <b>" + (statusLabels[status] || status) + "</b> (" + total + ")\n\n" +
+      (rows.length ? "Ниже — каждый баг отдельным сообщением:" : "Нет записей."),
+      { parse_mode: "HTML", reply_markup: { inline_keyboard: headerKb } }
+    );
+
+    // каждый баг — отдельное сообщение с кнопками
+    for (const r of rows) {
+      const name = r.tg_username || r.tg_user_id;
+      let msg = `📝 <b>${r.message || ""}</b>\n`;
+      msg += `@${name} · ${r.created_at}\n`;
+      if (r.admin_reply) msg += `💬 ${r.admin_reply}\n`;
+      const kb = [];
+      if (status === "received") {
+        kb.push([
+          { text: "✅ Принять", callback_data: "bug_accept_" + r.id },
+          { text: "❌ Отклонить", callback_data: "bug_reject_" + r.id },
+        ]);
+      } else if (status === "in_progress") {
+        kb.push([
+          { text: "✅ Выполнено", callback_data: "bug_complete_" + r.id },
+          { text: "💬 Ответить", callback_data: "bug_reply_" + r.id },
+        ]);
+      }
+      await ctx.reply(msg, {
+        parse_mode: "HTML",
+        reply_markup: kb.length ? { inline_keyboard: kb } : undefined,
+      }).catch(() => {});
+    }
     return;
   }
 
