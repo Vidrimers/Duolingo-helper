@@ -169,7 +169,7 @@ bot.on("callback_query", async (ctx) => {
         }
       } catch {}
 
-      // записываем дневной XP
+      // записываем дневной XP (не затираем синхронизированные данные)
       const today = new Date().toISOString().slice(0, 10);
       const prev = db.prepare("SELECT total_xp FROM user_stats WHERE duolingo_user_id = ? AND date < ? ORDER BY date DESC LIMIT 1").get(user.duolingo_user_id, today);
       const dayXp = prev ? Math.max(0, totalXp - prev.total_xp) : 0;
@@ -177,7 +177,9 @@ bot.on("callback_query", async (ctx) => {
         INSERT INTO user_stats (duolingo_user_id, date, xp, streak, total_xp)
         VALUES (?, ?, ?, ?, ?)
         ON CONFLICT(duolingo_user_id, date) DO UPDATE SET
-          xp = excluded.xp, streak = excluded.streak, total_xp = excluded.total_xp
+          xp = MAX(user_stats.xp, excluded.xp),
+          streak = COALESCE(excluded.streak, user_stats.streak),
+          total_xp = COALESCE(excluded.total_xp, user_stats.total_xp)
       `).run(user.duolingo_user_id, today, dayXp, streak, totalXp);
 
       // сегодня / неделя из user_stats
