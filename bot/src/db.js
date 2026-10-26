@@ -47,6 +47,22 @@ db.exec(`
     PRIMARY KEY (duolingo_user_id, date)
   );
 
+  CREATE TABLE IF NOT EXISTS banned_users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    tg_user_id INTEGER UNIQUE,
+    tg_username TEXT,
+    duolingo_user_id TEXT,
+    duolingo_username TEXT,
+    reason TEXT,
+    banned_at TEXT DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS script_installs (
+    duolingo_user_id TEXT PRIMARY KEY,
+    username TEXT,
+    first_seen TEXT DEFAULT (datetime('now'))
+  );
+
   CREATE INDEX IF NOT EXISTS idx_link_codes_expires ON link_codes(expires_at);
   CREATE INDEX IF NOT EXISTS idx_users_tg ON users(tg_user_id);
   CREATE INDEX IF NOT EXISTS idx_users_duo ON users(duolingo_user_id);

@@ -7,6 +7,25 @@ import { encryptJWT, decryptJWT } from "./crypto.js";
 
 const bot = new Bot(config.tgBotToken);
 
+// блокировка забаненных пользователей
+bot.use((ctx, next) => {
+  if (ctx.from && ctx.from.id) {
+    try {
+      const banned = db.prepare("SELECT id FROM banned_users WHERE tg_user_id = ?").get(ctx.from.id);
+      if (banned) {
+        // для callback — отвечаем тихо, для команд — сообщение
+        if (ctx.callbackQuery) {
+          ctx.answerCallbackQuery("⛔ Вы заблокированы.").catch(() => {});
+        } else {
+          ctx.reply("⛔ Вы заблокированы.").catch(() => {});
+        }
+        return;
+      }
+    } catch {}
+  }
+  return next();
+});
+
 // обновляем tg_username при каждом обращении
 bot.use((ctx, next) => {
   if (ctx.from && ctx.from.id) {
@@ -66,6 +85,45 @@ function settingsMenuKeyboard() {
   };
 }
 
+// рендер бан-листа с пагинацией
+function renderBanList(ctx, page) {
+  const perPage = 10;
+  const total = db.prepare("SELECT COUNT(*) as n FROM banned_users").get().n;
+  const totalPages = Math.max(1, Math.ceil(total / perPage));
+  const p = Math.max(1, Math.min(page, totalPages));
+  const rows = db.prepare("SELECT * FROM banned_users ORDER BY banned_at DESC LIMIT ? OFFSET ?").all(perPage, (p - 1) * perPage);
+
+  let text = `🚫 <b>Бан-лист</b> (${total})\n\n`;
+  if (!rows.length) {
+    text += "Список пуст.";
+  } else {
+    for (const r of rows) {
+      const name = r.tg_username || r.tg_user_id;
+      const duo = r.duolingo_username || r.duolingo_user_id || "—";
+      text += `🚫 <b>${name}</b> · <code>${r.tg_user_id}</code>\n`;
+      text += `   duo: ${duo} · ${r.banned_at}\n\n`;
+    }
+  }
+
+  // кнопки пагинации + разбан для каждого
+  const kb = [];
+  for (const r of rows) {
+    const name = r.tg_username || r.tg_user_id;
+    kb.push([{ text: "✅ Разбанить " + name, callback_data: "unban_" + r.tg_user_id }]);
+  }
+  const nav = [];
+  if (p > 1) nav.push({ text: "← Назад", callback_data: "banlist_page_" + (p - 1) });
+  nav.push({ text: `${p}/${totalPages}`, callback_data: "noop" });
+  if (p < totalPages) nav.push({ text: "Вперёд →", callback_data: "banlist_page_" + (p + 1) });
+  if (nav.length) kb.push(nav);
+  kb.push([{ text: "← В админку", callback_data: "menu_admin" }]);
+
+  ctx.editMessageText(text, {
+    parse_mode: "HTML",
+    reply_markup: { inline_keyboard: kb },
+  }).catch(() => {});
+}
+
 function adminMenuKeyboard() {
   return {
     inline_keyboard: [
@@ -74,7 +132,10 @@ function adminMenuKeyboard() {
         { text: "👥 Пользователи", callback_data: "admin_users" },
       ],
       [
+        { text: "🚫 Бан-лист", callback_data: "admin_banlist" },
         { text: "🗑 Очистка данных", callback_data: "admin_cleanup" },
+      ],
+      [
         { text: "📋 Логи", callback_data: "admin_logs" },
       ],
       [{ text: "← Назад", callback_data: "menu_main" }],
@@ -444,6 +505,68 @@ bot.on("callback_query", async (ctx) => {
     return;
   }
 
+  // === БАН ===
+  if (data.startsWith("ban_user_")) {
+    if (ctx.from.id !== config.adminTgId) { await ctx.answerCallbackQuery("⛔ Нет доступа"); return; }
+    const targetTgId = parseInt(data.replace("ban_user_", ""), 10);
+    const targetUser = db.prepare("SELECT * FROM users WHERE tg_user_id = ?").get(targetTgId);
+    if (targetUser) {
+      db.prepare(`INSERT OR IGNORE INTO banned_users (tg_user_id, tg_username, duolingo_user_id, duolingo_username, reason)
+        VALUES (?, ?, ?, ?, ?)`).run(
+        targetTgId, targetUser.tg_username || "", targetUser.duolingo_user_id || "", targetUser.duolingo_username || "", ""
+      );
+    } else {
+      db.prepare(`INSERT OR IGNORE INTO banned_users (tg_user_id) VALUES (?)`).run(targetTgId);
+    }
+    await ctx.editMessageReplyMarkup({
+      inline_keyboard: [[{ text: "🚫 Забанен", callback_data: "noop" }]],
+    });
+    await ctx.answerCallbackQuery("🚫 Пользователь забанен");
+    return;
+  }
+
+  if (data.startsWith("unban_")) {
+    if (ctx.from.id !== config.adminTgId) { await ctx.answerCallbackQuery("⛔ Нет доступа"); return; }
+    const targetTgId = parseInt(data.replace("unban_", ""), 10);
+    db.prepare("DELETE FROM banned_users WHERE tg_user_id = ?").run(targetTgId);
+    await ctx.answerCallbackQuery("✅ Разбанен");
+    // обновляем бан-лист
+    const page = 1;
+    renderBanList(ctx, page);
+    return;
+  }
+
+  // бан-лист
+  if (data === "admin_banlist" || data.startsWith("banlist_page_")) {
+    if (ctx.from.id !== config.adminTgId) { await ctx.answerCallbackQuery("⛔ Нет доступа"); return; }
+    const page = data.startsWith("banlist_page_") ? parseInt(data.replace("banlist_page_", ""), 10) : 1;
+    renderBanList(ctx, page);
+    return;
+  }
+
+  // === АДМИН: СТАТИСТИКА ===
+  if (data === "admin_stats") {
+    if (ctx.from.id !== config.adminTgId) { await ctx.answerCallbackQuery("⛔ Нет доступа"); return; }
+    const userCount = db.prepare("SELECT COUNT(*) as n FROM users").get().n;
+    const backupCount = db.prepare("SELECT COUNT(*) as n FROM backups").get().n;
+    const codeCount = db.prepare("SELECT COUNT(*) as n FROM link_codes WHERE used = 0 AND expires_at > ?").get(Date.now()).n;
+    const installCount = db.prepare("SELECT COUNT(*) as n FROM script_installs").get().n;
+    const banCount = db.prepare("SELECT COUNT(*) as n FROM banned_users").get().n;
+    await ctx.editMessageText(
+      `📊 <b>Статистика бота</b>\n\n` +
+      `👥 Пользователей: <b>${userCount}</b>\n` +
+      `📦 Установок скрипта: <b>${installCount}</b>\n` +
+      `💾 Бэкапов: <b>${backupCount}</b>\n` +
+      `🔑 Активных кодов: <b>${codeCount}</b>\n` +
+      `🚫 Забанено: <b>${banCount}</b>`,
+      {
+        parse_mode: "HTML",
+        reply_markup: { inline_keyboard: [[{ text: "← Назад", callback_data: "menu_admin" }]] },
+      }
+    );
+    return;
+  }
+
   // заглушки — «в разработке»
   const stubs = {
     action_friends: "👥 Друзья",
@@ -452,11 +575,14 @@ bot.on("callback_query", async (ctx) => {
     settings_backup: "☁️ Бэкап",
     settings_link: "🔗 Линковка",
     settings_help: "📋 Помощь",
-    admin_stats: "📊 Статистика бота",
     admin_users: "👥 Пользователи",
     admin_cleanup: "🗑 Очистка данных",
     admin_logs: "📋 Логи",
   };
+  if (data === "noop") {
+    await ctx.answerCallbackQuery();
+    return;
+  }
   if (stubs[data]) {
     await ctx.editMessageText(stubs[data] + "\n\n⏳ В разработке…", {
       reply_markup: { inline_keyboard: [[{ text: "← Назад", callback_data: "menu_main" }]] },
@@ -565,6 +691,28 @@ function handleLinkCode(ctx, code) {
     `Duolingo ID: ${row.duolingo_user_id}\n` +
     "Теперь ты получишь доступ к командам бота."
   );
+
+  // уведомление админу о линковке
+  try {
+    const duoName = row.duolingo_username || row.duolingo_user_id;
+    const tgName = ctx.from.username || ctx.from.id;
+    bot.api.sendMessage(config.adminTgId,
+      `🔗 <b>Линковка Telegram</b>\n\n` +
+      `👤 <b>${duoName}</b> (duo)\n` +
+      `🔗 <a href="https://www.duolingo.com/profile/${encodeURIComponent(duoName)}">Профиль</a>\n` +
+      `🆔 <code>${row.duolingo_user_id}</code>\n` +
+      `📱 @${tgName} (tg) · <code>${ctx.from.id}</code>\n` +
+      `📅 ${new Date().toLocaleString("ru")}`,
+      {
+        parse_mode: "HTML",
+        reply_markup: {
+          inline_keyboard: [[
+            { text: "🚫 Забанить", callback_data: "ban_user_" + ctx.from.id },
+          ]],
+        },
+      }
+    ).catch(() => {});
+  } catch {}
 }
 
 // rate limiting
@@ -695,6 +843,24 @@ const httpServer = createServer((req, res) => {
           res.end(JSON.stringify({ error: "duolingoUserId required" }));
           return;
         }
+        // проверяем: новый ли это пользователь (установка скрипта)
+        try {
+          const existing = db.prepare("SELECT duolingo_user_id FROM script_installs WHERE duolingo_user_id = ?").get(String(duolingoUserId));
+          if (!existing) {
+            db.prepare("INSERT OR IGNORE INTO script_installs (duolingo_user_id) VALUES (?)").run(String(duolingoUserId));
+            // уведомление админу
+            const uname = duolingoUsername || duolingoUserId;
+            bot.api.sendMessage(config.adminTgId,
+              `🆕 <b>Новый пользователь скрипта</b>\n\n` +
+              `👤 <b>${uname}</b>\n` +
+              `🔗 <a href="https://www.duolingo.com/profile/${encodeURIComponent(uname)}">Профиль</a>\n` +
+              `🆔 <code>${duolingoUserId}</code>\n` +
+              `📅 ${new Date().toLocaleString("ru")}`,
+              { parse_mode: "HTML" }
+            ).catch(() => {});
+          }
+        } catch {}
+
         // сохраняем записи xpLog в user_stats
         if (Array.isArray(xpLog)) {
           for (const entry of xpLog) {
