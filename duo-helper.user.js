@@ -37,6 +37,7 @@
   const STORAGE_KEY = "dh_data";
   const MARKER_ATTR = "data-dh-marked";
   const HOST_ID = "dh-root-host";
+  const BOT_API = "http://89.124.70.156:3777";
 
   // ========== ХРАНИЛИЩЕ ==========
   // ========== ХРАНИЛИЩЕ (всё per-account, включая настройки) ==========
@@ -6762,7 +6763,7 @@
       try {
         GM_xmlhttpRequest({
           method: "POST",
-          url: "http://89.124.70.156:3777/api/sync-stats",
+          url: BOT_API + "/api/sync-stats",
           headers: { "content-type": "application/json" },
           data: JSON.stringify({ duolingoUserId: myId, duolingoUsername: (DATA.me && DATA.me.username) || "", xpLog: stats.xpLog, totalXp, streak }),
           timeout: 5000,
@@ -6821,7 +6822,7 @@
       const res = await new Promise((resolve) => {
         GM_xmlhttpRequest({
           method: "POST",
-          url: "http://89.124.70.156:3777/api/link-code",
+          url: BOT_API + "/api/link-code",
           headers: { "content-type": "application/json" },
           data: JSON.stringify({ duolingoUserId: myId, duolingoUsername: (DATA.me && DATA.me.username) || "", jwt: jwt }),
           timeout: 10000,
@@ -6861,7 +6862,7 @@
       const res = await new Promise((resolve) => {
         GM_xmlhttpRequest({
           method: "GET",
-          url: "http://89.124.70.156:3777/api/link-status?duolingoUserId=" + encodeURIComponent(duoId),
+          url: BOT_API + "/api/link-status?duolingoUserId=" + encodeURIComponent(duoId),
           timeout: 10000,
           onload(r) { try { resolve(JSON.parse(r.responseText || "{}")); } catch { resolve(null); } },
           onerror() { resolve(null); },
@@ -6903,7 +6904,7 @@
       const res = await new Promise((resolve) => {
         GM_xmlhttpRequest({
           method: "POST",
-          url: "http://89.124.70.156:3777/api/unlink",
+          url: BOT_API + "/api/unlink",
           headers: { "content-type": "application/json" },
           data: JSON.stringify({ duolingoUserId: duoId }),
           timeout: 10000,
@@ -6944,7 +6945,7 @@
         const res = await new Promise((resolve) => {
           GM_xmlhttpRequest({
             method: "GET",
-            url: "http://89.124.70.156:3777/api/link-status?duolingoUserId=" + encodeURIComponent(duoId),
+            url: BOT_API + "/api/link-status?duolingoUserId=" + encodeURIComponent(duoId),
             timeout: 10000,
             onload(r) { try { resolve(JSON.parse(r.responseText || "{}")); } catch { resolve(null); } },
             onerror() { resolve(null); },
