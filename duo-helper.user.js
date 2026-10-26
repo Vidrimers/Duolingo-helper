@@ -494,10 +494,31 @@
   function isOwnProfile(username) {
     if (!username) return false;
     const u = String(username).toLowerCase().replace(/^@/, "");
+    // 1) по username из DATA.me
     const meName = (DATA.me && DATA.me.username ? String(DATA.me.username) : "")
       .toLowerCase()
       .replace(/^@/, "");
-    return !!meName && meName === u;
+    if (meName && meName === u) return true;
+    // 2) по userId из JWT vs userId из кеша
+    const myId = getMyId();
+    if (myId) {
+      try {
+        const rows = (friendsCache && friendsCache.rows) || [];
+        for (const r of rows) {
+          if ((r.username || "").toLowerCase() === u && String(r.userId) === myId) return true;
+        }
+      } catch {}
+      try {
+        const fc = DATA.followCache || {};
+        for (const key of Object.keys(fc)) {
+          if (key.toLowerCase() === u) {
+            const entry = fc[key];
+            if (entry && entry.theirId && String(entry.theirId) === myId) return true;
+          }
+        }
+      } catch {}
+    }
+    return false;
   }
 
   // ========== UI ==========
@@ -9995,7 +10016,7 @@ function savePage() {
   // ========== SPA watcher ==========
   let lastPath = location.pathname;
 
-  function onNavigate() {
+  async function onNavigate() {
     const path = location.pathname;
     if (path === lastPath) return;
     lastPath = path;
@@ -10011,6 +10032,10 @@ function savePage() {
     if (isProfilePage()) {
       const u = getProfileUsername();
       els.userInput.value = u || "";
+      // обновляем DATA.me перед проверкой — username мог смениться
+      if (u && !isOwnProfile(u)) {
+        try { await getMe(true); } catch {}
+      }
       if (u && isOwnProfile(u)) {
         hideBadge();
         mountInlineTag(u);
