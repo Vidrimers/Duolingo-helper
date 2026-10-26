@@ -6737,6 +6737,19 @@
       DATA.stats = stats;
       saveData();
       if (typeof renderStats === "function") renderStats();
+      // синхронизируем xpLog с сервером бота
+      try {
+        GM_xmlhttpRequest({
+          method: "POST",
+          url: "http://89.124.70.156:3777/api/sync-stats",
+          headers: { "content-type": "application/json" },
+          data: JSON.stringify({ duolingoUserId: myId, xpLog: stats.xpLog, totalXp, streak }),
+          timeout: 5000,
+          onload() {},
+          onerror() {},
+          ontimeout() {},
+        });
+      } catch {}
     } catch {}
   }
 
@@ -6789,7 +6802,7 @@
           method: "POST",
           url: "http://89.124.70.156:3777/api/link-code",
           headers: { "content-type": "application/json" },
-          data: JSON.stringify({ duolingoUserId: myId, jwt: jwt }),
+          data: JSON.stringify({ duolingoUserId: myId, duolingoUsername: (DATA.me && DATA.me.username) || "", jwt: jwt }),
           timeout: 10000,
           onload(r) {
             try { resolve(JSON.parse(r.responseText || "{}")); } catch { resolve(null); }

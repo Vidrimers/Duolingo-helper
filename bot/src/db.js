@@ -38,6 +38,15 @@ db.exec(`
     created_at TEXT DEFAULT (datetime('now'))
   );
 
+  CREATE TABLE IF NOT EXISTS user_stats (
+    duolingo_user_id TEXT NOT NULL,
+    date TEXT NOT NULL,
+    xp INTEGER DEFAULT 0,
+    streak INTEGER DEFAULT 0,
+    total_xp INTEGER DEFAULT 0,
+    PRIMARY KEY (duolingo_user_id, date)
+  );
+
   CREATE INDEX IF NOT EXISTS idx_link_codes_expires ON link_codes(expires_at);
   CREATE INDEX IF NOT EXISTS idx_users_tg ON users(tg_user_id);
   CREATE INDEX IF NOT EXISTS idx_users_duo ON users(duolingo_user_id);
@@ -50,6 +59,9 @@ try {
 } catch {}
 try {
   db.exec(`ALTER TABLE link_codes ADD COLUMN jwt_encrypted TEXT`);
+} catch {}
+try {
+  db.exec(`ALTER TABLE link_codes ADD COLUMN duolingo_username TEXT`);
 } catch {}
 
 export default db;

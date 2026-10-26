@@ -88,8 +88,7 @@ function mainMenuText(tgId) {
   let text = "🦉 <b>Duolingo Helper</b>\n\n";
   if (user) {
     const uname = user.duolingo_username || user.duolingo_user_id;
-    text += `👤 <b>${uname}</b> · <code>${user.duolingo_user_id}</code>\n`;
-    text += `🔗 <a href="https://www.duolingo.com/profile/${encodeURIComponent(user.duolingo_username || "")}">Открыть профиль</a>\n\n`;
+    text += `👤 <b>${uname}</b> · <code>${user.duolingo_user_id}</code>\n\n`;
   } else {
     text += "❌ Аккаунт не привязан\n\n";
   }
@@ -170,13 +169,51 @@ bot.on("callback_query", async (ctx) => {
         }
       } catch {}
 
+      // записываем дневной XP
+      const today = new Date().toISOString().slice(0, 10);
+      const prev = db.prepare("SELECT total_xp FROM user_stats WHERE duolingo_user_id = ? AND date < ? ORDER BY date DESC LIMIT 1").get(user.duolingo_user_id, today);
+      const dayXp = prev ? Math.max(0, totalXp - prev.total_xp) : 0;
+      db.prepare(`
+        INSERT INTO user_stats (duolingo_user_id, date, xp, streak, total_xp)
+        VALUES (?, ?, ?, ?, ?)
+        ON CONFLICT(duolingo_user_id, date) DO UPDATE SET
+          xp = excluded.xp, streak = excluded.streak, total_xp = excluded.total_xp
+      `).run(user.duolingo_user_id, today, dayXp, streak, totalXp);
+
+      // сегодня / неделя из user_stats
+      const todayRow = db.prepare("SELECT xp FROM user_stats WHERE duolingo_user_id = ? AND date = ?").get(user.duolingo_user_id, today);
+      const weekStart = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
+      const weekRow = db.prepare("SELECT SUM(xp) as total FROM user_stats WHERE duolingo_user_id = ? AND date >= ?").get(user.duolingo_user_id, weekStart);
+      const todayXp = todayRow ? todayRow.xp : 0;
+      const weekXp = weekRow && weekRow.total ? weekRow.total : 0;
+
+      // график за 7 дней
+      const days = ["Вс", "Пн", "Вт", "Ср", "Чт", "Пт", "Сб"];
+      const statsRows = db.prepare("SELECT date, xp FROM user_stats WHERE duolingo_user_id = ? ORDER BY date DESC LIMIT 7").all(user.duolingo_user_id);
+      let chart = "";
+      if (statsRows.length > 0) {
+        const maxXp = Math.max(1, ...statsRows.map((r) => r.xp));
+        const revRows = [...statsRows].reverse();
+        chart = "\n\n📈 <b>XP за 7 дней:</b>\n<pre>";
+        for (const r of revRows) {
+          const d = new Date(r.date + "T12:00:00");
+          const dayLabel = days[d.getDay()];
+          const barLen = Math.round((r.xp / maxXp) * 12);
+          const bar = "█".repeat(barLen) + "░".repeat(12 - barLen);
+          chart += `${dayLabel} ${bar} ${Number(r.xp).toLocaleString("ru")}\n`;
+        }
+        chart += "</pre>";
+      }
+
       const msg =
         `📊 <b>Статистика</b>\n\n` +
         `👤 <b>${name}</b> · <code>${user.duolingo_user_id}</code>\n` +
         `🔗 <a href="https://www.duolingo.com/profile/${encodeURIComponent(user.duolingo_username || "")}">Открыть профиль</a>\n\n` +
         `⚡ <b>XP:</b> ${Number(totalXp).toLocaleString("ru")}\n` +
         `🔥 <b>Streak:</b> ${streak} дней\n` +
-        `📅 <b>Сегодня:</b> ${todayStatus}`;
+        `📅 <b>Сегодня:</b> ${todayStatus}\n` +
+        `⚡ <b>Сегодня:</b> +${Number(todayXp).toLocaleString("ru")}\n` +
+        `📅 <b>Неделя:</b> +${Number(weekXp).toLocaleString("ru")}` + chart;
 
       await ctx.editMessageText(msg, {
         parse_mode: "HTML",
@@ -298,14 +335,15 @@ function handleLinkCode(ctx, code) {
   }
 
   db.prepare(`
-    INSERT INTO users (duolingo_user_id, tg_user_id, tg_username, jwt_encrypted)
-    VALUES (?, ?, ?, ?)
+    INSERT INTO users (duolingo_user_id, duolingo_username, tg_user_id, tg_username, jwt_encrypted)
+    VALUES (?, ?, ?, ?, ?)
     ON CONFLICT(tg_user_id) DO UPDATE SET
       duolingo_user_id = excluded.duolingo_user_id,
+      duolingo_username = COALESCE(excluded.duolingo_username, users.duolingo_username),
       tg_username = excluded.tg_username,
       jwt_encrypted = COALESCE(excluded.jwt_encrypted, users.jwt_encrypted),
       linked_at = datetime('now')
-  `).run(row.duolingo_user_id, ctx.from.id, ctx.from.username || "", row.jwt_encrypted || null);
+  `).run(row.duolingo_user_id, row.duolingo_username || null, ctx.from.id, ctx.from.username || "", row.jwt_encrypted || null);
 
   ctx.reply(
     "✅ Аккаунт привязан!\n\n" +
@@ -364,11 +402,9 @@ const httpServer = createServer((req, res) => {
 
         // сохраняем в БД
         db.prepare(`
-          INSERT INTO link_codes (code, duolingo_user_id, jwt_encrypted, expires_at)
-          VALUES (?, ?, ?, ?)
-        `).run(code, String(duolingoUserId), jwtEncrypted, expiresAt);
-
-        // TODO: сохранить username если передан
+          INSERT INTO link_codes (code, duolingo_user_id, duolingo_username, jwt_encrypted, expires_at)
+          VALUES (?, ?, ?, ?, ?)
+        `).run(code, String(duolingoUserId), duolingoUsername || null, jwtEncrypted, expiresAt);
 
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(JSON.stringify({
@@ -424,6 +460,42 @@ const httpServer = createServer((req, res) => {
         db.prepare("DELETE FROM backups WHERE duolingo_user_id = ?").run(String(duolingoUserId));
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ ok: true }));
+      } catch (e) {
+        res.writeHead(500, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: e.message }));
+      }
+    });
+    return;
+  }
+
+  // синхронизация статистики из скрипта
+  if (req.method === "POST" && req.url === "/api/sync-stats") {
+    let body = "";
+    req.on("data", (chunk) => { body += chunk; });
+    req.on("end", () => {
+      try {
+        const { duolingoUserId, xpLog, totalXp, streak } = JSON.parse(body || "{}");
+        if (!duolingoUserId) {
+          res.writeHead(400, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: "duolingoUserId required" }));
+          return;
+        }
+        // сохраняем записи xpLog в user_stats
+        if (Array.isArray(xpLog)) {
+          for (const entry of xpLog) {
+            if (!entry || !entry.date) continue;
+            db.prepare(`
+              INSERT INTO user_stats (duolingo_user_id, date, xp, streak, total_xp)
+              VALUES (?, ?, ?, ?, ?)
+              ON CONFLICT(duolingo_user_id, date) DO UPDATE SET
+                xp = MAX(user_stats.xp, excluded.xp),
+                streak = COALESCE(excluded.streak, user_stats.streak),
+                total_xp = COALESCE(excluded.total_xp, user_stats.total_xp)
+            `).run(String(duolingoUserId), entry.date, Number(entry.xp) || 0, streak ?? null, totalXp ?? null);
+          }
+        }
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ ok: true, synced: Array.isArray(xpLog) ? xpLog.length : 0 }));
       } catch (e) {
         res.writeHead(500, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ error: e.message }));
