@@ -100,7 +100,7 @@ function renderBanList(ctx, page) {
   const total = db.prepare("SELECT COUNT(*) as n FROM banned_users").get().n;
   const totalPages = Math.max(1, Math.ceil(total / perPage));
   const p = Math.max(1, Math.min(page, totalPages));
-  const rows = db.prepare("SELECT * FROM banned_users ORDER BY banned_at DESC LIMIT ? OFFSET ?").all(perPage, (p - 1) * perPage);
+  const rows = db.prepare("SELECT * FROM banned_users ORDER BY banned_at DESC LIMIT " + perPage + " OFFSET " + ((p - 1) * perPage)).all();
 
   let text = `🚫 <b>Бан-лист</b> (${total})\n\n`;
   if (!rows.length) {
@@ -593,7 +593,7 @@ bot.on("callback_query", async (ctx) => {
     const total = db.prepare("SELECT COUNT(*) as n FROM users").get().n;
     const totalPages = Math.max(1, Math.ceil(total / perPage));
     const p = Math.max(1, Math.min(page, totalPages));
-    const rows = db.prepare("SELECT * FROM users ORDER BY linked_at DESC LIMIT ? OFFSET ?").all(perPage, (p - 1) * perPage);
+    const rows = db.prepare("SELECT * FROM users ORDER BY linked_at DESC LIMIT " + perPage + " OFFSET " + ((p - 1) * perPage)).all();
 
     let text = `👥 <b>Пользователи</b> (${total})\n\n`;
     if (!rows.length) {
@@ -634,7 +634,7 @@ bot.on("callback_query", async (ctx) => {
     const total = db.prepare("SELECT COUNT(*) as n FROM script_installs").get().n;
     const totalPages = Math.max(1, Math.ceil(total / perPage));
     const p = Math.max(1, Math.min(page, totalPages));
-    const rows = db.prepare("SELECT * FROM script_installs ORDER BY first_seen DESC LIMIT ? OFFSET ?").all(perPage, (p - 1) * perPage);
+    const rows = db.prepare("SELECT * FROM script_installs ORDER BY first_seen DESC LIMIT " + perPage + " OFFSET " + ((p - 1) * perPage)).all();
 
     let text = `📦 <b>Установки скрипта</b> (${total})\n\n`;
     if (!rows.length) {
@@ -734,7 +734,7 @@ bot.on("callback_query", async (ctx) => {
     const total = db.prepare("SELECT COUNT(*) as n FROM bug_reports WHERE status = ?").get(status).n;
     const totalPages = Math.max(1, Math.ceil(total / perPage));
     const p = Math.max(1, Math.min(page, totalPages));
-    const rows = db.prepare("SELECT * FROM bug_reports WHERE status = ? ORDER BY updated_at DESC LIMIT ? OFFSET ?").all(status, perPage, (p - 1) * perPage);
+    const rows = db.prepare("SELECT * FROM bug_reports WHERE status = ? ORDER BY updated_at DESC LIMIT " + perPage + " OFFSET " + ((p - 1) * perPage)).all(status);
 
     let text = `🐛 <b>${statusLabels[status] || status}</b> (${total})\n\n`;
     if (!rows.length) {
