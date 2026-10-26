@@ -246,11 +246,12 @@ bot.on("callback_query", async (ctx) => {
     try {
       const jwt = decryptJWT(user.jwt_encrypted);
       const res = await fetch(
-        "https://duolingo-leaderboards-prod.duolingo.com/leaderboards/7d9f5dd1-8423-491a-91f2-2532052038ce/users/" + user.duolingo_user_id + "?client_unlocked=true&get_reactions=false",
+        "https://duolingo-leaderboards-prod.duolingo.com/leaderboards/7d9f5dd1-8423-491a-91f2-2532052038ce/users/" + user.duolingo_user_id + "?client_unlocked=true&get_reactions=true&_=" + Date.now(),
         { headers: { accept: "application/json", cookie: `jwt_token=${jwt}`, authorization: `Bearer ${jwt}` } }
       );
       const d = await res.json();
-      const rankings = (d && d.cohort && d.cohort.rankings) || [];
+      console.log("[league] API status=" + res.status + " keys=" + Object.keys(d || {}).join(",") + " rankings=" + ((d && d.active && d.active.cohort && d.active.cohort.rankings) ? d.active.cohort.rankings.length : 0));
+      const rankings = (d && d.active && d.active.cohort && d.active.cohort.rankings) || [];
       const myId = String(user.duolingo_user_id);
       const myIdx = rankings.findIndex((r) => String(r.user_id) === myId);
       const myScore = myIdx >= 0 ? rankings[myIdx].score : 0;
@@ -293,11 +294,11 @@ bot.on("callback_query", async (ctx) => {
     try {
       const jwt = decryptJWT(user.jwt_encrypted);
       const res = await fetch(
-        "https://duolingo-leaderboards-prod.duolingo.com/leaderboards/7d9f5dd1-8423-491a-91f2-2532052038ce/users/" + user.duolingo_user_id + "?client_unlocked=true&get_reactions=false",
+        "https://duolingo-leaderboards-prod.duolingo.com/leaderboards/7d9f5dd1-8423-491a-91f2-2532052038ce/users/" + user.duolingo_user_id + "?client_unlocked=true&get_reactions=true&_=" + Date.now(),
         { headers: { accept: "application/json", cookie: `jwt_token=${jwt}`, authorization: `Bearer ${jwt}` } }
       );
       const d = await res.json();
-      const rankings = (d && d.cohort && d.cohort.rankings) || [];
+      const rankings = (d && d.active && d.active.cohort && d.active.cohort.rankings) || [];
       const myId = String(user.duolingo_user_id);
       const myIdx = rankings.findIndex((r) => String(r.user_id) === myId);
       const myRank = myIdx >= 0 ? myIdx + 1 : 0;
@@ -340,9 +341,9 @@ bot.on("callback_query", async (ctx) => {
     const headers = { accept: "application/json", cookie: `jwt_token=${jwt}`, authorization: `Bearer ${jwt}` };
 
     async function getRankings() {
-      const res = await fetch(`${LEADERBOARD}/users/${myId}?client_unlocked=true&get_reactions=false`, { headers });
+      const res = await fetch(`${LEADERBOARD}/users/${myId}?client_unlocked=true&get_reactions=true&_=${Date.now()}`, { headers });
       const d = await res.json();
-      return (d && d.cohort && d.cohort.rankings) || [];
+      return (d && d.active && d.active.cohort && d.active.cohort.rankings) || [];
     }
 
     async function addXp(amount) {
