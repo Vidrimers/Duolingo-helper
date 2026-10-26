@@ -47,7 +47,10 @@ bot.command("start", (ctx) => {
     ctx.reply(
       "🐛 <b>Багрепорт</b>\n\n" +
       "Опишите проблему одним сообщением:",
-      { parse_mode: "HTML" }
+      {
+        parse_mode: "HTML",
+        reply_markup: { inline_keyboard: [[{ text: "✖ Отмена", callback_data: "bug_cancel" }]] },
+      }
     );
     return;
   }
@@ -70,7 +73,10 @@ function mainMenuKeyboard(isAdmin) {
       { text: "🏆 Лига", callback_data: "action_league" },
       { text: "🏷 Метки", callback_data: "action_tags" },
     ],
-    [{ text: "⚙️ Настройки", callback_data: "menu_settings" }],
+    [
+      { text: "⚙️ Настройки", callback_data: "menu_settings" },
+      { text: "🐛 Багрепорт", callback_data: "bug_report_start" },
+    ],
   ];
   if (isAdmin) {
     rows.push([{ text: "🔧 Админ-панель", callback_data: "menu_admin" }]);
@@ -661,6 +667,28 @@ bot.on("callback_query", async (ctx) => {
   }
 
   // === БАГРЕПОРТЫ ===
+  if (data === "bug_report_start") {
+    bugReportState.set(ctx.from.id, "waiting");
+    await ctx.editMessageText(
+      "🐛 <b>Багрепорт</b>\n\n" +
+      "Опишите проблему одним сообщением:",
+      {
+        parse_mode: "HTML",
+        reply_markup: { inline_keyboard: [[{ text: "✖ Отмена", callback_data: "bug_cancel" }]] },
+      }
+    );
+    return;
+  }
+
+  if (data === "bug_cancel") {
+    bugReportState.delete(ctx.from.id);
+    bugReplyState.delete(ctx.from.id);
+    await ctx.editMessageText("❌ Багрепорт отменён.", {
+      reply_markup: { inline_keyboard: [[{ text: "← В меню", callback_data: "menu_main" }]] },
+    });
+    return;
+  }
+
   if (data.startsWith("bug_accept_")) {
     if (ctx.from.id !== config.adminTgId) { await ctx.answerCallbackQuery("⛔ Нет доступа"); return; }
     const bugId = parseInt(data.replace("bug_accept_", ""), 10);
@@ -856,7 +884,10 @@ bot.command("bugreport", (ctx) => {
   ctx.reply(
     "🐛 <b>Багрепорт</b>\n\n" +
     "Опишите проблему одним сообщением:",
-    { parse_mode: "HTML" }
+    {
+      parse_mode: "HTML",
+      reply_markup: { inline_keyboard: [[{ text: "✖ Отмена", callback_data: "bug_cancel" }]] },
+    }
   );
 });
 
