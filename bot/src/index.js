@@ -522,6 +522,7 @@ bot.on("callback_query", async (ctx) => {
   if (data.startsWith("ban_user_")) {
     if (ctx.from.id !== config.adminTgId) { await ctx.answerCallbackQuery("⛔ Нет доступа"); return; }
     const targetTgId = parseInt(data.replace("ban_user_", ""), 10);
+    if (isNaN(targetTgId)) { await ctx.answerCallbackQuery("❌ Неверный ID"); return; }
     if (targetTgId === config.adminTgId) {
       await ctx.answerCallbackQuery("⛔ Нельзя забанить самого себя");
       return;
@@ -674,7 +675,7 @@ bot.on("callback_query", async (ctx) => {
       ]],
     });
     // уведомление пользователю
-    bot.api.sendMessage(bug.tg_user_id,
+    bot.api.sendMessage(Number(bug.tg_user_id),
       "🔄 Ваш багрепорт принят в работу!",
     ).catch(() => {});
     return;
@@ -699,7 +700,7 @@ bot.on("callback_query", async (ctx) => {
     db.prepare("UPDATE bug_reports SET status = 'completed', updated_at = datetime('now') WHERE id = ?").run(bugId);
     await ctx.answerCallbackQuery("✅ Выполнено");
     if (bug) {
-      bot.api.sendMessage(bug.tg_user_id, "✅ Ваш багрепорт выполнен!").catch(() => {});
+      bot.api.sendMessage(Number(bug.tg_user_id), "✅ Ваш багрепорт выполнен!").catch(() => {});
     }
     return;
   }
@@ -910,7 +911,7 @@ bot.on("message:text", (ctx) => {
     if (bug) {
       db.prepare("UPDATE bug_reports SET admin_reply = ?, status = 'in_progress', updated_at = datetime('now') WHERE id = ?").run(replyText, bugId);
       // отправляем ответ пользователю
-      bot.api.sendMessage(bug.tg_user_id, `💬 Ответ от поддержки:\n\n${replyText}`).catch(() => {});
+      bot.api.sendMessage(Number(bug.tg_user_id), `💬 Ответ от поддержки:\n\n${replyText}`).catch(() => {});
       ctx.reply("✅ Ответ отправлен пользователю.");
     }
     return;
@@ -1164,9 +1165,9 @@ const httpServer = createServer((req, res) => {
                 {
                   parse_mode: "HTML",
                   reply_markup: {
-                    inline_keyboard: [[
-                      { text: "🚫 Забанить", callback_data: "ban_user_" + (prevUser && prevUser.tg_user_id ? prevUser.tg_user_id : "") },
-                    ]],
+                    inline_keyboard: (prevUser && prevUser.tg_user_id) ? [[
+                      { text: "🚫 Забанить", callback_data: "ban_user_" + prevUser.tg_user_id },
+                    ]] : [],
                   },
                 }
               ).catch(() => {});
