@@ -82,9 +82,25 @@ function adminMenuKeyboard() {
   };
 }
 
+// формирование текста главного меню
+function mainMenuText(tgId) {
+  const user = db.prepare("SELECT duolingo_user_id, duolingo_username FROM users WHERE tg_user_id = ?").get(tgId);
+  let text = "🦉 <b>Duolingo Helper</b>\n\n";
+  if (user) {
+    const uname = user.duolingo_username || user.duolingo_user_id;
+    text += `👤 <b>${uname}</b> · <code>${user.duolingo_user_id}</code>\n`;
+    text += `🔗 <a href="https://www.duolingo.com/profile/${encodeURIComponent(user.duolingo_username || "")}">Открыть профиль</a>\n\n`;
+  } else {
+    text += "❌ Аккаунт не привязан\n\n";
+  }
+  text += "Выберите действие:";
+  return text;
+}
+
 function showMainMenu(ctx) {
   const isAdmin = ctx.from.id === config.adminTgId;
-  ctx.reply("🦉 Duolingo Helper\n\nВыберите действие:", {
+  ctx.reply(mainMenuText(ctx.from.id), {
+    parse_mode: "HTML",
     reply_markup: mainMenuKeyboard(isAdmin),
   });
 }
@@ -96,7 +112,8 @@ bot.on("callback_query", async (ctx) => {
 
   // навигация по меню
   if (data === "menu_main") {
-    await ctx.editMessageText("🦉 Duolingo Helper\n\nВыберите действие:", {
+    await ctx.editMessageText(mainMenuText(ctx.from.id), {
+      parse_mode: "HTML",
       reply_markup: mainMenuKeyboard(isAdmin),
     });
     return;
@@ -118,9 +135,64 @@ bot.on("callback_query", async (ctx) => {
     return;
   }
 
+  // реальная статистика
+  if (data === "action_stats") {
+    await ctx.answerCallbackQuery();
+    const user = db.prepare("SELECT * FROM users WHERE tg_user_id = ?").get(ctx.from.id);
+    if (!user || !user.jwt_encrypted) {
+      await ctx.editMessageText("📊 Статистика\n\n❌ Аккаунт не привязан или JWT отсутствует.", {
+        reply_markup: { inline_keyboard: [[{ text: "← Назад", callback_data: "menu_main" }]] },
+      });
+      return;
+    }
+    await ctx.editMessageText("📊 <b>Статистика</b>\n\n⏳ Загрузка…", {
+      parse_mode: "HTML",
+      reply_markup: { inline_keyboard: [[{ text: "← Назад", callback_data: "menu_main" }]] },
+    });
+    try {
+      const jwt = decryptJWT(user.jwt_encrypted);
+      const res = await fetch(
+        `https://www.duolingo.com/2017-06-30/users/${user.duolingo_user_id}?fields=totalXp,streak,name,username,streakData`,
+        { headers: { accept: "application/json", cookie: `jwt_token=${jwt}` } }
+      );
+      const d = await res.json();
+      const totalXp = d.totalXp ?? 0;
+      const streak = d.streak ?? 0;
+      const name = d.name || user.duolingo_username || user.duolingo_user_id;
+
+      // определяем, занимался ли сегодня
+      let todayStatus = "⚠️ <i>Ещё нет</i>";
+      try {
+        const lastExtended = d.streakData?.currentStreak?.lastExtendedDate;
+        if (lastExtended) {
+          const today = new Date().toISOString().slice(0, 10);
+          if (lastExtended >= today) todayStatus = "✅ <i>Занимался</i>";
+        }
+      } catch {}
+
+      const msg =
+        `📊 <b>Статистика</b>\n\n` +
+        `👤 <b>${name}</b> · <code>${user.duolingo_user_id}</code>\n` +
+        `🔗 <a href="https://www.duolingo.com/profile/${encodeURIComponent(user.duolingo_username || "")}">Открыть профиль</a>\n\n` +
+        `⚡ <b>XP:</b> ${Number(totalXp).toLocaleString("ru")}\n` +
+        `🔥 <b>Streak:</b> ${streak} дней\n` +
+        `📅 <b>Сегодня:</b> ${todayStatus}`;
+
+      await ctx.editMessageText(msg, {
+        parse_mode: "HTML",
+        reply_markup: { inline_keyboard: [[{ text: "← Назад", callback_data: "menu_main" }]] },
+      });
+    } catch (e) {
+      await ctx.editMessageText("📊 <b>Статистика</b>\n\n❌ Ошибка загрузки данных.", {
+        parse_mode: "HTML",
+        reply_markup: { inline_keyboard: [[{ text: "← Назад", callback_data: "menu_main" }]] },
+      });
+    }
+    return;
+  }
+
   // заглушки — «в разработке»
   const stubs = {
-    action_stats: "📊 Статистика",
     action_friends: "👥 Друзья",
     action_league: "🏆 Лига",
     action_tags: "🏷 Метки",
