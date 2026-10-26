@@ -7,6 +7,20 @@ import { encryptJWT, decryptJWT } from "./crypto.js";
 
 const bot = new Bot(config.tgBotToken);
 
+// локальная дата (YYYY-MM-DD) — не UTC, чтобы «сегодня» считалось по времени сервера
+function localDateStr(d = new Date()) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return y + "-" + m + "-" + day;
+}
+
+// ответ на callback + безопасное редактирование («message is not modified» не роняет бота)
+async function safeEdit(ctx, text, opts) {
+  await ctx.answerCallbackQuery().catch(() => {});
+  await ctx.editMessageText(text, opts).catch(() => {});
+}
+
 // блокировка забаненных пользователей
 bot.use((ctx, next) => {
   if (ctx.from && ctx.from.id) {
@@ -111,7 +125,7 @@ function settingsMenuKeyboard() {
 }
 
 // рендер бан-листа с пагинацией
-function renderBanList(ctx, page) {
+async function renderBanList(ctx, page) {
   const perPage = 10;
   const total = db.prepare("SELECT COUNT(*) as n FROM banned_users").get().n;
   const totalPages = Math.max(1, Math.ceil(total / perPage));
@@ -143,10 +157,10 @@ function renderBanList(ctx, page) {
   if (nav.length) kb.push(nav);
   kb.push([{ text: "← В админку", callback_data: "menu_admin" }]);
 
-  ctx.editMessageText(text, {
+  await safeEdit(ctx, text, {
     parse_mode: "HTML",
     reply_markup: { inline_keyboard: kb },
-  }).catch(() => {});
+  });
 }
 
 function adminMenuKeyboard() {
@@ -254,13 +268,13 @@ bot.on("callback_query", async (ctx) => {
       try {
         const lastExtended = d.streakData?.currentStreak?.lastExtendedDate;
         if (lastExtended) {
-          const today = new Date().toISOString().slice(0, 10);
+          const today = localDateStr();
           if (lastExtended >= today) todayStatus = "✅ <i>Занимался</i>";
         }
       } catch {}
 
       // записываем дневной XP (не затираем синхронизированные данные)
-      const today = new Date().toISOString().slice(0, 10);
+      const today = localDateStr();
       const prev = db.prepare("SELECT total_xp FROM user_stats WHERE duolingo_user_id = ? AND date < ? ORDER BY date DESC LIMIT 1").get(user.duolingo_user_id, today);
       const dayXp = prev ? Math.max(0, totalXp - prev.total_xp) : 0;
       db.prepare(`
@@ -274,7 +288,7 @@ bot.on("callback_query", async (ctx) => {
 
       // сегодня / неделя из user_stats
       const todayRow = db.prepare("SELECT xp FROM user_stats WHERE duolingo_user_id = ? AND date = ?").get(user.duolingo_user_id, today);
-      const weekStart = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
+      const weekStart = localDateStr(new Date(Date.now() - 7 * 86400000));
       const weekRow = db.prepare("SELECT SUM(xp) as total FROM user_stats WHERE duolingo_user_id = ? AND date >= ?").get(user.duolingo_user_id, weekStart);
       const todayXp = todayRow ? todayRow.xp : 0;
       const weekXp = weekRow && weekRow.total ? weekRow.total : 0;
@@ -554,7 +568,7 @@ bot.on("callback_query", async (ctx) => {
     }
     await ctx.editMessageReplyMarkup({
       inline_keyboard: [[{ text: "🚫 Забанен", callback_data: "noop" }]],
-    });
+    }).catch(() => {});
     await ctx.answerCallbackQuery("🚫 Пользователь забанен");
     return;
   }
@@ -566,7 +580,7 @@ bot.on("callback_query", async (ctx) => {
     await ctx.answerCallbackQuery("✅ Разбанен");
     // обновляем бан-лист
     const page = 1;
-    renderBanList(ctx, page);
+    await renderBanList(ctx, page);
     return;
   }
 
@@ -574,7 +588,7 @@ bot.on("callback_query", async (ctx) => {
   if (data === "admin_banlist" || data.startsWith("banlist_page_")) {
     if (ctx.from.id !== config.adminTgId) { await ctx.answerCallbackQuery("⛔ Нет доступа"); return; }
     const page = data.startsWith("banlist_page_") ? parseInt(data.replace("banlist_page_", ""), 10) : 1;
-    renderBanList(ctx, page);
+    await renderBanList(ctx, page);
     return;
   }
 
@@ -635,10 +649,10 @@ bot.on("callback_query", async (ctx) => {
     if (nav.length) kb.push(nav);
     kb.push([{ text: "← В админку", callback_data: "menu_admin" }]);
 
-    await ctx.editMessageText(text, {
+    await safeEdit(ctx, text, {
       parse_mode: "HTML",
       reply_markup: { inline_keyboard: kb },
-    }).catch(() => {});
+    });
     return;
   }
 
@@ -669,17 +683,17 @@ bot.on("callback_query", async (ctx) => {
     if (nav.length) kb.push(nav);
     kb.push([{ text: "← В админку", callback_data: "menu_admin" }]);
 
-    await ctx.editMessageText(text, {
+    await safeEdit(ctx, text, {
       parse_mode: "HTML",
       reply_markup: { inline_keyboard: kb },
-    }).catch(() => {});
+    });
     return;
   }
 
   // === БАГРЕПОРТЫ ===
   if (data === "bug_report_start") {
     bugReportState.set(ctx.from.id, "waiting");
-    await ctx.editMessageText(
+    await safeEdit(ctx,
       "🐛 <b>Багрепорт</b>\n\n" +
       "Опишите проблему одним сообщением:",
       {
@@ -693,7 +707,7 @@ bot.on("callback_query", async (ctx) => {
   if (data === "bug_cancel") {
     bugReportState.delete(ctx.from.id);
     bugReplyState.delete(ctx.from.id);
-    await ctx.editMessageText("❌ Багрепорт отменён.", {
+    await safeEdit(ctx, "❌ Багрепорт отменён.", {
       reply_markup: { inline_keyboard: [[{ text: "← В меню", callback_data: "menu_main" }]] },
     });
     return;
@@ -712,7 +726,7 @@ bot.on("callback_query", async (ctx) => {
         { text: "🔄 В работе", callback_data: "noop" },
         { text: "💬 Ответить", callback_data: "bug_reply_" + bugId },
       ]],
-    });
+    }).catch(() => {});
     // уведомление пользователю
     bot.api.sendMessage(Number(bug.tg_user_id),
       "🔄 Ваш багрепорт принят в работу!",
@@ -730,7 +744,7 @@ bot.on("callback_query", async (ctx) => {
     await ctx.answerCallbackQuery("❌ Отклонено");
     await ctx.editMessageReplyMarkup({
       inline_keyboard: [[{ text: "❌ Отклонён", callback_data: "noop" }]],
-    });
+    }).catch(() => {});
     // пользователю НЕ отправляем уведомление об отклонении
     return;
   }
@@ -754,6 +768,7 @@ bot.on("callback_query", async (ctx) => {
     const bugId = parseInt(data.replace("bug_reply_", ""), 10);
     // запрашиваем текст ответа
     bugReplyState.set(ctx.from.id, bugId);
+    await ctx.answerCallbackQuery().catch(() => {});
     await ctx.reply("💬 Введите текст ответа пользователю:");
     return;
   }
@@ -825,10 +840,10 @@ bot.on("callback_query", async (ctx) => {
     if (nav.length) kb.push(nav);
     kb.push([{ text: "← В админку", callback_data: "menu_admin" }]);
 
-    await ctx.editMessageText(text, {
+    await safeEdit(ctx, text, {
       parse_mode: "HTML",
       reply_markup: { inline_keyboard: kb },
-    }).catch(() => {});
+    });
     return;
   }
 
@@ -848,7 +863,7 @@ bot.on("callback_query", async (ctx) => {
     return;
   }
   if (stubs[data]) {
-    await ctx.editMessageText(stubs[data] + "\n\n⏳ В разработке…", {
+    await safeEdit(ctx, stubs[data] + "\n\n⏳ В разработке…", {
       reply_markup: { inline_keyboard: [[{ text: "← Назад", callback_data: "menu_main" }]] },
     });
     return;

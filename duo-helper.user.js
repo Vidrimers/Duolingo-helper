@@ -39,6 +39,14 @@
   const HOST_ID = "dh-root-host";
   const BOT_API = "http://89.124.70.156:3777";
 
+  // локальная дата (YYYY-MM-DD) — не UTC, чтобы «сегодня» считалось по времени пользователя
+  function localDateStr(d = new Date()) {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return y + "-" + m + "-" + day;
+  }
+
   // ========== ХРАНИЛИЩЕ ==========
   // ========== ХРАНИЛИЩЕ (всё per-account, включая настройки) ==========
   const ACCOUNT_FIELDS = [
@@ -6738,7 +6746,7 @@
 
       const stats = DATA.stats || { xpLog: [], leagueLog: [], lastSnapshot: null };
       const now = Date.now();
-      const today = new Date(now).toISOString().slice(0, 10);
+      const today = localDateStr(new Date(now));
       const last = stats.lastSnapshot;
 
       // записываем XP за день (накапливаем разницу)
@@ -6751,7 +6759,7 @@
           stats.xpLog.push({ date: today, xp: Math.max(0, delta) });
         }
         // обрезаем до 90 дней
-        const cutoff = new Date(now - 90 * 86400000).toISOString().slice(0, 10);
+        const cutoff = localDateStr(new Date(now - 90 * 86400000));
         stats.xpLog = stats.xpLog.filter((e) => e.date >= cutoff);
       }
 
@@ -6777,11 +6785,11 @@
 
   function renderStats() {
     const stats = DATA.stats || { xpLog: [], leagueLog: [], lastSnapshot: null };
-    const today = new Date().toISOString().slice(0, 10);
+    const today = localDateStr();
 
     // сегодня / неделя
     const todayXp = stats.xpLog.find((e) => e.date === today);
-    const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
+    const weekAgo = localDateStr(new Date(Date.now() - 7 * 86400000));
     const weekXp = stats.xpLog.filter((e) => e.date >= weekAgo).reduce((s, e) => s + (e.xp || 0), 0);
     const streak = (stats.lastSnapshot && stats.lastSnapshot.streak) ?? "—";
 
@@ -6793,7 +6801,7 @@
     if (els.statChart) {
       const days = [];
       for (let i = 6; i >= 0; i--) {
-        const d = new Date(Date.now() - i * 86400000).toISOString().slice(0, 10);
+        const d = localDateStr(new Date(Date.now() - i * 86400000));
         const entry = stats.xpLog.find((e) => e.date === d);
         days.push({ date: d, xp: entry ? entry.xp : 0 });
       }
