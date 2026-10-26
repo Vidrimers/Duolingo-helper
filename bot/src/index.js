@@ -229,10 +229,188 @@ bot.on("callback_query", async (ctx) => {
     return;
   }
 
+  // === ЛИГА ===
+  if (data === "action_league" || data === "league_refresh") {
+    await ctx.answerCallbackQuery();
+    const user = db.prepare("SELECT * FROM users WHERE tg_user_id = ?").get(ctx.from.id);
+    if (!user || !user.jwt_encrypted) {
+      await ctx.editMessageText("🏆 Лига\n\n❌ Аккаунт не привязан.", {
+        reply_markup: { inline_keyboard: [[{ text: "← Назад", callback_data: "menu_main" }]] },
+      });
+      return;
+    }
+    await ctx.editMessageText("🏆 <b>Лига</b>\n\n⏳ Загрузка…", {
+      parse_mode: "HTML",
+      reply_markup: { inline_keyboard: [[{ text: "← Назад", callback_data: "menu_main" }]] },
+    });
+    try {
+      const jwt = decryptJWT(user.jwt_encrypted);
+      const res = await fetch(
+        "https://duolingo-leaderboards-prod.duolingo.com/leaderboards/7d9f5dd1-8423-491a-91f2-2532052038ce/users/" + user.duolingo_user_id + "?client_unlocked=true&get_reactions=false",
+        { headers: { accept: "application/json", cookie: `jwt_token=${jwt}`, authorization: `Bearer ${jwt}` } }
+      );
+      const d = await res.json();
+      const rankings = (d && d.cohort && d.cohort.rankings) || [];
+      const myId = String(user.duolingo_user_id);
+      const myIdx = rankings.findIndex((r) => String(r.user_id) === myId);
+      const myScore = myIdx >= 0 ? rankings[myIdx].score : 0;
+
+      const medals = ["🥇", "🥈", "🥉"];
+      let table = "🏆 <b>Лига</b>\n\n";
+      for (let i = 0; i < Math.min(rankings.length, 15); i++) {
+        const r = rankings[i];
+        const isMe = String(r.user_id) === myId;
+        const gap = r.score - myScore;
+        const gapStr = isMe ? "← ты" : gap > 0 ? "+" + Number(gap).toLocaleString("ru") : Number(gap).toLocaleString("ru");
+        const medal = medals[i] || (i + 1) + ".";
+        table += `${medal} <b>${r.display_name || r.user_id}</b> ${Number(r.score).toLocaleString("ru")} <i>${gapStr}</i>\n`;
+      }
+      table += `\nТвоё место: <b>${myIdx >= 0 ? myIdx + 1 : "—"}</b>`;
+
+      await ctx.editMessageText(table, {
+        parse_mode: "HTML",
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: "🎯 Фарм до места", callback_data: "farm_menu" }],
+            [{ text: "🔄 Обновить", callback_data: "league_refresh" }, { text: "← Назад", callback_data: "menu_main" }],
+          ],
+        },
+      });
+    } catch (e) {
+      await ctx.editMessageText("🏆 <b>Лига</b>\n\n❌ Ошибка загрузки.", {
+        parse_mode: "HTML",
+        reply_markup: { inline_keyboard: [[{ text: "← Назад", callback_data: "menu_main" }]] },
+      });
+    }
+    return;
+  }
+
+  // меню выбора места для фарма
+  if (data === "farm_menu") {
+    await ctx.answerCallbackQuery();
+    const user = db.prepare("SELECT * FROM users WHERE tg_user_id = ?").get(ctx.from.id);
+    if (!user || !user.jwt_encrypted) return;
+    try {
+      const jwt = decryptJWT(user.jwt_encrypted);
+      const res = await fetch(
+        "https://duolingo-leaderboards-prod.duolingo.com/leaderboards/7d9f5dd1-8423-491a-91f2-2532052038ce/users/" + user.duolingo_user_id + "?client_unlocked=true&get_reactions=false",
+        { headers: { accept: "application/json", cookie: `jwt_token=${jwt}`, authorization: `Bearer ${jwt}` } }
+      );
+      const d = await res.json();
+      const rankings = (d && d.cohort && d.cohort.rankings) || [];
+      const myId = String(user.duolingo_user_id);
+      const myIdx = rankings.findIndex((r) => String(r.user_id) === myId);
+      const myRank = myIdx >= 0 ? myIdx + 1 : 0;
+
+      // кнопки только мест выше текущего
+      const rows = [];
+      const btns = [];
+      for (let i = 1; i < myRank; i++) {
+        btns.push({ text: String(i), callback_data: "farm_target_" + i });
+        if (btns.length === 5) { rows.push(btns.splice(0)); }
+      }
+      if (btns.length) rows.push(btns);
+      rows.push([{ text: "← Назад", callback_data: "action_league" }]);
+
+      await ctx.editMessageText(
+        `🎯 <b>Фарм до места</b>\n\nТвоё место: <b>${myRank}</b>\nВыберите целевое место:`,
+        { parse_mode: "HTML", reply_markup: { inline_keyboard: rows } }
+      );
+    } catch {
+      await ctx.answerCallbackQuery("❌ Ошибка");
+    }
+    return;
+  }
+
+  // фарм до места
+  if (data.startsWith("farm_target_")) {
+    const targetRank = parseInt(data.replace("farm_target_", ""), 10);
+    await ctx.answerCallbackQuery();
+    const user = db.prepare("SELECT * FROM users WHERE tg_user_id = ?").get(ctx.from.id);
+    if (!user || !user.jwt_encrypted) return;
+    const jwt = decryptJWT(user.jwt_encrypted);
+    const myId = String(user.duolingo_user_id);
+
+    await ctx.editMessageText(`🎯 <b>Фарм до места ${targetRank}</b>\n\n⏳ Начинаю…`, {
+      parse_mode: "HTML",
+      reply_markup: { inline_keyboard: [] },
+    });
+
+    const LEADERBOARD = "https://duolingo-leaderboards-prod.duolingo.com/leaderboards/7d9f5dd1-8423-491a-91f2-2532052038ce";
+    const headers = { accept: "application/json", cookie: `jwt_token=${jwt}`, authorization: `Bearer ${jwt}` };
+
+    async function getRankings() {
+      const res = await fetch(`${LEADERBOARD}/users/${myId}?client_unlocked=true&get_reactions=false`, { headers });
+      const d = await res.json();
+      return (d && d.cohort && d.cohort.rankings) || [];
+    }
+
+    async function addXp(amount) {
+      // XP через stories (как в скрипте)
+      const res = await fetch("https://stories.duolingo.com/api2/stories/fr-en-le-passeport/complete", {
+        method: "POST",
+        headers: { "content-type": "application/json", cookie: `jwt_token=${jwt}`, authorization: `Bearer ${jwt}` },
+        body: JSON.stringify({ awardXp: true, maxXp: amount }),
+      });
+      return res.ok;
+    }
+
+    let iterations = 0;
+    const maxIterations = 200; // страховка
+    while (iterations < maxIterations) {
+      iterations++;
+      const rankings = await getRankings();
+      const myIdx = rankings.findIndex((r) => String(r.user_id) === myId);
+      const myRank = myIdx >= 0 ? myIdx + 1 : 0;
+
+      if (myRank > 0 && myRank <= targetRank) {
+        // цель достигнута
+        const medals = ["🥇", "🥈", "🥉"];
+        let table = `✅ <b>Цель достигнута!</b> Место: <b>${myRank}</b>\n\n🏆 <b>Лига</b>\n\n`;
+        for (let i = 0; i < Math.min(rankings.length, 15); i++) {
+          const r = rankings[i];
+          const isMe = String(r.user_id) === myId;
+          const gap = r.score - (myIdx >= 0 ? rankings[myIdx].score : 0);
+          const gapStr = isMe ? "← ты" : gap > 0 ? "+" + Number(gap).toLocaleString("ru") : Number(gap).toLocaleString("ru");
+          const medal = medals[i] || (i + 1) + ".";
+          table += `${medal} <b>${r.display_name || r.user_id}</b> ${Number(r.score).toLocaleString("ru")} <i>${gapStr}</i>\n`;
+        }
+        await ctx.editMessageText(table, {
+          parse_mode: "HTML",
+          reply_markup: { inline_keyboard: [[{ text: "← Назад", callback_data: "action_league" }]] },
+        });
+        return;
+      }
+
+      // добавляем XP
+      await addXp(50);
+      await new Promise((r) => setTimeout(r, 1500));
+
+      // обновляем прогресс
+      const newRankings = await getRankings();
+      const newIdx = newRankings.findIndex((r) => String(r.user_id) === myId);
+      const newRank = newIdx >= 0 ? newIdx + 1 : 0;
+      const myNewScore = newIdx >= 0 ? newRankings[newIdx].score : 0;
+
+      await ctx.editMessageText(
+        `🎯 <b>Фарм до места ${targetRank}</b>\n\n` +
+        `⚡ +50 XP · место: <b>${newRank}</b>\n` +
+        `📊 Текущий XP: <b>${Number(myNewScore).toLocaleString("ru")}</b>\n` +
+        `⏱ Цикл: ${iterations}`,
+        { parse_mode: "HTML", reply_markup: { inline_keyboard: [] } }
+      ).catch(() => {});
+    }
+
+    await ctx.editMessageText("🎯 <b>Фарм</b>\n\n⚠️ Достигнут лимит итераций.", {
+      parse_mode: "HTML",
+      reply_markup: { inline_keyboard: [[{ text: "← Назад", callback_data: "action_league" }]] },
+    });
+    return;
+  }
+
   // заглушки — «в разработке»
   const stubs = {
     action_friends: "👥 Друзья",
-    action_league: "🏆 Лига",
     action_tags: "🏷 Метки",
     settings_notify: "🔔 Уведомления",
     settings_backup: "☁️ Бэкап",
