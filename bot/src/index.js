@@ -720,9 +720,11 @@ bot.on("callback_query", async (ctx) => {
     let status = "received";
     let page = 1;
     if (data.startsWith("bugs_")) {
-      const parts = data.split("_");
-      status = parts[1] || "received";
-      page = parseInt(parts[2] || "1", 10);
+      const m = data.match(/^bugs_(.+)_(\d+)$/);
+      if (m) {
+        status = m[1];
+        page = parseInt(m[2], 10) || 1;
+      }
     }
     const statusLabels = {
       received: "📥 Полученные",
@@ -1226,6 +1228,11 @@ try {
   `).run();
   console.log("[bot] script_installs backfilled");
 } catch {}
+
+// обработка ошибок — чтобы бот не падал
+bot.catch = (err) => {
+  console.error("[bot] Error:", err.message || err);
+};
 
 // запуск
 bot.start({
