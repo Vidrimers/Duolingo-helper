@@ -6775,6 +6775,7 @@
     const myId = getMyId();
     if (!myId) { showToast("Не удалось определить аккаунт", true); return; }
     const jwt = getToken();
+    console.log("[TG-LINK] getToken() =", jwt ? "YES len=" + jwt.length : "NULL");
     btn.disabled = true;
     btn.textContent = "…";
     try {

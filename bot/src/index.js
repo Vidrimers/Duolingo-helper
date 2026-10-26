@@ -348,6 +348,7 @@ const httpServer = createServer((req, res) => {
     req.on("end", () => {
       try {
         const { duolingoUserId, duolingoUsername, jwt } = JSON.parse(body || "{}");
+        console.log("[link-code] duolingoUserId=" + duolingoUserId + " jwt=" + (jwt ? "YES len=" + jwt.length : "NULL/UNDEFINED"));
         if (!duolingoUserId) {
           res.writeHead(400, { "Content-Type": "application/json" });
           res.end(JSON.stringify({ error: "duolingoUserId required" }));
