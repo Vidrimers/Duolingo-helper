@@ -132,10 +132,11 @@ function adminMenuKeyboard() {
         { text: "👥 Пользователи", callback_data: "admin_users" },
       ],
       [
+        { text: "📦 Установки", callback_data: "admin_installs" },
         { text: "🚫 Бан-лист", callback_data: "admin_banlist" },
-        { text: "🗑 Очистка данных", callback_data: "admin_cleanup" },
       ],
       [
+        { text: "🗑 Очистка данных", callback_data: "admin_cleanup" },
         { text: "📋 Логи", callback_data: "admin_logs" },
       ],
       [{ text: "← Назад", callback_data: "menu_main" }],
@@ -509,6 +510,10 @@ bot.on("callback_query", async (ctx) => {
   if (data.startsWith("ban_user_")) {
     if (ctx.from.id !== config.adminTgId) { await ctx.answerCallbackQuery("⛔ Нет доступа"); return; }
     const targetTgId = parseInt(data.replace("ban_user_", ""), 10);
+    if (targetTgId === config.adminTgId) {
+      await ctx.answerCallbackQuery("⛔ Нельзя забанить самого себя");
+      return;
+    }
     const targetUser = db.prepare("SELECT * FROM users WHERE tg_user_id = ?").get(targetTgId);
     if (targetUser) {
       db.prepare(`INSERT OR IGNORE INTO banned_users (tg_user_id, tg_username, duolingo_user_id, duolingo_username, reason)
@@ -567,6 +572,81 @@ bot.on("callback_query", async (ctx) => {
     return;
   }
 
+  // === АДМИН: ПОЛЬЗОВАТЕЛИ ===
+  if (data === "admin_users" || data.startsWith("users_page_")) {
+    if (ctx.from.id !== config.adminTgId) { await ctx.answerCallbackQuery("⛔ Нет доступа"); return; }
+    const page = data.startsWith("users_page_") ? parseInt(data.replace("users_page_", ""), 10) : 1;
+    const perPage = 5;
+    const total = db.prepare("SELECT COUNT(*) as n FROM users").get().n;
+    const totalPages = Math.max(1, Math.ceil(total / perPage));
+    const p = Math.max(1, Math.min(page, totalPages));
+    const rows = db.prepare("SELECT * FROM users ORDER BY linked_at DESC LIMIT ? OFFSET ?").all(perPage, (p - 1) * perPage);
+
+    let text = `👥 <b>Пользователи</b> (${total})\n\n`;
+    if (!rows.length) {
+      text += "Нет привязанных аккаунтов.";
+    }
+    const kb = [];
+    for (const r of rows) {
+      const duoName = r.duolingo_username || r.duolingo_user_id || "—";
+      const tgName = r.tg_username || r.tg_user_id;
+      const hasJwt = r.jwt_encrypted ? "✓" : "✗";
+      text += `👤 <b>${duoName}</b>\n`;
+      text += `   🆔 <code>${r.duolingo_user_id || "—"}</code>\n`;
+      text += `   📱 @${tgName} · <code>${r.tg_user_id}</code>\n`;
+      text += `   🔑 JWT: ${hasJwt} · 📅 ${r.linked_at}\n\n`;
+      kb.push([
+        { text: "🚫 Забанить " + duoName, callback_data: "ban_user_" + r.tg_user_id },
+      ]);
+    }
+    const nav = [];
+    if (p > 1) nav.push({ text: "← Назад", callback_data: "users_page_" + (p - 1) });
+    nav.push({ text: `${p}/${totalPages}`, callback_data: "noop" });
+    if (p < totalPages) nav.push({ text: "Вперёд →", callback_data: "users_page_" + (p + 1) });
+    if (nav.length) kb.push(nav);
+    kb.push([{ text: "← В админку", callback_data: "menu_admin" }]);
+
+    await ctx.editMessageText(text, {
+      parse_mode: "HTML",
+      reply_markup: { inline_keyboard: kb },
+    }).catch(() => {});
+    return;
+  }
+
+  // === АДМИН: УСТАНОВКИ ===
+  if (data === "admin_installs" || data.startsWith("installs_page_")) {
+    if (ctx.from.id !== config.adminTgId) { await ctx.answerCallbackQuery("⛔ Нет доступа"); return; }
+    const page = data.startsWith("installs_page_") ? parseInt(data.replace("installs_page_", ""), 10) : 1;
+    const perPage = 10;
+    const total = db.prepare("SELECT COUNT(*) as n FROM script_installs").get().n;
+    const totalPages = Math.max(1, Math.ceil(total / perPage));
+    const p = Math.max(1, Math.min(page, totalPages));
+    const rows = db.prepare("SELECT * FROM script_installs ORDER BY first_seen DESC LIMIT ? OFFSET ?").all(perPage, (p - 1) * perPage);
+
+    let text = `📦 <b>Установки скрипта</b> (${total})\n\n`;
+    if (!rows.length) {
+      text += "Нет данных.";
+    }
+    for (const r of rows) {
+      const name = r.username || r.duolingo_user_id;
+      text += `📦 <b>${name}</b> · <code>${r.duolingo_user_id}</code>\n`;
+      text += `   📅 ${r.first_seen}\n\n`;
+    }
+    const kb = [];
+    const nav = [];
+    if (p > 1) nav.push({ text: "← Назад", callback_data: "installs_page_" + (p - 1) });
+    nav.push({ text: `${p}/${totalPages}`, callback_data: "noop" });
+    if (p < totalPages) nav.push({ text: "Вперёд →", callback_data: "installs_page_" + (p + 1) });
+    if (nav.length) kb.push(nav);
+    kb.push([{ text: "← В админку", callback_data: "menu_admin" }]);
+
+    await ctx.editMessageText(text, {
+      parse_mode: "HTML",
+      reply_markup: { inline_keyboard: kb },
+    }).catch(() => {});
+    return;
+  }
+
   // заглушки — «в разработке»
   const stubs = {
     action_friends: "👥 Друзья",
@@ -575,7 +655,6 @@ bot.on("callback_query", async (ctx) => {
     settings_backup: "☁️ Бэкап",
     settings_link: "🔗 Линковка",
     settings_help: "📋 Помощь",
-    admin_users: "👥 Пользователи",
     admin_cleanup: "🗑 Очистка данных",
     admin_logs: "📋 Логи",
   };
