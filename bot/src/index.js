@@ -257,31 +257,24 @@ bot.on("callback_query", async (ctx) => {
       const myScore = myIdx >= 0 ? rankings[myIdx].score : 0;
 
       const medals = ["🥇", "🥈", "🥉"];
-      // таблица в моноширинном шрифте — колонки выровнены
-      const maxName = 18;
-      let table = "🏆 <b>Лига</b>\n\n<pre>";
+      let table = "🏆 <b>Лига</b>\n\n";
       for (let i = 0; i < Math.min(rankings.length, 15); i++) {
         const r = rankings[i];
         const isMe = String(r.user_id) === myId;
         const gap = r.score - myScore;
         const medal = medals[i] || (i + 1) + ".";
-        const rawName = r.display_name || r.user_id || "—";
-        const name = rawName.length > maxName ? rawName.slice(0, maxName - 1) + "…" : rawName;
-        const scoreStr = Number(r.score).toLocaleString("ru");
+        const dot = isMe ? "●" : gap > 0 ? "🟢" : gap < 0 ? "🔴" : "●";
         const gapStr = isMe
           ? "← ты"
           : gap > 0
-            ? "↑ +" + Number(gap).toLocaleString("ru")
+            ? "+" + Number(gap).toLocaleString("ru")
             : gap < 0
-              ? "↓ " + Number(gap).toLocaleString("ru")
-              : "  0";
-        // выравнивание: имя — влево, счёт и gap — вправо
-        const namePad = name.padEnd(maxName);
-        const scorePad = scoreStr.padStart(7);
-        const gapPad = gapStr.padStart(9);
-        table += `${medal} ${namePad}${scorePad}  ${gapPad}\n`;
+              ? "−" + Number(Math.abs(gap)).toLocaleString("ru")
+              : "0";
+        table += `${medal} <b>${r.display_name || r.user_id}</b>\n`;
+        table += `${dot} <code>${Number(r.score).toLocaleString("ru")}</code>  ${gapStr}\n\n`;
       }
-      table += "</pre>\nТвоё место: <b>" + (myIdx >= 0 ? myIdx + 1 : "—") + "</b>";
+      table += `Твоё место: <b>${myIdx >= 0 ? myIdx + 1 : "—"}</b>`;
 
       await ctx.editMessageText(table, {
         parse_mode: "HTML",
@@ -401,29 +394,23 @@ bot.on("callback_query", async (ctx) => {
       if (myRank > 0 && myRank <= targetRank) {
         // цель достигнута
         const medals = ["🥇", "🥈", "🥉"];
-        const maxName = 18;
-        let table = `✅ <b>Цель достигнута!</b> Место: <b>${myRank}</b>\n\n🏆 <b>Лига</b>\n\n<pre>`;
+        let table = `✅ <b>Цель достигнута!</b> Место: <b>${myRank}</b>\n\n🏆 <b>Лига</b>\n\n`;
         for (let i = 0; i < Math.min(rankings.length, 15); i++) {
           const r = rankings[i];
           const isMe = String(r.user_id) === myId;
           const gap = r.score - (myIdx >= 0 ? rankings[myIdx].score : 0);
           const medal = medals[i] || (i + 1) + ".";
-          const rawName = r.display_name || r.user_id || "—";
-          const name = rawName.length > maxName ? rawName.slice(0, maxName - 1) + "…" : rawName;
-          const scoreStr = Number(r.score).toLocaleString("ru");
+          const dot = isMe ? "●" : gap > 0 ? "🟢" : gap < 0 ? "🔴" : "●";
           const gapStr = isMe
             ? "← ты"
             : gap > 0
-              ? "↑ +" + Number(gap).toLocaleString("ru")
+              ? "+" + Number(gap).toLocaleString("ru")
               : gap < 0
-                ? "↓ " + Number(gap).toLocaleString("ru")
-                : "  0";
-          const namePad = name.padEnd(maxName);
-          const scorePad = scoreStr.padStart(7);
-          const gapPad = gapStr.padStart(9);
-          table += `${medal} ${namePad}${scorePad}  ${gapPad}\n`;
+                ? "−" + Number(Math.abs(gap)).toLocaleString("ru")
+                : "0";
+          table += `${medal} <b>${r.display_name || r.user_id}</b>\n`;
+          table += `${dot} <code>${Number(r.score).toLocaleString("ru")}</code>  ${gapStr}\n\n`;
         }
-        table += "</pre>";
         await ctx.editMessageText(table, {
           parse_mode: "HTML",
           reply_markup: { inline_keyboard: [[{ text: "← Назад", callback_data: "action_league" }]] },
