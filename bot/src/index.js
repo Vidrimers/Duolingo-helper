@@ -42,7 +42,17 @@ bot.use((ctx, next) => {
 // /start
 bot.command("start", (ctx) => {
   const startPayload = ctx.match;
-  if (startPayload === "bugreport") {
+  // bugreport с проверкой привязки
+  if (startPayload && startPayload.startsWith("bugreport")) {
+    const duoId = startPayload.replace("bugreport_", "").replace("bugreport", "");
+    if (duoId) {
+      // проверяем: привязан ли этот TG к этому Duolingo ID
+      const linked = db.prepare("SELECT * FROM users WHERE tg_user_id = ? AND duolingo_user_id = ?").get(ctx.from.id, duoId);
+      if (!linked) {
+        ctx.reply("❌ Этот Telegram не привязан к данному аккаунту Duolingo. Сначала привяжите аккаунт через скрипт.");
+        return;
+      }
+    }
     bugReportState.set(ctx.from.id, "waiting");
     ctx.reply(
       "🐛 <b>Багрепорт</b>\n\n" +
@@ -771,21 +781,23 @@ bot.on("callback_query", async (ctx) => {
       text += "Нет записей.";
     }
     const kb = [];
-    for (const r of rows) {
+    for (let idx = 0; idx < rows.length; idx++) {
+      const r = rows[idx];
       const name = r.tg_username || r.tg_user_id;
-      text += `📝 <b>${(r.message || "").substring(0, 80)}${(r.message || "").length > 80 ? "…" : ""}</b>\n`;
+      text += `<b>${idx + 1}.</b> 📝 <b>${(r.message || "").substring(0, 80)}${(r.message || "").length > 80 ? "…" : ""}</b>\n`;
       text += `   @${name} · ${r.created_at}\n`;
       if (r.admin_reply) text += `   💬 ${r.admin_reply.substring(0, 50)}…\n`;
       text += "\n";
+      // кнопки сразу под каждым багом
       if (status === "received") {
         kb.push([
-          { text: "✅ Принять", callback_data: "bug_accept_" + r.id },
-          { text: "❌ Отклонить", callback_data: "bug_reject_" + r.id },
+          { text: "✅ Принять " + (idx + 1), callback_data: "bug_accept_" + r.id },
+          { text: "❌ Отклонить " + (idx + 1), callback_data: "bug_reject_" + r.id },
         ]);
       } else if (status === "in_progress") {
         kb.push([
-          { text: "✅ Выполнено", callback_data: "bug_complete_" + r.id },
-          { text: "💬 Ответить", callback_data: "bug_reply_" + r.id },
+          { text: "✅ Выполнено " + (idx + 1), callback_data: "bug_complete_" + r.id },
+          { text: "💬 Ответить " + (idx + 1), callback_data: "bug_reply_" + r.id },
         ]);
       }
     }
@@ -906,7 +918,13 @@ bot.on("message:text", (ctx) => {
       ctx.reply("❌ Сообщение слишком короткое. Попробуйте ещё раз: /bugreport");
       return;
     }
+    // проверка привязки TG
     const user = db.prepare("SELECT * FROM users WHERE tg_user_id = ?").get(ctx.from.id);
+    if (!user) {
+      bugReportState.delete(ctx.from.id);
+      ctx.reply("❌ Для отправки багрепорта привяжите аккаунт. Кнопка «Привязать Telegram» в скрипте Duolingo Helper.");
+      return;
+    }
     const bugId = db.prepare(`
       INSERT INTO bug_reports (tg_user_id, tg_username, duolingo_user_id, duolingo_username, message)
       VALUES (?, ?, ?, ?, ?)

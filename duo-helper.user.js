@@ -9583,7 +9583,7 @@ function savePage() {
       return;
     }
     // открываем бота с /bugreport
-    window.open("https://t.me/Duolingo_Helperbot?start=bugreport", "_blank");
+    window.open("https://t.me/Duolingo_Helperbot?start=bugreport_" + myId, "_blank");
   }
 
   // ========== Toast ==========
