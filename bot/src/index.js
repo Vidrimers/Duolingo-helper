@@ -934,6 +934,26 @@ bot.on("message:text", (ctx) => {
       ctx.reply("❌ Для отправки багрепорта привяжите аккаунт. Кнопка «Привязать Telegram» в скрипте Duolingo Helper.");
       return;
     }
+    // rate limit: 1 баг в 5 минут
+    const recentBug = db.prepare("SELECT created_at FROM bug_reports WHERE tg_user_id = ? ORDER BY created_at DESC LIMIT 1").get(ctx.from.id);
+    if (recentBug) {
+      const elapsed = Date.now() - new Date(recentBug.created_at).getTime();
+      if (elapsed < 5 * 60 * 1000) {
+        bugReportState.delete(ctx.from.id);
+        const mins = Math.ceil((5 * 60 * 1000 - elapsed) / 60000);
+        ctx.reply("⏱ Слишком часто. Попробуйте через " + mins + " мин.");
+        return;
+      }
+    }
+    // rate limit: максимум 10 в день
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const todayCount = db.prepare("SELECT COUNT(*) as n FROM bug_reports WHERE tg_user_id = ? AND created_at >= ?").get(ctx.from.id, todayStart.toISOString()).n;
+    if (todayCount >= 10) {
+      bugReportState.delete(ctx.from.id);
+      ctx.reply("❌ Достигнут дневной лимит багрепортов (10). Попробуйте завтра.");
+      return;
+    }
     const bugId = db.prepare(`
       INSERT INTO bug_reports (tg_user_id, tg_username, duolingo_user_id, duolingo_username, message)
       VALUES (?, ?, ?, ?, ?)
