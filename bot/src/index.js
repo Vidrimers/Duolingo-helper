@@ -703,9 +703,16 @@ setInterval(cleanupOldLinkCodes, 24 * 60 * 60 * 1000);
 
 // запуск
 bot.start({
-  onStart: (me) => {
+  onStart: async (me) => {
     console.log(`[bot] Started as @${me.username}`);
     console.log(`[bot] Admin: ${config.adminTgId}`);
+    // меню команд (кнопка рядом с полем ввода)
+    await bot.api.setMyCommands([
+      { command: "start", description: "Главное меню" },
+      { command: "help", description: "Справка" },
+      { command: "status", description: "Статус привязки" },
+      { command: "unlink", description: "Отвязать аккаунт" },
+    ]);
     httpServer.listen(HTTP_PORT, () => {
       console.log(`[bot] HTTP API on port ${HTTP_PORT}`);
     });
