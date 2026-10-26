@@ -554,7 +554,7 @@ bot.on("callback_query", async (ctx) => {
     const banCount = db.prepare("SELECT COUNT(*) as n FROM banned_users").get().n;
     await ctx.editMessageText(
       `📊 <b>Статистика бота</b>\n\n` +
-      `👥 Пользователей: <b>${userCount}</b>\n` +
+      `🔗 Привязок Telegram: <b>${userCount}</b>\n` +
       `📦 Установок скрипта: <b>${installCount}</b>\n` +
       `💾 Бэкапов: <b>${backupCount}</b>\n` +
       `🔑 Активных кодов: <b>${codeCount}</b>\n` +
@@ -902,6 +902,15 @@ function cleanupOldLinkCodes() {
 cleanupOldLinkCodes();
 // проверяем раз в день (30 дней не влезает в 32-битный setInterval)
 setInterval(cleanupOldLinkCodes, 24 * 60 * 60 * 1000);
+
+// бэкфилл: существующие пользователи → script_installs
+try {
+  db.prepare(`
+    INSERT OR IGNORE INTO script_installs (duolingo_user_id, username)
+    SELECT duolingo_user_id, duolingo_username FROM users WHERE duolingo_user_id IS NOT NULL
+  `).run();
+  console.log("[bot] script_installs backfilled");
+} catch {}
 
 // запуск
 bot.start({
