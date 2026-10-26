@@ -42,6 +42,15 @@ bot.use((ctx, next) => {
 // /start
 bot.command("start", (ctx) => {
   const startPayload = ctx.match;
+  if (startPayload === "bugreport") {
+    bugReportState.set(ctx.from.id, "waiting");
+    ctx.reply(
+      "🐛 <b>Багрепорт</b>\n\n" +
+      "Опишите проблему одним сообщением:",
+      { parse_mode: "HTML" }
+    );
+    return;
+  }
   if (startPayload) {
     // deep link с кодом линковки
     handleLinkCode(ctx, startPayload);
@@ -136,7 +145,10 @@ function adminMenuKeyboard() {
         { text: "🚫 Бан-лист", callback_data: "admin_banlist" },
       ],
       [
+        { text: "🐛 Багрепорты", callback_data: "admin_bugs" },
         { text: "🗑 Очистка данных", callback_data: "admin_cleanup" },
+      ],
+      [
         { text: "📋 Логи", callback_data: "admin_logs" },
       ],
       [{ text: "← Назад", callback_data: "menu_main" }],
@@ -647,6 +659,127 @@ bot.on("callback_query", async (ctx) => {
     return;
   }
 
+  // === БАГРЕПОРТЫ ===
+  if (data.startsWith("bug_accept_")) {
+    if (ctx.from.id !== config.adminTgId) { await ctx.answerCallbackQuery("⛔ Нет доступа"); return; }
+    const bugId = parseInt(data.replace("bug_accept_", ""), 10);
+    const bug = db.prepare("SELECT * FROM bug_reports WHERE id = ?").get(bugId);
+    if (!bug) { await ctx.answerCallbackQuery("Багрепорт не найден"); return; }
+    db.prepare("UPDATE bug_reports SET status = 'in_progress', updated_at = datetime('now') WHERE id = ?").run(bugId);
+    await ctx.answerCallbackQuery("✅ Принято в работу");
+    await ctx.editMessageReplyMarkup({
+      inline_keyboard: [[
+        { text: "🔄 В работе", callback_data: "noop" },
+        { text: "💬 Ответить", callback_data: "bug_reply_" + bugId },
+      ]],
+    });
+    // уведомление пользователю
+    bot.api.sendMessage(bug.tg_user_id,
+      "🔄 Ваш багрепорт принят в работу!",
+    ).catch(() => {});
+    return;
+  }
+
+  if (data.startsWith("bug_reject_")) {
+    if (ctx.from.id !== config.adminTgId) { await ctx.answerCallbackQuery("⛔ Нет доступа"); return; }
+    const bugId = parseInt(data.replace("bug_reject_", ""), 10);
+    db.prepare("UPDATE bug_reports SET status = 'rejected', updated_at = datetime('now') WHERE id = ?").run(bugId);
+    await ctx.answerCallbackQuery("❌ Отклонено");
+    await ctx.editMessageReplyMarkup({
+      inline_keyboard: [[{ text: "❌ Отклонён", callback_data: "noop" }]],
+    });
+    // пользователю НЕ отправляем уведомление об отклонении
+    return;
+  }
+
+  if (data.startsWith("bug_complete_")) {
+    if (ctx.from.id !== config.adminTgId) { await ctx.answerCallbackQuery("⛔ Нет доступа"); return; }
+    const bugId = parseInt(data.replace("bug_complete_", ""), 10);
+    const bug = db.prepare("SELECT * FROM bug_reports WHERE id = ?").get(bugId);
+    db.prepare("UPDATE bug_reports SET status = 'completed', updated_at = datetime('now') WHERE id = ?").run(bugId);
+    await ctx.answerCallbackQuery("✅ Выполнено");
+    if (bug) {
+      bot.api.sendMessage(bug.tg_user_id, "✅ Ваш багрепорт выполнен!").catch(() => {});
+    }
+    return;
+  }
+
+  if (data.startsWith("bug_reply_")) {
+    if (ctx.from.id !== config.adminTgId) { await ctx.answerCallbackQuery("⛔ Нет доступа"); return; }
+    const bugId = parseInt(data.replace("bug_reply_", ""), 10);
+    // запрашиваем текст ответа
+    bugReplyState.set(ctx.from.id, bugId);
+    await ctx.reply("💬 Введите текст ответа пользователю:");
+    return;
+  }
+
+  // список багрепортов по статусам
+  if (data === "admin_bugs" || data.startsWith("bugs_")) {
+    if (ctx.from.id !== config.adminTgId) { await ctx.answerCallbackQuery("⛔ Нет доступа"); return; }
+    let status = "received";
+    let page = 1;
+    if (data.startsWith("bugs_")) {
+      const parts = data.split("_");
+      status = parts[1] || "received";
+      page = parseInt(parts[2] || "1", 10);
+    }
+    const statusLabels = {
+      received: "📥 Полученные",
+      in_progress: "🔄 В работе",
+      completed: "✅ Выполненные",
+      rejected: "❌ Отклонённые",
+    };
+    const perPage = 5;
+    const total = db.prepare("SELECT COUNT(*) as n FROM bug_reports WHERE status = ?").get(status).n;
+    const totalPages = Math.max(1, Math.ceil(total / perPage));
+    const p = Math.max(1, Math.min(page, totalPages));
+    const rows = db.prepare("SELECT * FROM bug_reports WHERE status = ? ORDER BY updated_at DESC LIMIT ? OFFSET ?").all(status, perPage, (p - 1) * perPage);
+
+    let text = `🐛 <b>${statusLabels[status] || status}</b> (${total})\n\n`;
+    if (!rows.length) {
+      text += "Нет записей.";
+    }
+    const kb = [];
+    for (const r of rows) {
+      const name = r.tg_username || r.tg_user_id;
+      text += `📝 <b>${(r.message || "").substring(0, 80)}${(r.message || "").length > 80 ? "…" : ""}</b>\n`;
+      text += `   @${name} · ${r.created_at}\n`;
+      if (r.admin_reply) text += `   💬 ${r.admin_reply.substring(0, 50)}…\n`;
+      text += "\n";
+      if (status === "received") {
+        kb.push([
+          { text: "✅ Принять", callback_data: "bug_accept_" + r.id },
+          { text: "❌ Отклонить", callback_data: "bug_reject_" + r.id },
+        ]);
+      } else if (status === "in_progress") {
+        kb.push([
+          { text: "✅ Выполнено", callback_data: "bug_complete_" + r.id },
+          { text: "💬 Ответить", callback_data: "bug_reply_" + r.id },
+        ]);
+      }
+    }
+    // фильтры статусов
+    kb.push([
+      { text: "📥", callback_data: "bugs_received_1" },
+      { text: "🔄", callback_data: "bugs_in_progress_1" },
+      { text: "✅", callback_data: "bugs_completed_1" },
+      { text: "❌", callback_data: "bugs_rejected_1" },
+    ]);
+    // пагинация
+    const nav = [];
+    if (p > 1) nav.push({ text: "← Назад", callback_data: "bugs_" + status + "_" + (p - 1) });
+    nav.push({ text: `${p}/${totalPages}`, callback_data: "noop" });
+    if (p < totalPages) nav.push({ text: "Вперёд →", callback_data: "bugs_" + status + "_" + (p + 1) });
+    if (nav.length) kb.push(nav);
+    kb.push([{ text: "← В админку", callback_data: "menu_admin" }]);
+
+    await ctx.editMessageText(text, {
+      parse_mode: "HTML",
+      reply_markup: { inline_keyboard: kb },
+    }).catch(() => {});
+    return;
+  }
+
   // заглушки — «в разработке»
   const stubs = {
     action_friends: "👥 Друзья",
@@ -710,6 +843,79 @@ bot.command("unlink", async (ctx) => {
   db.prepare("DELETE FROM users WHERE tg_user_id = ?").run(tgId);
   db.prepare("DELETE FROM backups WHERE duolingo_user_id = ?").run(user.duolingo_user_id);
   ctx.reply("✅ Аккаунт отвязан. Бэкапы удалены.");
+});
+
+// /bugreport — отправка бага
+const bugReportState = new Map(); // tg_id -> "waiting"
+const bugReplyState = new Map(); // tg_id -> bugId
+bot.command("bugreport", (ctx) => {
+  bugReportState.set(ctx.from.id, "waiting");
+  ctx.reply(
+    "🐛 <b>Багрепорт</b>\n\n" +
+    "Опишите проблему одним сообщением:",
+    { parse_mode: "HTML" }
+  );
+});
+
+// приём текста бага
+bot.on("message:text", (ctx) => {
+  // если ждём багрепорт — сохраняем
+  if (bugReportState.get(ctx.from.id) === "waiting") {
+    bugReportState.delete(ctx.from.id);
+    const text = ctx.message.text;
+    if (text.startsWith("/")) {
+      // это команда, не баг — пропускаем
+      bugReportState.set(ctx.from.id, "waiting");
+      return;
+    }
+    if (!text || text.length < 5) {
+      ctx.reply("❌ Сообщение слишком короткое. Попробуйте ещё раз: /bugreport");
+      return;
+    }
+    const user = db.prepare("SELECT * FROM users WHERE tg_user_id = ?").get(ctx.from.id);
+    const bugId = db.prepare(`
+      INSERT INTO bug_reports (tg_user_id, tg_username, duolingo_user_id, duolingo_username, message)
+      VALUES (?, ?, ?, ?, ?)
+    `).run(ctx.from.id, ctx.from.username || "", user ? user.duolingo_user_id || "" : "", user ? user.duolingo_username || "" : "", text).lastInsertRowid;
+
+    // подтверждение пользователю
+    ctx.reply("✅ <b>Багрепорт отправлен!</b>\n\nМы рассмотрим его в ближайшее время.", { parse_mode: "HTML" });
+
+    // уведомление админу
+    const duoName = (user && user.duolingo_username) || (user && user.duolingo_user_id) || "—";
+    bot.api.sendMessage(config.adminTgId,
+      `🐛 <b>Новый багрепорт</b>\n\n` +
+      `От: @${ctx.from.username || ctx.from.id} (tg)\n` +
+      `👤 ${duoName} (duo)\n` +
+      `📝 "${text.substring(0, 200)}${text.length > 200 ? "…" : ""}"\n` +
+      `📅 ${new Date().toLocaleString("ru")}`,
+      {
+        parse_mode: "HTML",
+        reply_markup: {
+          inline_keyboard: [[
+            { text: "✅ Принять", callback_data: "bug_accept_" + bugId },
+            { text: "❌ Отклонить", callback_data: "bug_reject_" + bugId },
+          ]],
+        },
+      }
+    ).catch(() => {});
+    return;
+  }
+  // если ждём ответ на багрепорт
+  if (bugReplyState.has(ctx.from.id)) {
+    const bugId = bugReplyState.get(ctx.from.id);
+    bugReplyState.delete(ctx.from.id);
+    const replyText = ctx.message.text;
+    const bug = db.prepare("SELECT * FROM bug_reports WHERE id = ?").get(bugId);
+    if (bug) {
+      db.prepare("UPDATE bug_reports SET admin_reply = ?, status = 'in_progress', updated_at = datetime('now') WHERE id = ?").run(replyText, bugId);
+      // отправляем ответ пользователю
+      bot.api.sendMessage(bug.tg_user_id, `💬 Ответ от поддержки:\n\n${replyText}`).catch(() => {});
+      ctx.reply("✅ Ответ отправлен пользователю.");
+    }
+    return;
+  }
+  // если не ждём баг — игнорируем (команды обрабатываются отдельно)
 });
 
 // /admin — только для ADMIN_TG_ID
@@ -1030,6 +1236,7 @@ bot.start({
       { command: "start", description: "Главное меню" },
       { command: "help", description: "Справка" },
       { command: "status", description: "Статус привязки" },
+      { command: "bugreport", description: "Сообщить об ошибке" },
       { command: "unlink", description: "Отвязать аккаунт" },
     ]);
     // уведомление админу о старте

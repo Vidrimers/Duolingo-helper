@@ -63,7 +63,22 @@ db.exec(`
     first_seen TEXT DEFAULT (datetime('now'))
   );
 
+  CREATE TABLE IF NOT EXISTS bug_reports (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    tg_user_id INTEGER NOT NULL,
+    tg_username TEXT,
+    duolingo_user_id TEXT,
+    duolingo_username TEXT,
+    message TEXT NOT NULL,
+    status TEXT DEFAULT 'received',
+    admin_reply TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now'))
+  );
+
   CREATE INDEX IF NOT EXISTS idx_link_codes_expires ON link_codes(expires_at);
+  CREATE INDEX IF NOT EXISTS idx_bug_reports_status ON bug_reports(status);
+  CREATE INDEX IF NOT EXISTS idx_bug_reports_tg ON bug_reports(tg_user_id);
   CREATE INDEX IF NOT EXISTS idx_users_tg ON users(tg_user_id);
   CREATE INDEX IF NOT EXISTS idx_users_duo ON users(duolingo_user_id);
   CREATE INDEX IF NOT EXISTS idx_backups_user ON backups(duolingo_user_id);

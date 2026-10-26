@@ -9498,6 +9498,36 @@ function savePage() {
   }
 
   function openBugReport() {
+    const theme = DATA.settings.theme || "win95";
+    const overlay = document.createElement("div");
+    overlay.className = "dh-confirm-overlay dh-theme-" + theme;
+    overlay.innerHTML = `
+      <div class="dh-confirm-box" style="width:340px">
+        <div class="dh-confirm-title">🐛 Багрепорт</div>
+        <div class="dh-confirm-body">
+          <p style="margin:0 0 12px">Как хотите отправить багрепорт?</p>
+        </div>
+        <div class="dh-confirm-actions" style="justify-content:center;gap:10px">
+          <button class="dh-btn dh-btn-primary" data-bug="github">GitHub</button>
+          <button class="dh-btn" data-bug="telegram">Telegram</button>
+          <button class="dh-btn" data-bug="cancel">Отмена</button>
+        </div>
+      </div>`;
+    shadow.appendChild(overlay);
+    const close = () => overlay.remove();
+    overlay.addEventListener("click", (e) => { if (e.target === overlay) close(); });
+    overlay.querySelector('[data-bug="cancel"]').addEventListener("click", close);
+    overlay.querySelector('[data-bug="github"]').addEventListener("click", () => {
+      close();
+      openGitHubBugReport();
+    });
+    overlay.querySelector('[data-bug="telegram"]').addEventListener("click", () => {
+      close();
+      openTelegramBugReport();
+    });
+  }
+
+  function openGitHubBugReport() {
     const ver = (typeof GM_info !== "undefined" && GM_info.script && GM_info.script.version) || CURRENT_VERSION;
     const body = encodeURIComponent(
       [
@@ -9524,6 +9554,36 @@ function savePage() {
         body,
       "_blank",
     );
+  }
+
+  async function openTelegramBugReport() {
+    const myId = getMyId();
+    if (!myId) {
+      showToast("Не удалось определить аккаунт", true);
+      return;
+    }
+    // проверяем привязку TG
+    try {
+      const res = await new Promise((resolve) => {
+        GM_xmlhttpRequest({
+          method: "GET",
+          url: BOT_API + "/api/link-status?duolingoUserId=" + encodeURIComponent(myId),
+          timeout: 10000,
+          onload(r) { try { resolve(JSON.parse(r.responseText || "{}")); } catch { resolve(null); } },
+          onerror() { resolve(null); },
+          ontimeout() { resolve(null); },
+        });
+      });
+      if (!res || !res.linked) {
+        showToast("Привязать Telegram можно в блоке «Аккаунты»", true);
+        return;
+      }
+    } catch {
+      showToast("Не удалось проверить привязку", true);
+      return;
+    }
+    // открываем бота с /bugreport
+    window.open("https://t.me/Duolingo_Helperbot?start=bugreport", "_blank");
   }
 
   // ========== Toast ==========
