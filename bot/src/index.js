@@ -209,8 +209,7 @@ bot.on("callback_query", async (ctx) => {
 
       const msg =
         `📊 <b>Статистика</b>\n\n` +
-        `👤 <b>${name}</b> · <code>${user.duolingo_user_id}</code>\n` +
-        `🔗 <a href="https://www.duolingo.com/profile/${encodeURIComponent(user.duolingo_username || "")}">Открыть профиль</a>\n\n` +
+        `👤 <b>${name}</b> · <code>${user.duolingo_user_id}</code>\n\n` +
         `⚡ <b>XP:</b> ${Number(totalXp).toLocaleString("ru")}\n` +
         `🔥 <b>Streak:</b> ${streak} дней\n` +
         `📅 <b>Сегодня:</b> ${todayStatus}\n` +
