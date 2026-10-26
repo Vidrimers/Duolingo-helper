@@ -713,8 +713,27 @@ bot.start({
       { command: "status", description: "Статус привязки" },
       { command: "unlink", description: "Отвязать аккаунт" },
     ]);
+    // уведомление админу о старте
+    try {
+      await bot.api.sendMessage(config.adminTgId, "🟢 Бот запущен и готов к работе.");
+    } catch {}
     httpServer.listen(HTTP_PORT, () => {
       console.log(`[bot] HTTP API on port ${HTTP_PORT}`);
     });
   },
+});
+
+// уведомление админу об остановке
+async function notifyStop() {
+  try {
+    await bot.api.sendMessage(config.adminTgId, "🔴 Бот остановлен.");
+  } catch {}
+}
+process.on("SIGINT", async () => {
+  await notifyStop();
+  process.exit(0);
+});
+process.on("SIGTERM", async () => {
+  await notifyStop();
+  process.exit(0);
 });
