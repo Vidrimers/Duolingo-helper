@@ -262,9 +262,9 @@ bot.on("callback_query", async (ctx) => {
         const r = rankings[i];
         const isMe = String(r.user_id) === myId;
         const gap = r.score - myScore;
-        const gapStr = isMe ? "← ты" : gap > 0 ? "+" + Number(gap).toLocaleString("ru") : Number(gap).toLocaleString("ru");
+        const gapStr = isMe ? "← ты" : gap > 0 ? "🟢 +" + Number(gap).toLocaleString("ru") : gap < 0 ? "🔴 " + Number(gap).toLocaleString("ru") : "0";
         const medal = medals[i] || (i + 1) + ".";
-        table += `${medal} <b>${r.display_name || r.user_id}</b> ${Number(r.score).toLocaleString("ru")} <i>${gapStr}</i>\n`;
+        table += `${medal} <b>${r.display_name || r.user_id}</b> <b><code>${Number(r.score).toLocaleString("ru")}</code></b> <i>${gapStr}</i>\n`;
       }
       table += `\nТвоё место: <b>${myIdx >= 0 ? myIdx + 1 : "—"}</b>`;
 
@@ -387,9 +387,9 @@ bot.on("callback_query", async (ctx) => {
           const r = rankings[i];
           const isMe = String(r.user_id) === myId;
           const gap = r.score - (myIdx >= 0 ? rankings[myIdx].score : 0);
-          const gapStr = isMe ? "← ты" : gap > 0 ? "+" + Number(gap).toLocaleString("ru") : Number(gap).toLocaleString("ru");
+          const gapStr = isMe ? "← ты" : gap > 0 ? "🟢 +" + Number(gap).toLocaleString("ru") : gap < 0 ? "🔴 " + Number(gap).toLocaleString("ru") : "0";
           const medal = medals[i] || (i + 1) + ".";
-          table += `${medal} <b>${r.display_name || r.user_id}</b> ${Number(r.score).toLocaleString("ru")} <i>${gapStr}</i>\n`;
+          table += `${medal} <b>${r.display_name || r.user_id}</b> <b><code>${Number(r.score).toLocaleString("ru")}</code></b> <i>${gapStr}</i>\n`;
         }
         await ctx.editMessageText(table, {
           parse_mode: "HTML",
