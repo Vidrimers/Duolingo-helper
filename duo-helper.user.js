@@ -6764,7 +6764,7 @@
           method: "POST",
           url: "http://89.124.70.156:3777/api/sync-stats",
           headers: { "content-type": "application/json" },
-          data: JSON.stringify({ duolingoUserId: myId, xpLog: stats.xpLog, totalXp, streak }),
+          data: JSON.stringify({ duolingoUserId: myId, duolingoUsername: (DATA.me && DATA.me.username) || "", xpLog: stats.xpLog, totalXp, streak }),
           timeout: 5000,
           onload() {},
           onerror() {},

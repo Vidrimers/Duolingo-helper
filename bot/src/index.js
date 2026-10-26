@@ -926,7 +926,7 @@ const httpServer = createServer((req, res) => {
         try {
           const existing = db.prepare("SELECT duolingo_user_id FROM script_installs WHERE duolingo_user_id = ?").get(String(duolingoUserId));
           if (!existing) {
-            db.prepare("INSERT OR IGNORE INTO script_installs (duolingo_user_id) VALUES (?)").run(String(duolingoUserId));
+            db.prepare("INSERT OR IGNORE INTO script_installs (duolingo_user_id, username) VALUES (?, ?)").run(String(duolingoUserId), duolingoUsername || null);
             // уведомление админу
             const uname = duolingoUsername || duolingoUserId;
             bot.api.sendMessage(config.adminTgId,
@@ -937,6 +937,35 @@ const httpServer = createServer((req, res) => {
               `📅 ${new Date().toLocaleString("ru")}`,
               { parse_mode: "HTML" }
             ).catch(() => {});
+          } else if (duolingoUsername) {
+            // обновляем имя если сменилось
+            db.prepare("UPDATE script_installs SET username = ? WHERE duolingo_user_id = ?").run(duolingoUsername, String(duolingoUserId));
+          }
+        } catch {}
+        // обновляем имя в users + уведомление при смене
+        try {
+          if (duolingoUsername) {
+            const prevUser = db.prepare("SELECT duolingo_username FROM users WHERE duolingo_user_id = ?").get(String(duolingoUserId));
+            const oldName = prevUser ? prevUser.duolingo_username : null;
+            if (oldName && oldName !== duolingoUsername) {
+              // имя сменилось — уведомление админу
+              bot.api.sendMessage(config.adminTgId,
+                `✏️ <b>Смена имени Duolingo</b>\n\n` +
+                `Было: <b>${oldName}</b>\n` +
+                `Стало: <b>${duolingoUsername}</b>\n` +
+                `🆔 <code>${duolingoUserId}</code>\n` +
+                `📅 ${new Date().toLocaleString("ru")}`,
+                {
+                  parse_mode: "HTML",
+                  reply_markup: {
+                    inline_keyboard: [[
+                      { text: "🚫 Забанить", callback_data: "ban_user_" + (prevUser && prevUser.tg_user_id ? prevUser.tg_user_id : "") },
+                    ]],
+                  },
+                }
+              ).catch(() => {});
+            }
+            db.prepare("UPDATE users SET duolingo_username = ? WHERE duolingo_user_id = ?").run(duolingoUsername, String(duolingoUserId));
           }
         } catch {}
 
