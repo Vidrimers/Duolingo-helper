@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Duolingo Helper
 // @namespace    https://github.com/Vidrimers/Duolingo-helper
-// @version      0.9.3
+// @version      0.9.4
 // @description  Проверка взаимной подписки на профилях Duolingo. Панель, бейджи, кеш.
 // @author       Vidrimers
 // @match        *://*.duolingo.com/*
@@ -69,7 +69,7 @@
       autoCheck: true,
       cacheMinutes: 30,
       requestDelay: 350,
-      inactiveDays: 3,
+      inactiveDays: 7,
       activitySort: "xp_desc",
       showBadge: true,
       badgePos: "top-right",
@@ -6779,7 +6779,6 @@
             xpLog: stats.xpLog,
             totalXp,
             streak,
-            inactiveDays: DATA.settings.inactiveDays || 3,
             excludeList: DATA.excludeList || [],
           }),
           timeout: 5000,
@@ -8253,7 +8252,7 @@ function savePage() {
   /** Отписка от неактивных среди моих подписок (не подписчиков). */
   async function massUnfollowInactive() {
     const rows = (friendsCache && friendsCache.rows) || [];
-    const daysLimit = DATA.settings.inactiveDays || 3;
+    const daysLimit = DATA.settings.inactiveDays || 7;
     const targets = rows.filter(
       (r) =>
         (r.inactive === true || (r.inactiveDays || 0) >= daysLimit) &&
@@ -8352,7 +8351,7 @@ function savePage() {
 
   async function massBlockInactive() {
     const rows = (friendsCache && friendsCache.rows) || [];
-    const daysLimit = DATA.settings.inactiveDays || 3;
+    const daysLimit = DATA.settings.inactiveDays || 7;
     const targets = rows.filter(
       (r) =>
         (r.inactive === true || (r.inactiveDays || 0) >= daysLimit) &&
@@ -8737,7 +8736,7 @@ function savePage() {
     const btn = els.scanActivity;
     if (btn) btn.disabled = true;
     const delay = Math.max(0, DATA.settings.requestDelay || 350);
-    const daysLimit = DATA.settings.inactiveDays || 3;
+    const daysLimit = DATA.settings.inactiveDays || 7;
     let scanned = 0;
 
     setFriendsStatus(`Проверка активности 0/${targets.length}…`);
@@ -8749,7 +8748,7 @@ function savePage() {
         );
         const streakData = data && data.streakData;
         const cur = streakData && streakData.currentStreak;
-        const daysLimit = DATA.settings.inactiveDays || 3;
+        const daysLimit = DATA.settings.inactiveDays || 7;
 
         // дата последней активности
         let activityTs = NaN;
@@ -11362,7 +11361,7 @@ function savePage() {
       el.value = v;
     });
     bindNumSetting(els.setInactive, (el) => {
-      const v = Math.max(1, Math.min(365, parseInt(el.value, 10) || 3));
+      const v = Math.max(1, Math.min(365, parseInt(el.value, 10) || 7));
       DATA.settings.inactiveDays = v;
       el.value = v;
       if (typeof renderFriends === "function") renderFriends();

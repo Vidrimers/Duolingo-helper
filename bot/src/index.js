@@ -573,9 +573,8 @@ function loadFriendScan(duoId) {
 }
 
 // скан активности (логика из scanFriendsActivity скрипта)
-async function runFriendsScan(user, targets, onProgress, shouldStop) {
+async function runFriendsScan(user, targets, daysLimit, onProgress, shouldStop) {
   const jwt = decryptJWT(user.jwt_encrypted);
-  const daysLimit = Number(user.inactive_days) || 3;
   const results = [];
   for (let i = 0; i < targets.length; i++) {
     if (shouldStop && shouldStop()) break;
@@ -612,6 +611,76 @@ async function runFriendsScan(user, targets, onProgress, shouldStop) {
     await new Promise((rr) => setTimeout(rr, 300 + Math.floor(Math.random() * 250)));
   }
   return results;
+}
+
+// запуск скана: правит сообщение (chatId, messageId), порог — параметр (только этот скан)
+async function startFriendsScan(user, daysLimit, chatId, messageId, tgId) {
+  const edit = (text, replyMarkup) =>
+    bot.api.editMessageText(chatId, messageId, text, { parse_mode: "HTML", reply_markup: replyMarkup }).catch(() => {});
+  const cache = friendsCache.get(tgId);
+  // подписки ∪ подписчики (как фильтр «Неактивные» в скрипте)
+  const byId = new Map();
+  for (const u of (cache ? cache.following : [])) byId.set(String(u.userId), { userId: String(u.userId), name: u.name, iFollow: true });
+  for (const f of (cache ? cache.followers : [])) {
+    const id = String(f.userId);
+    if (!byId.has(id)) byId.set(id, { userId: id, name: f.name, iFollow: false });
+  }
+  const targets = [...byId.values()];
+  if (!targets.length) {
+    await edit("🔍 <b>Активность</b>\n\nСначала откройте список друзей.", {
+      inline_keyboard: [[{ text: "← Назад", callback_data: "action_friends" }]],
+    });
+    return;
+  }
+  if (friendsRunning.has(tgId)) {
+    await edit("🔍 <b>Активность</b>\n\n⏳ Уже выполняется.", {
+      inline_keyboard: [[{ text: "← Назад", callback_data: "action_friends" }]],
+    });
+    return;
+  }
+  friendsRunning.add(tgId);
+  friendsScanStop.delete(tgId);
+  const stopKb = { inline_keyboard: [[{ text: "⏹ Стоп", callback_data: "friends_scan_stop" }]] };
+  await edit(`🔍 <b>Активность</b>\n\nПроверка 0/${targets.length}…`, stopKb);
+  let lastEdit = 0;
+  try {
+    const items = await runFriendsScan(user, targets, daysLimit, (done, total) => {
+      const now = Date.now();
+      if (now - lastEdit < 2000) return;
+      lastEdit = now;
+      edit(`🔍 <b>Активность</b>\n\nПроверка ${done}/${total}…`, stopKb);
+    }, () => friendsScanStop.has(tgId));
+    const stopped = friendsScanStop.has(tgId);
+    try {
+      db.prepare(`
+        INSERT INTO friend_scan (duolingo_user_id, data, scanned_at)
+        VALUES (?, ?, ?)
+        ON CONFLICT(duolingo_user_id) DO UPDATE SET data = excluded.data, scanned_at = excluded.scanned_at
+      `).run(String(user.duolingo_user_id), JSON.stringify({ items, daysLimit }), Date.now());
+    } catch {}
+    const inactive = items.filter((r) => r.inactive);
+    await edit(
+      `🔍 <b>Активность</b>\n\n` +
+      (stopped
+        ? `⏹ Остановлено: проверено <b>${items.length}</b> из ${targets.length}\n`
+        : `Проверено: <b>${items.length}</b>\n`) +
+      `Неактивны: <b>${inactive.length}</b> (порог ${daysLimit} дн.)`,
+      {
+        inline_keyboard: [
+          [{ text: "🚫 Отписаться от неактивных", callback_data: "friends_unf_inactive" }],
+          [{ text: "🚫 Заблокировать неактивных", callback_data: "friends_block_inactive" }],
+          [{ text: "← Назад", callback_data: "action_friends" }],
+        ],
+      }
+    );
+  } catch {
+    await edit("🔍 <b>Активность</b>\n\n❌ Ошибка скана.", {
+      inline_keyboard: [[{ text: "← Назад", callback_data: "action_friends" }]],
+    });
+  } finally {
+    friendsRunning.delete(tgId);
+    friendsScanStop.delete(tgId);
+  }
 }
 
 // обработка инлайн-кнопок
@@ -1202,83 +1271,49 @@ bot.on("callback_query", async (ctx) => {
       });
       return;
     }
-    if (friendsRunning.has(ctx.from.id)) {
-      await safeEdit(ctx, "🔍 <b>Активность</b>\n\n⏳ Уже выполняется.", {
+    // выбор порога — применяется только к этому скану
+    await safeEdit(ctx,
+      "🔍 <b>Активность</b>\n\nПорог неактивности, дней:",
+      {
+        parse_mode: "HTML",
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: "7 дн", callback_data: "friends_scan_d_7" }, { text: "14 дн", callback_data: "friends_scan_d_14" }, { text: "30 дн", callback_data: "friends_scan_d_30" }],
+            [{ text: "✏ Ввести число", callback_data: "friends_scan_custom" }],
+            [{ text: "← Назад", callback_data: "action_friends" }],
+          ],
+        },
+      }
+    );
+    return;
+  }
+
+  if (/^friends_scan_d_\d+$/.test(data)) {
+    await ctx.answerCallbackQuery();
+    const daysLimit = parseInt(data.replace("friends_scan_d_", ""), 10);
+    const user = db.prepare("SELECT * FROM users WHERE tg_user_id = ?").get(ctx.from.id);
+    if (!user || !user.jwt_encrypted) {
+      await safeEdit(ctx, "🔍 <b>Активность</b>\n\n❌ Аккаунт не привязан.", {
         parse_mode: "HTML",
         reply_markup: { inline_keyboard: [[{ text: "← Назад", callback_data: "action_friends" }]] },
       });
       return;
     }
-    const cache = friendsCache.get(ctx.from.id);
-    // подписки ∪ подписчики (как фильтр «Неактивные» в скрипте)
-    const byId = new Map();
-    for (const u of (cache ? cache.following : [])) byId.set(String(u.userId), { userId: String(u.userId), name: u.name, iFollow: true });
-    for (const f of (cache ? cache.followers : [])) {
-      const id = String(f.userId);
-      if (!byId.has(id)) byId.set(id, { userId: id, name: f.name, iFollow: false });
-    }
-    const targets = [...byId.values()];
-    if (!targets.length) {
-      await safeEdit(ctx, "🔍 <b>Активность</b>\n\nСначала откройте список друзей.", {
+    const msg = ctx.callbackQuery.message;
+    await startFriendsScan(user, daysLimit, msg.chat.id, msg.message_id, ctx.from.id);
+    return;
+  }
+
+  if (data === "friends_scan_custom") {
+    const msg = ctx.callbackQuery.message;
+    scanDaysState.set(ctx.from.id, { chatId: msg.chat.id, messageId: msg.message_id });
+    await safeEdit(ctx,
+      "✏ <b>Порог неактивности</b>\n\nВведите число дней (1–365):",
+      {
         parse_mode: "HTML",
-        reply_markup: { inline_keyboard: [[{ text: "← Назад", callback_data: "action_friends" }]] },
-      });
-      return;
-    }
-    friendsRunning.add(ctx.from.id);
-    friendsScanStop.delete(ctx.from.id);
-    const stopKb = { inline_keyboard: [[{ text: "⏹ Стоп", callback_data: "friends_scan_stop" }]] };
-    await ctx.editMessageText(`🔍 <b>Активность</b>\n\nПроверка 0/${targets.length}…`, {
-      parse_mode: "HTML",
-      reply_markup: stopKb,
-    }).catch(() => {});
-    let lastEdit = 0;
-    try {
-      const items = await runFriendsScan(user, targets, (done, total) => {
-        const now = Date.now();
-        if (now - lastEdit < 2000) return;
-        lastEdit = now;
-        ctx.editMessageText(`🔍 <b>Активность</b>\n\nПроверка ${done}/${total}…`, {
-          parse_mode: "HTML",
-          reply_markup: stopKb,
-        }).catch(() => {});
-      }, () => friendsScanStop.has(ctx.from.id));
-      const stopped = friendsScanStop.has(ctx.from.id);
-      try {
-        db.prepare(`
-          INSERT INTO friend_scan (duolingo_user_id, data, scanned_at)
-          VALUES (?, ?, ?)
-          ON CONFLICT(duolingo_user_id) DO UPDATE SET data = excluded.data, scanned_at = excluded.scanned_at
-        `).run(String(user.duolingo_user_id), JSON.stringify({ items }), Date.now());
-      } catch {}
-      const daysLimit = Number(user.inactive_days) || 3;
-      const inactive = items.filter((r) => r.inactive);
-      await ctx.editMessageText(
-        `🔍 <b>Активность</b>\n\n` +
-        (stopped
-          ? `⏹ Остановлено: проверено <b>${items.length}</b> из ${targets.length}\n`
-          : `Проверено: <b>${items.length}</b>\n`) +
-        `Неактивны: <b>${inactive.length}</b> (порог ${daysLimit} дн.)`,
-        {
-          parse_mode: "HTML",
-          reply_markup: {
-            inline_keyboard: [
-              [{ text: "🚫 Отписаться от неактивных", callback_data: "friends_unf_inactive" }],
-              [{ text: "🚫 Заблокировать неактивных", callback_data: "friends_block_inactive" }],
-              [{ text: "← Назад", callback_data: "action_friends" }],
-            ],
-          },
-        }
-      ).catch(() => {});
-    } catch {
-      await ctx.editMessageText("🔍 <b>Активность</b>\n\n❌ Ошибка скана.", {
-        parse_mode: "HTML",
-        reply_markup: { inline_keyboard: [[{ text: "← Назад", callback_data: "action_friends" }]] },
-      }).catch(() => {});
-    } finally {
-      friendsRunning.delete(ctx.from.id);
-      friendsScanStop.delete(ctx.from.id);
-    }
+        reply_markup: { inline_keyboard: [[{ text: "✖ Отмена", callback_data: "friends_scan" }]] },
+      }
+    );
     return;
   }
 
@@ -1592,6 +1627,7 @@ const streakRunning = new Set(); // tg_id — накрутка серии уже
 const friendsCache = new Map(); // tg_id -> { myId, following, followers, nonFollowers }
 const friendsRunning = new Set(); // tg_id — действие с друзьями уже идёт
 const friendsScanStop = new Set(); // tg_id — флаг остановки скана активности
+const scanDaysState = new Map(); // tg_id -> { chatId, messageId } — ждём порог неактивности
 bot.command("bugreport", (ctx) => {
   bugReportState.set(ctx.from.id, "waiting");
   ctx.reply(
@@ -1719,6 +1755,29 @@ bot.on("message:text", async (ctx) => {
     } finally {
       streakRunning.delete(ctx.from.id);
     }
+    return;
+  }
+
+  // если ждём порог неактивности для скана
+  if (scanDaysState.has(ctx.from.id)) {
+    const raw = ctx.message.text.trim();
+    if (raw.startsWith("/")) {
+      return; // команда — не мешаем
+    }
+    const st = scanDaysState.get(ctx.from.id);
+    scanDaysState.delete(ctx.from.id);
+    const days = parseInt(raw, 10);
+    if (!Number.isFinite(days) || days < 1 || days > 365) {
+      await ctx.reply("❌ Введите число от 1 до 365:");
+      scanDaysState.set(ctx.from.id, st);
+      return;
+    }
+    const user = db.prepare("SELECT * FROM users WHERE tg_user_id = ?").get(ctx.from.id);
+    if (!user || !user.jwt_encrypted) {
+      await ctx.reply("❌ Аккаунт не привязан.");
+      return;
+    }
+    await startFriendsScan(user, days, st.chatId, st.messageId, ctx.from.id);
     return;
   }
 
@@ -2011,18 +2070,14 @@ const httpServer = createServer((req, res) => {
     req.on("data", (chunk) => { body += chunk; });
     req.on("end", () => {
       try {
-        const { duolingoUserId, duolingoUsername, xpLog, totalXp, streak, inactiveDays, excludeList } = JSON.parse(body || "{}");
+        const { duolingoUserId, duolingoUsername, xpLog, totalXp, streak, excludeList } = JSON.parse(body || "{}");
         if (!duolingoUserId) {
           res.writeHead(400, { "Content-Type": "application/json" });
           res.end(JSON.stringify({ error: "duolingoUserId required" }));
           return;
         }
-        // сохраняем настройки скрипта (порог неактивности, исключения 🛡)
+        // сохраняем исключения 🛡 из скрипта (порог неактивности выбирается в боте)
         try {
-          if (typeof inactiveDays === "number" && inactiveDays > 0) {
-            db.prepare("UPDATE users SET inactive_days = ? WHERE duolingo_user_id = ?")
-              .run(Math.min(365, Math.floor(inactiveDays)), String(duolingoUserId));
-          }
           if (Array.isArray(excludeList)) {
             db.prepare("UPDATE users SET exclude_list = ? WHERE duolingo_user_id = ?")
               .run(JSON.stringify(excludeList.map((x) => String(x && x.userId != null ? x.userId : x))), String(duolingoUserId));
