@@ -7764,11 +7764,15 @@ function savePage() {
       row.style.borderBottom = "none";
       row.style.padding = "5px 2px";
       const when = fmtTime(item.ts);
+      const massLabel = (fallback) =>
+        item.name
+          ? item.name.charAt(0).toUpperCase() + item.name.slice(1)
+          : `${fallback} (${(item.ids || []).length})`;
       const label =
         item.type === "unfollow_mass"
-          ? `Отписка от неподписанных ❌ (${(item.ids || []).length})`
+          ? massLabel("Отписка от неподписанных") + " ❌"
           : item.type === "block_mass"
-            ? `Блокировка неактивных (${(item.ids || []).length})`
+            ? massLabel("Блокировка неактивных")
             : item.type === "unfollow"
               ? "Отписка от " + (item.name || item.userId)
               : item.type === "block"
