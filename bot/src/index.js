@@ -246,8 +246,16 @@ async function buildStatsText(user) {
 
   // записываем дневной XP (не затираем синхронизированные данные)
   const today = localDateStr();
-  const prev = db.prepare("SELECT total_xp FROM user_stats WHERE duolingo_user_id = ? AND date < ? ORDER BY date DESC LIMIT 1").get(user.duolingo_user_id, today);
-  const dayXp = prev ? Math.max(0, totalXp - prev.total_xp) : 0;
+  const todayRow = db.prepare("SELECT xp, total_xp FROM user_stats WHERE duolingo_user_id = ? AND date = ?").get(user.duolingo_user_id, today);
+  const yesterday = localDateStr(new Date(Date.now() - 86400000));
+  const prevRow = db.prepare("SELECT total_xp FROM user_stats WHERE duolingo_user_id = ? AND date = ?").get(user.duolingo_user_id, yesterday);
+  // базовая линия дня = итог на конец вчерашнего дня.
+  // Из сегодняшней пары (total_xp − xp) — она не портится из-за чужих total_xp,
+  // иначе берём вчерашний итог (только саму вчерашнюю строку, не «последнюю доступную»)
+  let baseline = null;
+  if (todayRow && todayRow.total_xp != null) baseline = todayRow.total_xp - todayRow.xp;
+  else if (prevRow && prevRow.total_xp != null) baseline = prevRow.total_xp;
+  const dayXp = baseline != null ? Math.max(0, totalXp - baseline) : 0;
   db.prepare(`
     INSERT INTO user_stats (duolingo_user_id, date, xp, streak, total_xp)
     VALUES (?, ?, ?, ?, ?)
@@ -258,10 +266,10 @@ async function buildStatsText(user) {
   `).run(user.duolingo_user_id, today, dayXp, streak, totalXp);
 
   // сегодня / неделя из user_stats
-  const todayRow = db.prepare("SELECT xp FROM user_stats WHERE duolingo_user_id = ? AND date = ?").get(user.duolingo_user_id, today);
+  const todayXpRow = db.prepare("SELECT xp FROM user_stats WHERE duolingo_user_id = ? AND date = ?").get(user.duolingo_user_id, today);
   const weekStart = localDateStr(new Date(Date.now() - 7 * 86400000));
   const weekRow = db.prepare("SELECT SUM(xp) as total FROM user_stats WHERE duolingo_user_id = ? AND date >= ?").get(user.duolingo_user_id, weekStart);
-  const todayXp = todayRow ? todayRow.xp : 0;
+  const todayXp = todayXpRow ? todayXpRow.xp : 0;
   const weekXp = weekRow && weekRow.total ? weekRow.total : 0;
 
   // график за 7 дней
@@ -1434,10 +1442,19 @@ const httpServer = createServer((req, res) => {
           }
         } catch {}
 
-        // сохраняем записи xpLog в user_stats
+        // сохраняем записи xpLog в user_stats.
+        // total_xp для каждой даты = итог на КОНЕЦ этой даты:
+        // текущий totalXp минус XP всех более поздних дат.
+        // Иначе текущий итог затирает вчерашние строки и ломает расчёт дня.
         if (Array.isArray(xpLog)) {
-          for (const entry of xpLog) {
-            if (!entry || !entry.date) continue;
+          const entries = xpLog.filter((e) => e && e.date).sort((a, b) => (a.date < b.date ? -1 : 1));
+          const total = totalXp != null ? Number(totalXp) : null;
+          let laterXp = 0;
+          for (let i = entries.length - 1; i >= 0; i--) {
+            const entry = entries[i];
+            const entryXp = Number(entry.xp) || 0;
+            const endTotal = total != null ? total - laterXp : null;
+            const isLatest = i === entries.length - 1;
             db.prepare(`
               INSERT INTO user_stats (duolingo_user_id, date, xp, streak, total_xp)
               VALUES (?, ?, ?, ?, ?)
@@ -1445,7 +1462,8 @@ const httpServer = createServer((req, res) => {
                 xp = MAX(user_stats.xp, excluded.xp),
                 streak = COALESCE(excluded.streak, user_stats.streak),
                 total_xp = COALESCE(excluded.total_xp, user_stats.total_xp)
-            `).run(String(duolingoUserId), entry.date, Number(entry.xp) || 0, streak ?? null, totalXp ?? null);
+            `).run(String(duolingoUserId), entry.date, entryXp, isLatest ? (streak ?? null) : null, endTotal);
+            laterXp += entryXp;
           }
         }
         res.writeHead(200, { "Content-Type": "application/json" });
