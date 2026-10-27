@@ -573,11 +573,12 @@ function loadFriendScan(duoId) {
 }
 
 // скан активности (логика из scanFriendsActivity скрипта)
-async function runFriendsScan(user, targets, onProgress) {
+async function runFriendsScan(user, targets, onProgress, shouldStop) {
   const jwt = decryptJWT(user.jwt_encrypted);
   const daysLimit = Number(user.inactive_days) || 3;
   const results = [];
   for (let i = 0; i < targets.length; i++) {
+    if (shouldStop && shouldStop()) break;
     const r = targets[i];
     let inactive = false;
     let inactiveDays = 999;
@@ -1185,6 +1186,12 @@ bot.on("callback_query", async (ctx) => {
     return;
   }
 
+  if (data === "friends_scan_stop") {
+    friendsScanStop.add(ctx.from.id);
+    await ctx.answerCallbackQuery("⏹ Останавливаю…").catch(() => {});
+    return;
+  }
+
   if (data === "friends_scan") {
     await ctx.answerCallbackQuery();
     const user = db.prepare("SELECT * FROM users WHERE tg_user_id = ?").get(ctx.from.id);
@@ -1219,6 +1226,12 @@ bot.on("callback_query", async (ctx) => {
       return;
     }
     friendsRunning.add(ctx.from.id);
+    friendsScanStop.delete(ctx.from.id);
+    const stopKb = { inline_keyboard: [[{ text: "⏹ Стоп", callback_data: "friends_scan_stop" }]] };
+    await ctx.editMessageText(`🔍 <b>Активность</b>\n\nПроверка 0/${targets.length}…`, {
+      parse_mode: "HTML",
+      reply_markup: stopKb,
+    }).catch(() => {});
     let lastEdit = 0;
     try {
       const items = await runFriendsScan(user, targets, (done, total) => {
@@ -1227,8 +1240,10 @@ bot.on("callback_query", async (ctx) => {
         lastEdit = now;
         ctx.editMessageText(`🔍 <b>Активность</b>\n\nПроверка ${done}/${total}…`, {
           parse_mode: "HTML",
+          reply_markup: stopKb,
         }).catch(() => {});
-      });
+      }, () => friendsScanStop.has(ctx.from.id));
+      const stopped = friendsScanStop.has(ctx.from.id);
       try {
         db.prepare(`
           INSERT INTO friend_scan (duolingo_user_id, data, scanned_at)
@@ -1240,7 +1255,9 @@ bot.on("callback_query", async (ctx) => {
       const inactive = items.filter((r) => r.inactive);
       await ctx.editMessageText(
         `🔍 <b>Активность</b>\n\n` +
-        `Проверено: <b>${items.length}</b>\n` +
+        (stopped
+          ? `⏹ Остановлено: проверено <b>${items.length}</b> из ${targets.length}\n`
+          : `Проверено: <b>${items.length}</b>\n`) +
         `Неактивны: <b>${inactive.length}</b> (порог ${daysLimit} дн.)`,
         {
           parse_mode: "HTML",
@@ -1260,6 +1277,7 @@ bot.on("callback_query", async (ctx) => {
       }).catch(() => {});
     } finally {
       friendsRunning.delete(ctx.from.id);
+      friendsScanStop.delete(ctx.from.id);
     }
     return;
   }
@@ -1573,6 +1591,7 @@ const streakAmountState = new Map(); // tg_id -> "waiting" (ждём колич�
 const streakRunning = new Set(); // tg_id — накрутка серии уже идёт
 const friendsCache = new Map(); // tg_id -> { myId, following, followers, nonFollowers }
 const friendsRunning = new Set(); // tg_id — действие с друзьями уже идёт
+const friendsScanStop = new Set(); // tg_id — флаг остановки скана активности
 bot.command("bugreport", (ctx) => {
   bugReportState.set(ctx.from.id, "waiting");
   ctx.reply(
