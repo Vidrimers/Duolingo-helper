@@ -220,6 +220,20 @@ async function buildStatsText(user) {
   const streak = d.streak ?? 0;
   const name = d.name || user.duolingo_username || user.duolingo_user_id;
 
+  // XP в лиге (текущий скор в таблице лиги)
+  let leagueXp = null;
+  try {
+    const lr = await fetch(
+      "https://duolingo-leaderboards-prod.duolingo.com/leaderboards/7d9f5dd1-8423-491a-91f2-2532052038ce/users/" + user.duolingo_user_id + "?client_unlocked=true&get_reactions=true&_=" + Date.now(),
+      { headers: { accept: "application/json", cookie: `jwt_token=${jwt}`, authorization: `Bearer ${jwt}` } }
+    );
+    const ld = await lr.json();
+    const rankings = (ld && ld.active && ld.active.cohort && ld.active.cohort.rankings) || [];
+    const myId = String(user.duolingo_user_id);
+    const myIdx = rankings.findIndex((r) => String(r.user_id) === myId);
+    if (myIdx >= 0) leagueXp = rankings[myIdx].score;
+  } catch {}
+
   // определяем, занимался ли сегодня
   let todayStatus = "⚠️ <i>Ещё нет</i>";
   try {
@@ -272,6 +286,7 @@ async function buildStatsText(user) {
     `📊 <b>Статистика</b>\n\n` +
     `👤 <b>${name}</b> · <code>${user.duolingo_user_id}</code>\n\n` +
     `⚡ <b>XP:</b> ${Number(totalXp).toLocaleString("ru")}\n` +
+    `🏆 <b>XP в лиге:</b> ${leagueXp == null ? "—" : Number(leagueXp).toLocaleString("ru")}\n` +
     `🔥 <b>Streak:</b> ${streak} дней\n` +
     `📅 <b>Сегодня:</b> ${todayStatus}\n` +
     `⚡ <b>Сегодня:</b> +${Number(todayXp).toLocaleString("ru")}\n` +
