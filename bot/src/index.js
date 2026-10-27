@@ -101,6 +101,7 @@ function mainMenuKeyboard(isAdmin) {
       { text: "⚙️ Настройки", callback_data: "menu_settings" },
       { text: "🐛 Багрепорт", callback_data: "bug_report_start" },
     ],
+    [{ text: "🌐 Открыть сайт", url: "https://www.duolingo.com" }],
   ];
   if (isAdmin) {
     rows.push([{ text: "🔧 Админ-панель", callback_data: "menu_admin" }]);
