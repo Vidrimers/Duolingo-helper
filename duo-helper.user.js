@@ -3799,7 +3799,7 @@
             </div>
         </div>
         <div class="dh-footer">
-            <a class="dh-donate-link" href="https://vidrimers.online/donate" target="_blank" rel="noopener">Поддержать проект</a>
+            <a class="dh-donate-link" href="https://vidrimers.su/donate" target="_blank" rel="noopener">Поддержать проект</a>
             <span style="opacity:0.4;margin:0 6px">·</span>
             <a class="dh-donate-link" id="dh-license-link" href="#" style="cursor:pointer">Лицензия</a>
         </div>
