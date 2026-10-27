@@ -95,7 +95,6 @@ function mainMenuKeyboard(isAdmin) {
     ],
     [
       { text: "🏆 Лига", callback_data: "action_league" },
-      { text: "🏷 Метки", callback_data: "action_tags" },
     ],
     [
       { text: "⚙️ Настройки", callback_data: "menu_settings" },
@@ -209,6 +208,146 @@ function showMainMenu(ctx) {
   });
 }
 
+// сборка текста статистики (используется в экране статистики и после накрутки XP)
+async function buildStatsText(user) {
+  const jwt = decryptJWT(user.jwt_encrypted);
+  const res = await fetch(
+    `https://www.duolingo.com/2017-06-30/users/${user.duolingo_user_id}?fields=totalXp,streak,name,username,streakData`,
+    { headers: { accept: "application/json", cookie: `jwt_token=${jwt}` } }
+  );
+  const d = await res.json();
+  const totalXp = d.totalXp ?? 0;
+  const streak = d.streak ?? 0;
+  const name = d.name || user.duolingo_username || user.duolingo_user_id;
+
+  // определяем, занимался ли сегодня
+  let todayStatus = "⚠️ <i>Ещё нет</i>";
+  try {
+    const lastExtended = d.streakData?.currentStreak?.lastExtendedDate;
+    if (lastExtended) {
+      const today = localDateStr();
+      if (lastExtended >= today) todayStatus = "✅ <i>Занимался</i>";
+    }
+  } catch {}
+
+  // записываем дневной XP (не затираем синхронизированные данные)
+  const today = localDateStr();
+  const prev = db.prepare("SELECT total_xp FROM user_stats WHERE duolingo_user_id = ? AND date < ? ORDER BY date DESC LIMIT 1").get(user.duolingo_user_id, today);
+  const dayXp = prev ? Math.max(0, totalXp - prev.total_xp) : 0;
+  db.prepare(`
+    INSERT INTO user_stats (duolingo_user_id, date, xp, streak, total_xp)
+    VALUES (?, ?, ?, ?, ?)
+    ON CONFLICT(duolingo_user_id, date) DO UPDATE SET
+      xp = MAX(user_stats.xp, excluded.xp),
+      streak = COALESCE(excluded.streak, user_stats.streak),
+      total_xp = COALESCE(excluded.total_xp, user_stats.total_xp)
+  `).run(user.duolingo_user_id, today, dayXp, streak, totalXp);
+
+  // сегодня / неделя из user_stats
+  const todayRow = db.prepare("SELECT xp FROM user_stats WHERE duolingo_user_id = ? AND date = ?").get(user.duolingo_user_id, today);
+  const weekStart = localDateStr(new Date(Date.now() - 7 * 86400000));
+  const weekRow = db.prepare("SELECT SUM(xp) as total FROM user_stats WHERE duolingo_user_id = ? AND date >= ?").get(user.duolingo_user_id, weekStart);
+  const todayXp = todayRow ? todayRow.xp : 0;
+  const weekXp = weekRow && weekRow.total ? weekRow.total : 0;
+
+  // график за 7 дней
+  const days = ["Вс", "Пн", "Вт", "Ср", "Чт", "Пт", "Сб"];
+  const statsRows = db.prepare("SELECT date, xp FROM user_stats WHERE duolingo_user_id = ? ORDER BY date DESC LIMIT 7").all(user.duolingo_user_id);
+  let chart = "";
+  if (statsRows.length > 0) {
+    const maxXp = Math.max(1, ...statsRows.map((r) => r.xp));
+    const revRows = [...statsRows].reverse();
+    chart = "\n\n📈 <b>XP за 7 дней:</b>\n<pre>";
+    for (const r of revRows) {
+      const d = new Date(r.date + "T12:00:00");
+      const dayLabel = days[d.getDay()];
+      const barLen = Math.round((r.xp / maxXp) * 12);
+      const bar = "█".repeat(barLen) + "░".repeat(12 - barLen);
+      chart += `${dayLabel} ${bar} ${Number(r.xp).toLocaleString("ru")}\n`;
+    }
+    chart += "</pre>";
+  }
+
+  return (
+    `📊 <b>Статистика</b>\n\n` +
+    `👤 <b>${name}</b> · <code>${user.duolingo_user_id}</code>\n\n` +
+    `⚡ <b>XP:</b> ${Number(totalXp).toLocaleString("ru")}\n` +
+    `🔥 <b>Streak:</b> ${streak} дней\n` +
+    `📅 <b>Сегодня:</b> ${todayStatus}\n` +
+    `⚡ <b>Сегодня:</b> +${Number(todayXp).toLocaleString("ru")}\n` +
+    `📅 <b>Неделя:</b> +${Number(weekXp).toLocaleString("ru")}` + chart
+  );
+}
+
+function statsKeyboard() {
+  return {
+    inline_keyboard: [
+      [{ text: "🎁 Получить XP", callback_data: "xp_get" }],
+      [{ text: "← Назад", callback_data: "menu_main" }],
+    ],
+  };
+}
+
+// накрутка XP через stories (логика из farmXp("stories") скрипта)
+const STORY_SLUG = "fr-en-le-passeport";
+
+async function runXpFarm(user, target) {
+  const jwt = decryptJWT(user.jwt_encrypted);
+  // язык интерфейса — для fromLanguage в теле запроса
+  let fromLanguage = "en";
+  try {
+    const r = await fetch(
+      `https://www.duolingo.com/2017-06-30/users/${user.duolingo_user_id}?fields=fromLanguage,learningLanguage`,
+      { headers: { accept: "application/json", cookie: `jwt_token=${jwt}` } }
+    );
+    const u = await r.json();
+    fromLanguage = u.fromLanguage || "en";
+  } catch {}
+
+  let earned = 0;
+  let fails = 0;
+  while (earned < target) {
+    let got = 0;
+    try {
+      const res = await fetch(`https://stories.duolingo.com/api2/stories/${STORY_SLUG}/complete`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          accept: "application/json",
+          authorization: "Bearer " + jwt,
+        },
+        body: JSON.stringify({
+          awardXp: true,
+          completedBonusChallenge: true,
+          fromLanguage: fromLanguage === "en" ? "fr" : fromLanguage,
+          learningLanguage: "en",
+          hasXpBoost: true,
+          illustrationFormat: "svg",
+          isFeaturedStoryInPracticeHub: true,
+          isLegendaryMode: true,
+          isV2Redo: false,
+        }),
+      });
+      if (res.status === 200) {
+        const body = await res.json();
+        got = Number((body && (body.awardedXp || body.xpGain)) || 499);
+      }
+    } catch {}
+    if (got > 0) {
+      earned += got;
+      fails = 0;
+    } else {
+      fails++;
+      if (fails >= 5) break;
+      await new Promise((r) => setTimeout(r, 1500));
+    }
+    if (earned < target) {
+      await new Promise((r) => setTimeout(r, 350 + Math.floor(Math.random() * 350)));
+    }
+  }
+  return earned;
+}
+
 // обработка инлайн-кнопок
 bot.on("callback_query", async (ctx) => {
   const data = ctx.callbackQuery.data;
@@ -254,76 +393,10 @@ bot.on("callback_query", async (ctx) => {
       reply_markup: { inline_keyboard: [[{ text: "← Назад", callback_data: "menu_main" }]] },
     });
     try {
-      const jwt = decryptJWT(user.jwt_encrypted);
-      const res = await fetch(
-        `https://www.duolingo.com/2017-06-30/users/${user.duolingo_user_id}?fields=totalXp,streak,name,username,streakData`,
-        { headers: { accept: "application/json", cookie: `jwt_token=${jwt}` } }
-      );
-      const d = await res.json();
-      const totalXp = d.totalXp ?? 0;
-      const streak = d.streak ?? 0;
-      const name = d.name || user.duolingo_username || user.duolingo_user_id;
-
-      // определяем, занимался ли сегодня
-      let todayStatus = "⚠️ <i>Ещё нет</i>";
-      try {
-        const lastExtended = d.streakData?.currentStreak?.lastExtendedDate;
-        if (lastExtended) {
-          const today = localDateStr();
-          if (lastExtended >= today) todayStatus = "✅ <i>Занимался</i>";
-        }
-      } catch {}
-
-      // записываем дневной XP (не затираем синхронизированные данные)
-      const today = localDateStr();
-      const prev = db.prepare("SELECT total_xp FROM user_stats WHERE duolingo_user_id = ? AND date < ? ORDER BY date DESC LIMIT 1").get(user.duolingo_user_id, today);
-      const dayXp = prev ? Math.max(0, totalXp - prev.total_xp) : 0;
-      db.prepare(`
-        INSERT INTO user_stats (duolingo_user_id, date, xp, streak, total_xp)
-        VALUES (?, ?, ?, ?, ?)
-        ON CONFLICT(duolingo_user_id, date) DO UPDATE SET
-          xp = MAX(user_stats.xp, excluded.xp),
-          streak = COALESCE(excluded.streak, user_stats.streak),
-          total_xp = COALESCE(excluded.total_xp, user_stats.total_xp)
-      `).run(user.duolingo_user_id, today, dayXp, streak, totalXp);
-
-      // сегодня / неделя из user_stats
-      const todayRow = db.prepare("SELECT xp FROM user_stats WHERE duolingo_user_id = ? AND date = ?").get(user.duolingo_user_id, today);
-      const weekStart = localDateStr(new Date(Date.now() - 7 * 86400000));
-      const weekRow = db.prepare("SELECT SUM(xp) as total FROM user_stats WHERE duolingo_user_id = ? AND date >= ?").get(user.duolingo_user_id, weekStart);
-      const todayXp = todayRow ? todayRow.xp : 0;
-      const weekXp = weekRow && weekRow.total ? weekRow.total : 0;
-
-      // график за 7 дней
-      const days = ["Вс", "Пн", "Вт", "Ср", "Чт", "Пт", "Сб"];
-      const statsRows = db.prepare("SELECT date, xp FROM user_stats WHERE duolingo_user_id = ? ORDER BY date DESC LIMIT 7").all(user.duolingo_user_id);
-      let chart = "";
-      if (statsRows.length > 0) {
-        const maxXp = Math.max(1, ...statsRows.map((r) => r.xp));
-        const revRows = [...statsRows].reverse();
-        chart = "\n\n📈 <b>XP за 7 дней:</b>\n<pre>";
-        for (const r of revRows) {
-          const d = new Date(r.date + "T12:00:00");
-          const dayLabel = days[d.getDay()];
-          const barLen = Math.round((r.xp / maxXp) * 12);
-          const bar = "█".repeat(barLen) + "░".repeat(12 - barLen);
-          chart += `${dayLabel} ${bar} ${Number(r.xp).toLocaleString("ru")}\n`;
-        }
-        chart += "</pre>";
-      }
-
-      const msg =
-        `📊 <b>Статистика</b>\n\n` +
-        `👤 <b>${name}</b> · <code>${user.duolingo_user_id}</code>\n\n` +
-        `⚡ <b>XP:</b> ${Number(totalXp).toLocaleString("ru")}\n` +
-        `🔥 <b>Streak:</b> ${streak} дней\n` +
-        `📅 <b>Сегодня:</b> ${todayStatus}\n` +
-        `⚡ <b>Сегодня:</b> +${Number(todayXp).toLocaleString("ru")}\n` +
-        `📅 <b>Неделя:</b> +${Number(weekXp).toLocaleString("ru")}` + chart;
-
+      const msg = await buildStatsText(user);
       await ctx.editMessageText(msg, {
         parse_mode: "HTML",
-        reply_markup: { inline_keyboard: [[{ text: "← Назад", callback_data: "menu_main" }]] },
+        reply_markup: statsKeyboard(),
       });
     } catch (e) {
       await ctx.editMessageText("📊 <b>Статистика</b>\n\n❌ Ошибка загрузки данных.", {
@@ -691,6 +764,29 @@ bot.on("callback_query", async (ctx) => {
     return;
   }
 
+  // === XP БУСТ ===
+  if (data === "xp_get") {
+    xpAmountState.set(ctx.from.id, "waiting");
+    await safeEdit(ctx,
+      "🎁 <b>Получить XP</b>\n\n" +
+      "Введите количество XP (минимум 50):\n\n" +
+      "⚠️ <i>Накрутка XP — на свой страх и риск, возможна блокировка.</i>",
+      {
+        parse_mode: "HTML",
+        reply_markup: { inline_keyboard: [[{ text: "✖ Отмена", callback_data: "xp_cancel" }]] },
+      }
+    );
+    return;
+  }
+
+  if (data === "xp_cancel") {
+    xpAmountState.delete(ctx.from.id);
+    await safeEdit(ctx, "❌ Накрутка отменена.", {
+      reply_markup: { inline_keyboard: [[{ text: "← В статистику", callback_data: "action_stats" }]] },
+    });
+    return;
+  }
+
   // === БАГРЕПОРТЫ ===
   if (data === "bug_report_start") {
     bugReportState.set(ctx.from.id, "waiting");
@@ -851,7 +947,6 @@ bot.on("callback_query", async (ctx) => {
   // заглушки — «в разработке»
   const stubs = {
     action_friends: "👥 Друзья",
-    action_tags: "🏷 Метки",
     settings_notify: "🔔 Уведомления",
     settings_backup: "☁️ Бэкап",
     settings_link: "🔗 Линковка",
@@ -916,6 +1011,8 @@ bot.command("unlink", async (ctx) => {
 // /bugreport — отправка бага
 const bugReportState = new Map(); // tg_id -> "waiting"
 const bugReplyState = new Map(); // tg_id -> bugId
+const xpAmountState = new Map(); // tg_id -> "waiting" (ждём количество XP)
+const xpRunning = new Set(); // tg_id — накрутка уже идёт
 bot.command("bugreport", (ctx) => {
   bugReportState.set(ctx.from.id, "waiting");
   ctx.reply(
@@ -928,8 +1025,58 @@ bot.command("bugreport", (ctx) => {
   );
 });
 
-// приём текста бага
-bot.on("message:text", (ctx) => {
+// приём текста бага и количества XP
+bot.on("message:text", async (ctx) => {
+  // если ждём количество XP — запускаем накрутку
+  if (xpAmountState.get(ctx.from.id) === "waiting") {
+    const raw = ctx.message.text.trim();
+    if (raw.startsWith("/")) {
+      return; // команда — не мешаем
+    }
+    xpAmountState.delete(ctx.from.id);
+    const amount = parseInt(raw, 10);
+    if (!Number.isFinite(amount) || amount < 50) {
+      await ctx.reply("❌ Минимум 50 XP. Попробуйте ещё раз:");
+      xpAmountState.set(ctx.from.id, "waiting");
+      return;
+    }
+    const target = Math.min(99999, amount);
+    if (xpRunning.has(ctx.from.id)) {
+      await ctx.reply("⏳ Накрутка уже идёт, дождитесь завершения.");
+      return;
+    }
+    const user = db.prepare("SELECT * FROM users WHERE tg_user_id = ?").get(ctx.from.id);
+    if (!user || !user.jwt_encrypted) {
+      await ctx.reply("❌ Аккаунт не привязан или JWT отсутствует.");
+      return;
+    }
+    const statusMsg = await ctx.reply("⏳ <b>Идёт накрутка XP…</b>", { parse_mode: "HTML" });
+    xpRunning.add(ctx.from.id);
+    try {
+      const earned = await runXpFarm(user, target);
+      const statsText = await buildStatsText(user);
+      await ctx.api.editMessageText(
+        statusMsg.chat.id,
+        statusMsg.message_id,
+        (earned ? `✅ <b>Готово: +${Number(earned).toLocaleString("ru")} XP</b>\n\n` : "⚠️ <b>XP не начислены</b>\n\n") + statsText,
+        {
+          parse_mode: "HTML",
+          reply_markup: statsKeyboard(),
+        }
+      ).catch(() => {});
+    } catch (e) {
+      await ctx.api.editMessageText(
+        statusMsg.chat.id,
+        statusMsg.message_id,
+        "❌ Ошибка накрутки XP.",
+        { reply_markup: statsKeyboard() }
+      ).catch(() => {});
+    } finally {
+      xpRunning.delete(ctx.from.id);
+    }
+    return;
+  }
+
   // если ждём багрепорт — сохраняем
   if (bugReportState.get(ctx.from.id) === "waiting") {
     bugReportState.delete(ctx.from.id);
