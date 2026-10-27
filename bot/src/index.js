@@ -306,6 +306,7 @@ function statsKeyboard() {
   return {
     inline_keyboard: [
       [{ text: "🎁 Получить XP", callback_data: "xp_get" }],
+      [{ text: "🔥 Серия дней", callback_data: "streak_get" }],
       [{ text: "← Назад", callback_data: "menu_main" }],
     ],
   };
@@ -369,6 +370,138 @@ async function runXpFarm(user, target) {
     }
   }
   return earned;
+}
+
+// накрутка серии дней (логика из runStreakFarm скрипта):
+// сессии GLOBAL_PRACTICE с endTime в прошлые дни — серия растёт назад
+const CHALLENGE_TYPES = [
+  "assist","characterIntro","characterMatch","characterPuzzle","characterSelect",
+  "characterTrace","characterWrite","completeReverseTranslation","definition",
+  "dialogue","extendedMatch","extendedListenMatch","form","freeResponse","gapFill",
+  "judge","listen","listenComplete","listenMatch","match","name","listenComprehension",
+  "listenIsolation","listenSpeak","listenTap","orderTapComplete","partialListen",
+  "partialReverseTranslate","patternTapComplete","radioBinary","radioImageSelect",
+  "radioListenMatch","radioListenRecognize","radioSelect","readComprehension",
+  "reverseAssist","sameDifferent","select","selectPronunciation","selectTranscription",
+  "svgPuzzle","syllableTap","syllableListenTap","speak","tapCloze","tapClozeTable",
+  "tapComplete","tapCompleteTable","tapDescribe","translate","transliterate",
+  "transliterationAssist","typeCloze","typeClozeTable","typeComplete","typeCompleteTable",
+  "writeComprehension",
+];
+
+function tzParts(timeZone, date) {
+  const dtf = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    hourCycle: "h23",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+  const out = {};
+  dtf.formatToParts(date).forEach((p) => {
+    if (p.type !== "literal") out[p.type] = p.value;
+  });
+  return out;
+}
+
+function wallClockToSeconds(timeZone, year, month, day, hour, minute, second) {
+  const guess = Date.UTC(year, month - 1, day, hour, minute, second);
+  const parts = tzParts(timeZone, new Date(guess));
+  const localAsUtc = Date.UTC(
+    +parts.year,
+    +parts.month - 1,
+    +parts.day,
+    +parts.hour,
+    +parts.minute,
+    +parts.second,
+  );
+  return Math.floor((guess - (localAsUtc - guess)) / 1000);
+}
+
+async function sessionRequest(jwt, method, url, payload) {
+  try {
+    const res = await fetch(url, {
+      method,
+      headers: {
+        "Content-Type": "application/json",
+        accept: "application/json",
+        authorization: "Bearer " + jwt,
+      },
+      body: payload ? JSON.stringify(payload) : undefined,
+    });
+    let body = null;
+    try { body = await res.json(); } catch {}
+    return { status: res.status, body };
+  } catch {
+    return { status: 0, body: null };
+  }
+}
+
+async function runStreakFarm(user, target, onProgress) {
+  const jwt = decryptJWT(user.jwt_encrypted);
+  const u = await (await fetch(
+    `https://www.duolingo.com/2017-06-30/users/${user.duolingo_user_id}?fields=timezone,streakData,fromLanguage,learningLanguage`,
+    { headers: { accept: "application/json", cookie: `jwt_token=${jwt}` } }
+  )).json();
+  const tz = u.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const startDate = u.streakData && u.streakData.currentStreak ? u.streakData.currentStreak.startDate : null;
+  const fromLanguage = u.fromLanguage || "en";
+  const learningLanguage = u.learningLanguage || "en";
+
+  let base;
+  if (startDate && /^\d{4}-\d{2}-\d{2}$/.test(startDate)) {
+    const [y, m, d] = startDate.split("-").map(Number);
+    base = { year: y, month: m, day: d };
+  } else {
+    const p = tzParts(tz, new Date());
+    base = { year: +p.year, month: +p.month, day: +p.day };
+  }
+
+  let saved = 0;
+  let fails = 0;
+  for (let i = 0; i < target; i++) {
+    const sr = await sessionRequest(jwt, "POST", "https://www.duolingo.com/2017-06-30/sessions", {
+      challengeTypes: CHALLENGE_TYPES,
+      fromLanguage,
+      isFinalLevel: false,
+      isV2: true,
+      juicy: true,
+      learningLanguage,
+      smartTipsVersion: 2,
+      type: "GLOBAL_PRACTICE",
+    });
+    if (sr.status !== 200 || !sr.body || !sr.body.id) {
+      fails++;
+      if (onProgress) onProgress(i, saved, true);
+      if (fails >= 5) break;
+      await new Promise((r) => setTimeout(r, 2500));
+      continue;
+    }
+    const endSecs = wallClockToSeconds(tz, base.year, base.month, base.day - 1 - i, 12, 0, 0);
+    const pr = await sessionRequest(jwt, "PUT", `https://www.duolingo.com/2017-06-30/sessions/${sr.body.id}`, {
+      ...sr.body,
+      heartsLeft: 5,
+      startTime: endSecs - 1,
+      endTime: endSecs,
+      enableBonusPoints: false,
+      failed: false,
+      maxInLessonStreak: 9,
+      shouldLearnThings: true,
+    });
+    if (pr.status === 200) {
+      saved++;
+      fails = 0;
+    } else {
+      fails++;
+      if (fails >= 5) break;
+    }
+    if (onProgress) onProgress(i, saved, false);
+    await new Promise((r) => setTimeout(r, 400 + Math.floor(Math.random() * 400)));
+  }
+  return saved;
 }
 
 // обработка инлайн-кнопок
@@ -789,6 +922,7 @@ bot.on("callback_query", async (ctx) => {
 
   // === XP БУСТ ===
   if (data === "xp_get") {
+    streakAmountState.delete(ctx.from.id);
     xpAmountState.set(ctx.from.id, "waiting");
     await safeEdit(ctx,
       "🎁 <b>Получить XP</b>\n\n" +
@@ -804,6 +938,31 @@ bot.on("callback_query", async (ctx) => {
 
   if (data === "xp_cancel") {
     xpAmountState.delete(ctx.from.id);
+    await safeEdit(ctx, "❌ Накрутка отменена.", {
+      reply_markup: { inline_keyboard: [[{ text: "← В статистику", callback_data: "action_stats" }]] },
+    });
+    return;
+  }
+
+  // === СЕРИЯ ДНЕЙ ===
+  if (data === "streak_get") {
+    xpAmountState.delete(ctx.from.id);
+    streakAmountState.set(ctx.from.id, "waiting");
+    await safeEdit(ctx,
+      "🔥 <b>Накрутка серии</b>\n\n" +
+      "Сколько дней накрутить? (минимум 1, максимум 365)\n\n" +
+      "⚠️ <i>Накрутка серии — на свой страх и риск, возможна блокировка.</i>\n" +
+      "⏱ <i>Процесс может занять 5–6 минут.</i>",
+      {
+        parse_mode: "HTML",
+        reply_markup: { inline_keyboard: [[{ text: "✖ Отмена", callback_data: "streak_cancel" }]] },
+      }
+    );
+    return;
+  }
+
+  if (data === "streak_cancel") {
+    streakAmountState.delete(ctx.from.id);
     await safeEdit(ctx, "❌ Накрутка отменена.", {
       reply_markup: { inline_keyboard: [[{ text: "← В статистику", callback_data: "action_stats" }]] },
     });
@@ -1036,6 +1195,8 @@ const bugReportState = new Map(); // tg_id -> "waiting"
 const bugReplyState = new Map(); // tg_id -> bugId
 const xpAmountState = new Map(); // tg_id -> "waiting" (ждём количество XP)
 const xpRunning = new Set(); // tg_id — накрутка уже идёт
+const streakAmountState = new Map(); // tg_id -> "waiting" (ждём количество дней серии)
+const streakRunning = new Set(); // tg_id — накрутка серии уже идёт
 bot.command("bugreport", (ctx) => {
   bugReportState.set(ctx.from.id, "waiting");
   ctx.reply(
@@ -1096,6 +1257,72 @@ bot.on("message:text", async (ctx) => {
       ).catch(() => {});
     } finally {
       xpRunning.delete(ctx.from.id);
+    }
+    return;
+  }
+
+  // если ждём количество дней серии — запускаем накрутку
+  if (streakAmountState.get(ctx.from.id) === "waiting") {
+    const raw = ctx.message.text.trim();
+    if (raw.startsWith("/")) {
+      return; // команда — не мешаем
+    }
+    streakAmountState.delete(ctx.from.id);
+    const amount = parseInt(raw, 10);
+    if (!Number.isFinite(amount) || amount < 1) {
+      await ctx.reply("❌ Минимум 1 день. Попробуйте ещё раз:");
+      streakAmountState.set(ctx.from.id, "waiting");
+      return;
+    }
+    const target = Math.min(365, amount);
+    if (streakRunning.has(ctx.from.id)) {
+      await ctx.reply("⏳ Накрутка серии уже идёт, дождитесь завершения.");
+      return;
+    }
+    const user = db.prepare("SELECT * FROM users WHERE tg_user_id = ?").get(ctx.from.id);
+    if (!user || !user.jwt_encrypted) {
+      await ctx.reply("❌ Аккаунт не привязан или JWT отсутствует.");
+      return;
+    }
+    const statusMsg = await ctx.reply(
+      `🔥 <b>Накрутка серии…</b>\n\nДень 0/${target}… (+0)\n\n⏱ <i>Может занять 5–6 минут.</i>`,
+      { parse_mode: "HTML" }
+    );
+    streakRunning.add(ctx.from.id);
+    try {
+      let lastEdit = 0;
+      const saved = await runStreakFarm(user, target, (i, ok, isFail) => {
+        // обновляем прогресс не чаще раза в 2 секунды
+        const now = Date.now();
+        if (now - lastEdit < 2000) return;
+        lastEdit = now;
+        const day = Math.min(i + 1, target);
+        ctx.api.editMessageText(
+          statusMsg.chat.id,
+          statusMsg.message_id,
+          `🔥 <b>Накрутка серии…</b>\n\nДень ${day}/${target}… (+${ok})` + (isFail ? " ⚠️" : "") + `\n\n⏱ <i>Может занять 5–6 минут.</i>`,
+          { parse_mode: "HTML" }
+        ).catch(() => {});
+      });
+      const statsText = await buildStatsText(user);
+      await ctx.api.editMessageText(
+        statusMsg.chat.id,
+        statusMsg.message_id,
+        (saved ? `✅ <b>Готово: +${saved} дн.</b>\n\n` : "⚠️ <b>Серия не увеличена</b>\n\n") + statsText,
+        {
+          parse_mode: "HTML",
+          reply_markup: statsKeyboard(),
+        }
+      ).catch(() => {});
+    } catch (e) {
+      await ctx.api.editMessageText(
+        statusMsg.chat.id,
+        statusMsg.message_id,
+        "❌ Ошибка накрутки серии.",
+        { reply_markup: statsKeyboard() }
+      ).catch(() => {});
+    } finally {
+      streakRunning.delete(ctx.from.id);
     }
     return;
   }
