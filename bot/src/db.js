@@ -92,6 +92,25 @@ db.exec(`
     scanned_at INTEGER NOT NULL
   );
 
+  CREATE TABLE IF NOT EXISTS notify_prefs (
+    tg_user_id INTEGER PRIMARY KEY,
+    remind_practice INTEGER DEFAULT 1,
+    league_overtake INTEGER DEFAULT 1,
+    script_updates INTEGER DEFAULT 1,
+    last_reminder_date TEXT
+  );
+
+  CREATE TABLE IF NOT EXISTS league_snapshot (
+    duolingo_user_id TEXT PRIMARY KEY,
+    data TEXT NOT NULL,
+    scanned_at INTEGER NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS bot_kv (
+    key TEXT PRIMARY KEY,
+    value TEXT
+  );
+
   CREATE INDEX IF NOT EXISTS idx_link_codes_expires ON link_codes(expires_at);
   CREATE INDEX IF NOT EXISTS idx_bug_reports_status ON bug_reports(status);
   CREATE INDEX IF NOT EXISTS idx_bug_reports_tg ON bug_reports(tg_user_id);
@@ -116,6 +135,9 @@ try {
 } catch {}
 try {
   db.exec(`ALTER TABLE users ADD COLUMN exclude_list TEXT`);
+} catch {}
+try {
+  db.exec(`ALTER TABLE users ADD COLUMN timezone TEXT`);
 } catch {}
 
 export default db;

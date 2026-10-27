@@ -407,6 +407,12 @@ function tzParts(timeZone, date) {
   return out;
 }
 
+// YYYY-MM-DD в часовом поясе tz
+function dateStrInTz(tz, date) {
+  const p = tzParts(tz, date);
+  return `${p.year}-${p.month}-${p.day}`;
+}
+
 function wallClockToSeconds(timeZone, year, month, day, hour, minute, second) {
   const guess = Date.UTC(year, month - 1, day, hour, minute, second);
   const parts = tzParts(timeZone, new Date(guess));
@@ -681,6 +687,66 @@ async function startFriendsScan(user, daysLimit, chatId, messageId, tgId) {
     friendsRunning.delete(tgId);
     friendsScanStop.delete(tgId);
   }
+}
+
+// === УВЕДОМЛЕНИЯ: настройки ===
+const NOTIFY_COLS = { practice: "remind_practice", league: "league_overtake", updates: "script_updates" };
+
+function getNotifyPrefs(tgId) {
+  const row = db.prepare("SELECT * FROM notify_prefs WHERE tg_user_id = ?").get(tgId);
+  return {
+    remind_practice: row ? Number(row.remind_practice) : 1,
+    league_overtake: row ? Number(row.league_overtake) : 1,
+    script_updates: row ? Number(row.script_updates) : 1,
+    last_reminder_date: row ? row.last_reminder_date : null,
+  };
+}
+
+function toggleNotify(tgId, key) {
+  const col = NOTIFY_COLS[key];
+  if (!col) return;
+  const p = getNotifyPrefs(tgId);
+  p[col] = p[col] ? 0 : 1;
+  db.prepare(`
+    INSERT INTO notify_prefs (tg_user_id, remind_practice, league_overtake, script_updates)
+    VALUES (?, ?, ?, ?)
+    ON CONFLICT(tg_user_id) DO UPDATE SET
+      remind_practice = excluded.remind_practice,
+      league_overtake = excluded.league_overtake,
+      script_updates = excluded.script_updates
+  `).run(tgId, p.remind_practice, p.league_overtake, p.script_updates);
+}
+
+function markReminder(tgId, date) {
+  const p = getNotifyPrefs(tgId);
+  db.prepare(`
+    INSERT INTO notify_prefs (tg_user_id, remind_practice, league_overtake, script_updates, last_reminder_date)
+    VALUES (?, ?, ?, ?, ?)
+    ON CONFLICT(tg_user_id) DO UPDATE SET last_reminder_date = excluded.last_reminder_date
+  `).run(tgId, p.remind_practice, p.league_overtake, p.script_updates, date);
+}
+
+function notifyKeyboard(prefs) {
+  const flag = (v) => (v ? "✅" : "🔕");
+  return {
+    inline_keyboard: [
+      [{ text: `🔥 Пора позаниматься: ${flag(prefs.remind_practice)}`, callback_data: "notify_toggle_practice" }],
+      [{ text: `🏆 Обход в лиге: ${flag(prefs.league_overtake)}`, callback_data: "notify_toggle_league" }],
+      [{ text: `🚀 Обновления скрипта: ${flag(prefs.script_updates)}`, callback_data: "notify_toggle_updates" }],
+      [{ text: "← Назад", callback_data: "menu_settings" }],
+    ],
+  };
+}
+
+function cmpVersion(a, b) {
+  const pa = String(a).split(".").map(Number);
+  const pb = String(b).split(".").map(Number);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const x = pa[i] || 0;
+    const y = pb[i] || 0;
+    if (x !== y) return x < y ? -1 : 1;
+  }
+  return 0;
 }
 
 // обработка инлайн-кнопок
@@ -1554,9 +1620,20 @@ bot.on("callback_query", async (ctx) => {
     return;
   }
 
+  // === УВЕДОМЛЕНИЯ ===
+  if (data === "settings_notify" || data.startsWith("notify_toggle_")) {
+    if (data.startsWith("notify_toggle_")) {
+      toggleNotify(ctx.from.id, data.replace("notify_toggle_", ""));
+    }
+    await safeEdit(ctx, "🔔 <b>Уведомления</b>\n\nВыберите, что уведомлять:", {
+      parse_mode: "HTML",
+      reply_markup: notifyKeyboard(getNotifyPrefs(ctx.from.id)),
+    });
+    return;
+  }
+
   // заглушки — «в разработке»
   const stubs = {
-    settings_notify: "🔔 Уведомления",
     settings_backup: "☁️ Бэкап",
     settings_link: "🔗 Линковка",
     settings_help: "📋 Помощь",
@@ -2196,6 +2273,161 @@ function cleanupOldLinkCodes() {
 cleanupOldLinkCodes();
 // проверяем раз в день (30 дней не влезает в 32-битный setInterval)
 setInterval(cleanupOldLinkCodes, 24 * 60 * 60 * 1000);
+
+// === Фоновые уведомления ===
+// 1) «Пора позаниматься» — в 23:00 по таймзоне аккаунта, если серия сегодня не продлена
+async function checkPracticeReminders() {
+  const rows = db.prepare(`
+    SELECT u.tg_user_id, u.duolingo_user_id, u.jwt_encrypted, u.timezone
+    FROM users u
+    WHERE u.tg_user_id IS NOT NULL
+      AND u.tg_user_id NOT IN (SELECT tg_user_id FROM banned_users)
+  `).all();
+  const now = new Date();
+  for (const u of rows) {
+    try {
+      const prefs = getNotifyPrefs(u.tg_user_id);
+      if (!prefs.remind_practice) continue;
+      let tz = u.timezone;
+      // ранняя отсечка по кешированной таймзоне
+      if (tz && Number(tzParts(tz, now).hour) < 23) continue;
+      if (tz && prefs.last_reminder_date === dateStrInTz(tz, now)) continue;
+      const jwt = decryptJWT(u.jwt_encrypted);
+      if (!jwt) continue;
+      const res = await fetch(
+        `https://www.duolingo.com/2017-06-30/users/${u.duolingo_user_id}?fields=timezone,streakData`,
+        { headers: { accept: "application/json", cookie: `jwt_token=${jwt}` } }
+      );
+      const d = await res.json();
+      if (!tz) {
+        tz = d.timezone || "Europe/Moscow";
+        db.prepare("UPDATE users SET timezone = ? WHERE tg_user_id = ?").run(tz, u.tg_user_id);
+      }
+      const todayUser = dateStrInTz(tz, now);
+      if (Number(tzParts(tz, now).hour) < 23) continue;
+      if (prefs.last_reminder_date === todayUser) continue;
+      const lastExt = d.streakData && d.streakData.currentStreak && d.streakData.currentStreak.lastExtendedDate;
+      if (lastExt && lastExt >= todayUser) {
+        // уже занимался — больше не проверяем сегодня
+        markReminder(u.tg_user_id, todayUser);
+        continue;
+      }
+      await bot.api.sendMessage(u.tg_user_id,
+        "🔥 <b>Скоро полночь!</b>\n\nСегодня вы ещё не занимались — пора позаниматься.",
+        {
+          parse_mode: "HTML",
+          reply_markup: { inline_keyboard: [[{ text: "🌐 Открыть сайт", url: "https://www.duolingo.com" }]] },
+        }
+      ).catch(() => {});
+      markReminder(u.tg_user_id, todayUser);
+    } catch {}
+  }
+}
+
+// 2) «Обход в лиге» — по снапшоту таблицы, уведомляем только на пересечении
+async function checkLeagueOvertakes() {
+  const rows = db.prepare(`
+    SELECT u.tg_user_id, u.duolingo_user_id, u.jwt_encrypted
+    FROM users u
+    WHERE u.tg_user_id IS NOT NULL
+      AND u.tg_user_id NOT IN (SELECT tg_user_id FROM banned_users)
+  `).all();
+  for (const u of rows) {
+    try {
+      const prefs = getNotifyPrefs(u.tg_user_id);
+      if (!prefs.league_overtake) continue;
+      const jwt = decryptJWT(u.jwt_encrypted);
+      if (!jwt) continue;
+      const res = await fetch(
+        "https://duolingo-leaderboards-prod.duolingo.com/leaderboards/7d9f5dd1-8423-491a-91f2-2532052038ce/users/" + u.duolingo_user_id + "?client_unlocked=true&get_reactions=true&_=" + Date.now(),
+        { headers: { accept: "application/json", cookie: `jwt_token=${jwt}`, authorization: `Bearer ${jwt}` } }
+      );
+      const d = await res.json();
+      const rankings = (d && d.active && d.active.cohort && d.active.cohort.rankings) || [];
+      const myId = String(u.duolingo_user_id);
+      const myIdx = rankings.findIndex((r) => String(r.user_id) === myId);
+      if (myIdx < 0) continue;
+      const myScore = Number(rankings[myIdx].score);
+      let prev = null;
+      try {
+        const snap = db.prepare("SELECT data FROM league_snapshot WHERE duolingo_user_id = ?").get(myId);
+        prev = snap ? JSON.parse(snap.data || "null") : null;
+      } catch {}
+      if (prev && typeof prev === "object") {
+        const prevMy = Number(prev.__my != null ? prev.__my : myScore);
+        const overtakers = [];
+        for (let i = 0; i < myIdx; i++) {
+          const r = rankings[i];
+          const prevScore = prev[String(r.user_id)] != null ? Number(prev[String(r.user_id)]) : null;
+          // был наравне или ниже меня, теперь выше
+          if (prevScore != null && prevScore <= prevMy && Number(r.score) > myScore) {
+            const gap = Number(r.score) - myScore;
+            overtakers.push({ name: r.display_name || String(r.user_id), gap });
+          }
+        }
+        if (overtakers.length) {
+          const text = overtakers.length === 1
+            ? `🏆 <b>Тебя обогнал ${overtakers[0].name}</b>\n\nНа ${Number(overtakers[0].gap).toLocaleString("ru")} очков.`
+            : `🏆 <b>Тебя обогнали</b>\n\n` + overtakers.map((t) => `${t.name} — на ${Number(t.gap).toLocaleString("ru")} очков`).join("\n");
+          await bot.api.sendMessage(u.tg_user_id, text, { parse_mode: "HTML" }).catch(() => {});
+        }
+      }
+      // сохраняем снапшот (первый прогон — просто базовая линия)
+      const snapObj = { __my: myScore };
+      for (const r of rankings) snapObj[String(r.user_id)] = Number(r.score);
+      db.prepare(`
+        INSERT INTO league_snapshot (duolingo_user_id, data, scanned_at)
+        VALUES (?, ?, ?)
+        ON CONFLICT(duolingo_user_id) DO UPDATE SET data = excluded.data, scanned_at = excluded.scanned_at
+      `).run(myId, JSON.stringify(snapObj), Date.now());
+    } catch {}
+  }
+}
+
+// 3) «Обновления скрипта» — версия с GitHub
+async function checkScriptUpdates() {
+  try {
+    const res = await fetch("https://raw.githubusercontent.com/Vidrimers/Duolingo-helper/master/duo-helper.user.js");
+    const text = await res.text();
+    const m = text.match(/\/\/\s*@version\s+([0-9]+\.[0-9]+\.[0-9]+)/);
+    if (!m) return;
+    const version = m[1];
+    const row = db.prepare("SELECT value FROM bot_kv WHERE key = ?").get("notified_version");
+    const last = row ? row.value : null;
+    if (last === version) return;
+    if (last && cmpVersion(version, last) <= 0) {
+      db.prepare("INSERT OR REPLACE INTO bot_kv (key, value) VALUES (?, ?)").run("notified_version", version);
+      return;
+    }
+    if (last) {
+      const users = db.prepare(`
+        SELECT u.tg_user_id FROM users u
+        WHERE u.tg_user_id IS NOT NULL
+          AND u.tg_user_id NOT IN (SELECT tg_user_id FROM banned_users)
+      `).all();
+      for (const u of users) {
+        const prefs = getNotifyPrefs(u.tg_user_id);
+        if (!prefs.script_updates) continue;
+        await bot.api.sendMessage(u.tg_user_id,
+          `🚀 <b>Доступно обновление Duolingo Helper v${version}</b>`,
+          {
+            parse_mode: "HTML",
+            reply_markup: { inline_keyboard: [[{ text: "📦 Установить", url: "https://raw.githubusercontent.com/Vidrimers/Duolingo-helper/master/duo-helper.user.js" }]] },
+          }
+        ).catch(() => {});
+      }
+    }
+    // первый прогон — фиксируем текущую версию без оповещений
+    db.prepare("INSERT OR REPLACE INTO bot_kv (key, value) VALUES (?, ?)").run("notified_version", version);
+  } catch {}
+}
+
+checkPracticeReminders();
+setInterval(checkPracticeReminders, 15 * 60 * 1000);
+checkLeagueOvertakes();
+setInterval(checkLeagueOvertakes, 30 * 60 * 1000);
+checkScriptUpdates();
+setInterval(checkScriptUpdates, 6 * 60 * 60 * 1000);
 
 // бэкфилл: существующие пользователи → script_installs
 try {
