@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Duolingo Helper
 // @namespace    https://github.com/Vidrimers/Duolingo-helper
-// @version      0.9.2
+// @version      0.9.3
 // @description  Проверка взаимной подписки на профилях Duolingo. Панель, бейджи, кеш.
 // @author       Vidrimers
 // @match        *://*.duolingo.com/*
@@ -6773,9 +6773,23 @@
           method: "POST",
           url: BOT_API + "/api/sync-stats",
           headers: { "content-type": "application/json" },
-          data: JSON.stringify({ duolingoUserId: myId, duolingoUsername: (DATA.me && DATA.me.username) || "", xpLog: stats.xpLog, totalXp, streak }),
+          data: JSON.stringify({
+            duolingoUserId: myId,
+            duolingoUsername: (DATA.me && DATA.me.username) || "",
+            xpLog: stats.xpLog,
+            totalXp,
+            streak,
+            inactiveDays: DATA.settings.inactiveDays || 3,
+            excludeList: DATA.excludeList || [],
+          }),
           timeout: 5000,
-          onload() {},
+          onload(r) {
+            // действия бота → в историю (undo там)
+            try {
+              const d = JSON.parse(r.responseText || "null");
+              if (d && Array.isArray(d.pendingActions)) mergeBotActions(d.pendingActions);
+            } catch {}
+          },
           onerror() {},
           ontimeout() {},
         });
@@ -7377,6 +7391,33 @@ function savePage() {
     if (DATA.actionLog.length > 200) DATA.actionLog.length = 200;
     saveData();
     return item;
+  }
+
+  /** Действия, сделанные ботом, — в историю, чтобы работал откат (Вернуть). */
+  function mergeBotActions(list) {
+    if (!Array.isArray(list) || !list.length) return;
+    DATA.actionLog = DATA.actionLog || [];
+    let changed = false;
+    for (const p of list) {
+      if (!p || !p.type || !Array.isArray(p.ids)) continue;
+      // дедуп по ts: одно действие приходит один раз
+      if (DATA.actionLog.some((a) => a.ts === p.ts && a.type === p.type)) continue;
+      DATA.actionLog.unshift({
+        id: "b" + p.ts,
+        ts: p.ts,
+        undone: false,
+        type: p.type,
+        ids: p.ids,
+        name: p.name || "",
+        via: "bot",
+      });
+      changed = true;
+    }
+    if (changed) {
+      if (DATA.actionLog.length > 200) DATA.actionLog.length = 200;
+      saveData();
+      if (typeof renderHistory === "function") renderHistory();
+    }
   }
 
   function isExcluded(userId) {

@@ -504,6 +504,115 @@ async function runStreakFarm(user, target, onProgress) {
   return saved;
 }
 
+// === ДРУЗЬЯ: API (логика из скрипта) ===
+const FRIENDS_API = "https://www.duolingo.com/2017-06-30/friends";
+
+async function fetchUserList(jwt, userId, kind) {
+  const users = [];
+  let cursor = null;
+  for (let page = 0; page < 30; page++) {
+    let url = `${FRIENDS_API}/users/${userId}/${kind}?viewerId=${userId}&limit=100`;
+    if (cursor) url += `&cursor=${encodeURIComponent(cursor)}`;
+    const res = await fetch(url, {
+      headers: { accept: "application/json", cookie: `jwt_token=${jwt}` },
+    }).catch(() => null);
+    if (!res || !res.ok) break;
+    const data = await res.json().catch(() => ({}));
+    const bucket = data[kind] || data;
+    const pageUsers = bucket.users || bucket || [];
+    if (Array.isArray(pageUsers)) users.push(...pageUsers);
+    cursor = bucket.nextCursor || bucket.cursor || data.nextCursor || data.cursor || null;
+    const hasMore = bucket.hasMore ?? data.hasMore ?? (cursor !== null && pageUsers.length > 0);
+    if (!hasMore || !cursor || pageUsers.length === 0) break;
+  }
+  return users.map((u) => ({
+    userId: String(u.userId ?? u.id ?? ""),
+    username: u.username || "",
+    name: u.displayName || u.name || u.username || "",
+  }));
+}
+
+async function unfollowUser(jwt, myId, targetId) {
+  try {
+    const res = await fetch(`${FRIENDS_API}/users/${myId}/follow/${targetId}`, {
+      method: "DELETE",
+      headers: { accept: "application/json", authorization: "Bearer " + jwt },
+    });
+    return res.status === 200 || res.status === 201 || res.status === 204;
+  } catch { return false; }
+}
+
+async function blockUser(jwt, myId, targetId) {
+  try {
+    const res = await fetch(`${FRIENDS_API}/users/${myId}/block/${targetId}`, {
+      method: "POST",
+      headers: { accept: "application/json", authorization: "Bearer " + jwt },
+    });
+    return res.status === 200 || res.status === 201;
+  } catch { return false; }
+}
+
+function getExclusions(user) {
+  try {
+    return new Set(JSON.parse(user.exclude_list || "[]").map(String));
+  } catch { return new Set(); }
+}
+
+// запись в action_log → уйдёт в историю скрипта (undo там)
+function logBotAction(duoId, type, ids, name) {
+  try {
+    db.prepare("INSERT INTO action_log (duolingo_user_id, type, ids, name, ts) VALUES (?, ?, ?, ?, ?)")
+      .run(String(duoId), type, JSON.stringify(ids.map(String)), name, Date.now());
+  } catch {}
+}
+
+function loadFriendScan(duoId) {
+  const row = db.prepare("SELECT data FROM friend_scan WHERE duolingo_user_id = ?").get(String(duoId));
+  if (!row) return null;
+  try { return JSON.parse(row.data); } catch { return null; }
+}
+
+// скан активности (логика из scanFriendsActivity скрипта)
+async function runFriendsScan(user, targets, onProgress) {
+  const jwt = decryptJWT(user.jwt_encrypted);
+  const daysLimit = Number(user.inactive_days) || 3;
+  const results = [];
+  for (let i = 0; i < targets.length; i++) {
+    const r = targets[i];
+    let inactive = false;
+    let inactiveDays = 999;
+    try {
+      const res = await fetch(
+        `https://www.duolingo.com/2017-06-30/users/${r.userId}?fields=totalXp,streak,streakData`,
+        { headers: { accept: "application/json", cookie: `jwt_token=${jwt}` } }
+      );
+      const data = await res.json();
+      const streakData = data && data.streakData;
+      const cur = streakData && streakData.currentStreak;
+      let activityTs = NaN;
+      if (cur) {
+        const lastExt = cur.lastExtendedDate ? Date.parse(cur.lastExtendedDate) : NaN;
+        const start = cur.startDate ? Date.parse(cur.startDate) : NaN;
+        activityTs = Number.isFinite(lastExt) ? lastExt : start;
+      }
+      if (!Number.isFinite(activityTs) && streakData && streakData.previousStreak && streakData.previousStreak.endDate) {
+        activityTs = Date.parse(streakData.previousStreak.endDate);
+      }
+      if (Number.isFinite(activityTs)) {
+        inactiveDays = Math.floor((Date.now() - activityTs) / 86400000);
+        inactive = inactiveDays >= daysLimit;
+      } else {
+        inactive = !cur || !cur.startDate;
+        inactiveDays = inactive ? 999 : 0;
+      }
+    } catch {}
+    results.push({ userId: r.userId, name: r.name, iFollow: !!r.iFollow, inactive, inactiveDays });
+    if (onProgress) onProgress(i + 1, targets.length);
+    await new Promise((rr) => setTimeout(rr, 300 + Math.floor(Math.random() * 250)));
+  }
+  return results;
+}
+
 // обработка инлайн-кнопок
 bot.on("callback_query", async (ctx) => {
   const data = ctx.callbackQuery.data;
@@ -920,6 +1029,272 @@ bot.on("callback_query", async (ctx) => {
     return;
   }
 
+  // === ДРУЗЬЯ ===
+  if (data === "action_friends") {
+    await ctx.answerCallbackQuery();
+    const user = db.prepare("SELECT * FROM users WHERE tg_user_id = ?").get(ctx.from.id);
+    if (!user || !user.jwt_encrypted) {
+      await ctx.editMessageText("👥 Друзья\n\n❌ Аккаунт не привязан.", {
+        reply_markup: { inline_keyboard: [[{ text: "← Назад", callback_data: "menu_main" }]] },
+      }).catch(() => {});
+      return;
+    }
+    await ctx.editMessageText("👥 <b>Друзья</b>\n\n⏳ Загрузка…", { parse_mode: "HTML" }).catch(() => {});
+    try {
+      const jwt = decryptJWT(user.jwt_encrypted);
+      const myId = user.duolingo_user_id;
+      const [following, followers] = await Promise.all([
+        fetchUserList(jwt, myId, "following"),
+        fetchUserList(jwt, myId, "followers"),
+      ]);
+      const followersSet = new Set(followers.map((f) => String(f.userId)));
+      const nonFollowers = following.filter((u) => !followersSet.has(String(u.userId)));
+      friendsCache.set(ctx.from.id, { myId, following, followers, nonFollowers });
+      await ctx.editMessageText(
+        `👥 <b>Друзья</b>\n\n` +
+        `Подписок: <b>${following.length}</b>\n` +
+        `Подписчиков: <b>${followers.length}</b>\n` +
+        `Не подписаны: <b>${nonFollowers.length}</b>`,
+        {
+          parse_mode: "HTML",
+          reply_markup: {
+            inline_keyboard: [
+              [{ text: "🚫 Отписаться от неподписанных", callback_data: "friends_unfollow_nonf" }],
+              [{ text: "🔍 Активность", callback_data: "friends_scan" }],
+              [{ text: "← Назад", callback_data: "menu_main" }],
+            ],
+          },
+        }
+      ).catch(() => {});
+    } catch {
+      await ctx.editMessageText("👥 <b>Друзья</b>\n\n❌ Ошибка загрузки.", {
+        parse_mode: "HTML",
+        reply_markup: { inline_keyboard: [[{ text: "← Назад", callback_data: "menu_main" }]] },
+      }).catch(() => {});
+    }
+    return;
+  }
+
+  if (data === "friends_unfollow_nonf") {
+    await ctx.answerCallbackQuery();
+    const user = db.prepare("SELECT * FROM users WHERE tg_user_id = ?").get(ctx.from.id);
+    const cache = friendsCache.get(ctx.from.id);
+    const excl = getExclusions(user || {});
+    const targets = cache ? cache.nonFollowers.filter((u) => !excl.has(String(u.userId))) : [];
+    if (!targets.length) {
+      await safeEdit(ctx, "🚫 <b>Отписка от неподписанных</b>\n\nНет целей (обновите список друзей).", {
+        parse_mode: "HTML",
+        reply_markup: { inline_keyboard: [[{ text: "← Назад", callback_data: "action_friends" }]] },
+      });
+      return;
+    }
+    await safeEdit(ctx,
+      `🚫 <b>Отписка от неподписанных</b>\n\nОтписаться от ${targets.length} пользователей, которые не подписаны на вас?\nИсключения 🛡 не тронем.`,
+      {
+        parse_mode: "HTML",
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: `✅ Да, отписать ${targets.length}`, callback_data: "friends_unfollow_nonf_go" }],
+            [{ text: "← Назад", callback_data: "action_friends" }],
+          ],
+        },
+      }
+    );
+    return;
+  }
+
+  if (data === "friends_unfollow_nonf_go" || data === "friends_unf_inactive_go" || data === "friends_block_inactive_go") {
+    await ctx.answerCallbackQuery();
+    const isBlock = data === "friends_block_inactive_go";
+    const isNonf = data === "friends_unfollow_nonf_go";
+    const user = db.prepare("SELECT * FROM users WHERE tg_user_id = ?").get(ctx.from.id);
+    if (!user || !user.jwt_encrypted) {
+      await safeEdit(ctx, "❌ Аккаунт не привязан.", {
+        reply_markup: { inline_keyboard: [[{ text: "← Назад", callback_data: "action_friends" }]] },
+      });
+      return;
+    }
+    const excl = getExclusions(user);
+    let targets = [];
+    let title = "";
+    if (isNonf) {
+      const cache = friendsCache.get(ctx.from.id);
+      targets = cache ? cache.nonFollowers.filter((u) => !excl.has(String(u.userId))) : [];
+      title = "🚫 <b>Отписка от неподписанных</b>";
+    } else {
+      const scan = loadFriendScan(user.duolingo_user_id);
+      const items = scan ? (scan.items || []) : [];
+      targets = items.filter((r) => r.inactive && !excl.has(String(r.userId)) && (isBlock || r.iFollow));
+      title = isBlock ? "🚫 <b>Блокировка неактивных</b>" : "🚫 <b>Отписка от неактивных</b>";
+    }
+    if (!targets.length) {
+      await safeEdit(ctx, title + "\n\nНет целей.", {
+        parse_mode: "HTML",
+        reply_markup: { inline_keyboard: [[{ text: "← Назад", callback_data: "action_friends" }]] },
+      });
+      return;
+    }
+    if (friendsRunning.has(ctx.from.id)) {
+      await safeEdit(ctx, title + "\n\n⏳ Действие уже выполняется.", {
+        parse_mode: "HTML",
+        reply_markup: { inline_keyboard: [[{ text: "← Назад", callback_data: "action_friends" }]] },
+      });
+      return;
+    }
+    friendsRunning.add(ctx.from.id);
+    const jwt = decryptJWT(user.jwt_encrypted);
+    const myId = user.duolingo_user_id;
+    let ok = 0;
+    const ids = [];
+    let lastEdit = 0;
+    try {
+      for (let i = 0; i < targets.length; i++) {
+        const t = targets[i];
+        const success = isBlock ? await blockUser(jwt, myId, t.userId) : await unfollowUser(jwt, myId, t.userId);
+        if (success) { ok++; ids.push(String(t.userId)); }
+        const now = Date.now();
+        if (now - lastEdit >= 2000 || i === targets.length - 1) {
+          lastEdit = now;
+          await ctx.editMessageText(`${title}\n\n${isBlock ? "Блокировка" : "Отписка"} ${i + 1}/${targets.length}… (+${ok})`, {
+            parse_mode: "HTML",
+          }).catch(() => {});
+        }
+        await new Promise((r) => setTimeout(r, 300 + Math.floor(Math.random() * 250)));
+      }
+      const name = isNonf
+        ? `отписка от ${ok} неподписанных`
+        : isBlock
+          ? `блокировка ${ok} неактивных`
+          : `отписка от ${ok} неактивных`;
+      logBotAction(user.duolingo_user_id, isBlock ? "block_mass" : "unfollow_mass", ids, name);
+      await ctx.editMessageText(
+        `${title}\n\n✅ Готово: ${ok} / ${targets.length}`,
+        {
+          parse_mode: "HTML",
+          reply_markup: { inline_keyboard: [[{ text: "← Назад", callback_data: "action_friends" }]] },
+        }
+      ).catch(() => {});
+    } catch {
+      await ctx.editMessageText(`${title}\n\n❌ Ошибка (${ok} / ${targets.length}).`, {
+        parse_mode: "HTML",
+        reply_markup: { inline_keyboard: [[{ text: "← Назад", callback_data: "action_friends" }]] },
+      }).catch(() => {});
+    } finally {
+      friendsRunning.delete(ctx.from.id);
+    }
+    return;
+  }
+
+  if (data === "friends_scan") {
+    await ctx.answerCallbackQuery();
+    const user = db.prepare("SELECT * FROM users WHERE tg_user_id = ?").get(ctx.from.id);
+    if (!user || !user.jwt_encrypted) {
+      await safeEdit(ctx, "🔍 <b>Активность</b>\n\n❌ Аккаунт не привязан.", {
+        parse_mode: "HTML",
+        reply_markup: { inline_keyboard: [[{ text: "← Назад", callback_data: "action_friends" }]] },
+      });
+      return;
+    }
+    if (friendsRunning.has(ctx.from.id)) {
+      await safeEdit(ctx, "🔍 <b>Активность</b>\n\n⏳ Уже выполняется.", {
+        parse_mode: "HTML",
+        reply_markup: { inline_keyboard: [[{ text: "← Назад", callback_data: "action_friends" }]] },
+      });
+      return;
+    }
+    const cache = friendsCache.get(ctx.from.id);
+    // подписки ∪ подписчики (как фильтр «Неактивные» в скрипте)
+    const byId = new Map();
+    for (const u of (cache ? cache.following : [])) byId.set(String(u.userId), { userId: String(u.userId), name: u.name, iFollow: true });
+    for (const f of (cache ? cache.followers : [])) {
+      const id = String(f.userId);
+      if (!byId.has(id)) byId.set(id, { userId: id, name: f.name, iFollow: false });
+    }
+    const targets = [...byId.values()];
+    if (!targets.length) {
+      await safeEdit(ctx, "🔍 <b>Активность</b>\n\nСначала откройте список друзей.", {
+        parse_mode: "HTML",
+        reply_markup: { inline_keyboard: [[{ text: "← Назад", callback_data: "action_friends" }]] },
+      });
+      return;
+    }
+    friendsRunning.add(ctx.from.id);
+    let lastEdit = 0;
+    try {
+      const items = await runFriendsScan(user, targets, (done, total) => {
+        const now = Date.now();
+        if (now - lastEdit < 2000) return;
+        lastEdit = now;
+        ctx.editMessageText(`🔍 <b>Активность</b>\n\nПроверка ${done}/${total}…`, {
+          parse_mode: "HTML",
+        }).catch(() => {});
+      });
+      try {
+        db.prepare(`
+          INSERT INTO friend_scan (duolingo_user_id, data, scanned_at)
+          VALUES (?, ?, ?)
+          ON CONFLICT(duolingo_user_id) DO UPDATE SET data = excluded.data, scanned_at = excluded.scanned_at
+        `).run(String(user.duolingo_user_id), JSON.stringify({ items }), Date.now());
+      } catch {}
+      const daysLimit = Number(user.inactive_days) || 3;
+      const inactive = items.filter((r) => r.inactive);
+      await ctx.editMessageText(
+        `🔍 <b>Активность</b>\n\n` +
+        `Проверено: <b>${items.length}</b>\n` +
+        `Неактивны: <b>${inactive.length}</b> (порог ${daysLimit} дн.)`,
+        {
+          parse_mode: "HTML",
+          reply_markup: {
+            inline_keyboard: [
+              [{ text: "🚫 Отписаться от неактивных", callback_data: "friends_unf_inactive" }],
+              [{ text: "🚫 Заблокировать неактивных", callback_data: "friends_block_inactive" }],
+              [{ text: "← Назад", callback_data: "action_friends" }],
+            ],
+          },
+        }
+      ).catch(() => {});
+    } catch {
+      await ctx.editMessageText("🔍 <b>Активность</b>\n\n❌ Ошибка скана.", {
+        parse_mode: "HTML",
+        reply_markup: { inline_keyboard: [[{ text: "← Назад", callback_data: "action_friends" }]] },
+      }).catch(() => {});
+    } finally {
+      friendsRunning.delete(ctx.from.id);
+    }
+    return;
+  }
+
+  if (data === "friends_unf_inactive" || data === "friends_block_inactive") {
+    await ctx.answerCallbackQuery();
+    const isBlock = data === "friends_block_inactive";
+    const user = db.prepare("SELECT * FROM users WHERE tg_user_id = ?").get(ctx.from.id);
+    const excl = getExclusions(user || {});
+    const scan = user ? loadFriendScan(user.duolingo_user_id) : null;
+    const items = scan ? (scan.items || []) : [];
+    const targets = items.filter((r) => r.inactive && !excl.has(String(r.userId)) && (isBlock || r.iFollow));
+    const title = isBlock ? "🚫 <b>Блокировка неактивных</b>" : "🚫 <b>Отписка от неактивных</b>";
+    if (!targets.length) {
+      await safeEdit(ctx, title + "\n\nНет целей (сначала проверьте активность).", {
+        parse_mode: "HTML",
+        reply_markup: { inline_keyboard: [[{ text: "← Назад", callback_data: "action_friends" }]] },
+      });
+      return;
+    }
+    await safeEdit(ctx,
+      `${title}\n\n${isBlock ? "Заблокировать" : "Отписаться от"} ${targets.length} неактивных?\nИсключения 🛡 не тронем.`,
+      {
+        parse_mode: "HTML",
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: `✅ Да, ${isBlock ? "заблокировать" : "отписать"} ${targets.length}`, callback_data: isBlock ? "friends_block_inactive_go" : "friends_unf_inactive_go" }],
+            [{ text: "← Назад", callback_data: "action_friends" }],
+          ],
+        },
+      }
+    );
+    return;
+  }
+
   // === XP БУСТ ===
   if (data === "xp_get") {
     streakAmountState.delete(ctx.from.id);
@@ -1128,7 +1503,6 @@ bot.on("callback_query", async (ctx) => {
 
   // заглушки — «в разработке»
   const stubs = {
-    action_friends: "👥 Друзья",
     settings_notify: "🔔 Уведомления",
     settings_backup: "☁️ Бэкап",
     settings_link: "🔗 Линковка",
@@ -1197,6 +1571,8 @@ const xpAmountState = new Map(); // tg_id -> "waiting" (ждём количес�
 const xpRunning = new Set(); // tg_id — накрутка уже идёт
 const streakAmountState = new Map(); // tg_id -> "waiting" (ждём количество дней серии)
 const streakRunning = new Set(); // tg_id — накрутка серии уже идёт
+const friendsCache = new Map(); // tg_id -> { myId, following, followers, nonFollowers }
+const friendsRunning = new Set(); // tg_id — действие с друзьями уже идёт
 bot.command("bugreport", (ctx) => {
   bugReportState.set(ctx.from.id, "waiting");
   ctx.reply(
@@ -1616,12 +1992,23 @@ const httpServer = createServer((req, res) => {
     req.on("data", (chunk) => { body += chunk; });
     req.on("end", () => {
       try {
-        const { duolingoUserId, xpLog, totalXp, streak } = JSON.parse(body || "{}");
+        const { duolingoUserId, duolingoUsername, xpLog, totalXp, streak, inactiveDays, excludeList } = JSON.parse(body || "{}");
         if (!duolingoUserId) {
           res.writeHead(400, { "Content-Type": "application/json" });
           res.end(JSON.stringify({ error: "duolingoUserId required" }));
           return;
         }
+        // сохраняем настройки скрипта (порог неактивности, исключения 🛡)
+        try {
+          if (typeof inactiveDays === "number" && inactiveDays > 0) {
+            db.prepare("UPDATE users SET inactive_days = ? WHERE duolingo_user_id = ?")
+              .run(Math.min(365, Math.floor(inactiveDays)), String(duolingoUserId));
+          }
+          if (Array.isArray(excludeList)) {
+            db.prepare("UPDATE users SET exclude_list = ? WHERE duolingo_user_id = ?")
+              .run(JSON.stringify(excludeList.map((x) => String(x && x.userId != null ? x.userId : x))), String(duolingoUserId));
+          }
+        } catch {}
         // проверяем: новый ли это пользователь (установка скрипта)
         try {
           const existing = db.prepare("SELECT duolingo_user_id FROM script_installs WHERE duolingo_user_id = ?").get(String(duolingoUserId));
@@ -1693,8 +2080,23 @@ const httpServer = createServer((req, res) => {
             laterXp += entryXp;
           }
         }
+        // незакрытые действия бота → в историю скрипта (undo там)
+        let pendingActions = [];
+        try {
+          pendingActions = db.prepare(
+            "SELECT type, ids, name, ts FROM action_log WHERE duolingo_user_id = ? AND delivered = 0 ORDER BY id ASC LIMIT 50"
+          ).all(String(duolingoUserId)).map((r) => ({
+            type: r.type,
+            ids: JSON.parse(r.ids || "[]"),
+            name: r.name || "",
+            ts: r.ts,
+          }));
+          if (pendingActions.length) {
+            db.prepare("UPDATE action_log SET delivered = 1 WHERE duolingo_user_id = ? AND delivered = 0").run(String(duolingoUserId));
+          }
+        } catch {}
         res.writeHead(200, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ ok: true, synced: Array.isArray(xpLog) ? xpLog.length : 0 }));
+        res.end(JSON.stringify({ ok: true, synced: Array.isArray(xpLog) ? xpLog.length : 0, pendingActions }));
       } catch (e) {
         res.writeHead(500, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ error: e.message }));
