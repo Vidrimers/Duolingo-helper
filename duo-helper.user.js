@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Duolingo Helper
 // @namespace    https://github.com/Vidrimers/Duolingo-helper
-// @version      0.9.5
+// @version      0.10.0
 // @description  Проверка взаимной подписки на профилях Duolingo. Панель, бейджи, кеш.
 // @author       Vidrimers
 // @match        *://*.duolingo.com/*
@@ -105,6 +105,7 @@
       friendChangesUnread: 0,
       userTags: {},
       stats: { xpLog: [], leagueLog: [], lastSnapshot: null },
+      privacySnapshot: {},
     };
   }
 
@@ -3796,6 +3797,16 @@
                         <button class="dh-btn" id="dh-import" style="padding:5px 10px;font-size:11px">📤 Импорт</button>
                     </div>
                 </div>
+                <div class="dh-setting-row" style="border-bottom:none">
+                    <div class="dh-setting-label">
+                        Облачные сохранения
+                        <small id="dh-cloud-status">Бэкап на сервере бота · один на аккаунт</small>
+                    </div>
+                    <div class="dh-row" style="gap:6px">
+                        <button class="dh-btn" id="dh-cloud-save" style="padding:5px 10px;font-size:11px" title="Сначала привяжите Telegram">☁️ Сохранить</button>
+                        <button class="dh-btn" id="dh-cloud-load" style="padding:5px 10px;font-size:11px" title="Сначала привяжите Telegram">📥 Восстановить</button>
+                    </div>
+                </div>
             </div>
         </div>
         <div class="dh-footer">
@@ -3945,6 +3956,9 @@
       exportBtn: modal.querySelector("#dh-export"),
       importBtn: modal.querySelector("#dh-import"),
       importFile: modal.querySelector("#dh-import-file"),
+      cloudSave: modal.querySelector("#dh-cloud-save"),
+      cloudLoad: modal.querySelector("#dh-cloud-load"),
+      cloudStatus: modal.querySelector("#dh-cloud-status"),
       licenseLink: modal.querySelector("#dh-license-link"),
       statsToggle: modal.querySelector("#dh-stats-toggle"),
       statsBody: modal.querySelector("#dh-stats-body"),
@@ -3977,6 +3991,7 @@
       applyFabPos();
     });
     initUpdateCheck();
+    updateCloudBlock();
   }
 
   // ========== Theme ==========
@@ -7273,6 +7288,7 @@ function savePage() {
       if (typeof renderStats === "function") renderStats();
       if (typeof collectStats === "function") collectStats();
       if (typeof loadPrivacyStatus === "function") loadPrivacyStatus();
+      if (typeof updateCloudBlock === "function") updateCloudBlock();
     } catch (e) {
       console.warn("[DuoHelper] refreshUiForAccount", e);
     }
@@ -10733,6 +10749,39 @@ function savePage() {
   }
 
   // ========== Экспорт (модалка) ==========
+  /** Собирает аккаунты в формате v2 (общий для файла и облачного бэкапа). */
+  function buildExportAccounts(ids, includeJwt) {
+    const accounts = (DATA._store && DATA._store.accounts) || {};
+    const out = [];
+    for (const id of ids) {
+      const a = accounts[id] || {};
+      const entry = {
+        id,
+        username: (a.me && a.me.username) || a.username || "",
+        displayName: (a.me && a.me.name) || (a.me && a.me.displayName) || "",
+        label: a.label || "",
+        updatedAt: a.updatedAt || 0,
+        data: {
+          settings: a.settings || {},
+          followCache: a.followCache || {},
+          me: a.me || null,
+          actionLog: a.actionLog || [],
+          excludeList: a.excludeList || [],
+          blockList: a.blockList || [],
+          friendSnapshots: a.friendSnapshots || [],
+          friendChanges: a.friendChanges || [],
+          friendChangesUnread: a.friendChangesUnread || 0,
+          userTags: a.userTags || {},
+          stats: a.stats || { xpLog: [], leagueLog: [], lastSnapshot: null },
+          privacySnapshot: a.privacySnapshot || {},
+        },
+      };
+      if (includeJwt && a.jwt) entry.jwt = a.jwt;
+      out.push(entry);
+    }
+    return out;
+  }
+
   function showExportModal() {
     if (!shadow) return;
     const theme = DATA.settings.theme || "win95";
@@ -10833,38 +10882,14 @@ function savePage() {
         return;
       }
 
-      const outAccounts = [];
-      for (const id of selected) {
-        const a = accounts[id] || {};
-        const entry = {
-          id,
-          username: (a.me && a.me.username) || a.username || "",
-          displayName: (a.me && a.me.name) || (a.me && a.me.displayName) || "",
-          label: a.label || "",
-          updatedAt: a.updatedAt || 0,
-          data: {
-            settings: a.settings || {},
-            followCache: a.followCache || {},
-            me: a.me || null,
-            actionLog: a.actionLog || [],
-            excludeList: a.excludeList || [],
-            blockList: a.blockList || [],
-            friendSnapshots: a.friendSnapshots || [],
-            friendChanges: a.friendChanges || [],
-            friendChangesUnread: a.friendChangesUnread || 0,
-            userTags: a.userTags || {},
-            stats: a.stats || { xpLog: [], leagueLog: [], lastSnapshot: null },
-            privacySnapshot: a.privacySnapshot || {},
-          },
-        };
-        if (includeJwt && a.jwt) {
-          if (doEncrypt) {
-            entry.jwt_encrypted = await encryptJWT(a.jwt, password);
-          } else {
-            entry.jwt = a.jwt;
+      const outAccounts = buildExportAccounts(selected, includeJwt);
+      if (includeJwt && doEncrypt) {
+        for (const entry of outAccounts) {
+          if (entry.jwt) {
+            entry.jwt_encrypted = await encryptJWT(entry.jwt, password);
+            delete entry.jwt;
           }
         }
-        outAccounts.push(entry);
       }
 
       const payload = {
@@ -11435,6 +11460,8 @@ function savePage() {
     els.refreshPage.addEventListener("click", () => location.reload());
 
     els.exportBtn.addEventListener("click", () => showExportModal());
+  if (els.cloudSave) els.cloudSave.addEventListener("click", () => cloudSave());
+  if (els.cloudLoad) els.cloudLoad.addEventListener("click", () => cloudLoad());
     if (els.licenseLink) {
       els.licenseLink.addEventListener("click", (e) => {
         e.preventDefault();
@@ -11539,8 +11566,126 @@ function savePage() {
     }
   }
 
+  /** Бэкап данных на сервере бота (один на аккаунт). Управление только из скрипта. */
+  function cloudRequest(url, options) {
+    return new Promise((resolve) => {
+      GM_xmlhttpRequest({
+        method: options.method,
+        url,
+        headers: options.headers,
+        data: options.data,
+        timeout: 20000,
+        onload(r) {
+          try { resolve(JSON.parse(r.responseText || "{}")); } catch { resolve(null); }
+        },
+        onerror() { resolve(null); },
+        ontimeout() { resolve(null); },
+      });
+    });
+  }
+
+  /** Обновляет блок «Облачные сохранения»: доступность кнопок и дату бэкапа. */
+  async function updateCloudBlock() {
+    const saveBtn = els.cloudSave;
+    const loadBtn = els.cloudLoad;
+    const status = els.cloudStatus;
+    if (!saveBtn || !loadBtn) return;
+    const myId = getMyId();
+    const lock = () => {
+      saveBtn.disabled = true;
+      loadBtn.disabled = true;
+      saveBtn.title = "Сначала привяжите Telegram";
+      loadBtn.title = "Сначала привяжите Telegram";
+      if (status) status.textContent = "Привяжите Telegram, чтобы сохранять в облаке";
+    };
+    if (!myId) { lock(); return; }
+    const linked = await cloudRequest(
+      BOT_API + "/api/link-status?duolingoUserId=" + encodeURIComponent(myId),
+      { method: "GET" }
+    );
+    if (!linked || !linked.linked) { lock(); return; }
+    saveBtn.disabled = false;
+    loadBtn.disabled = false;
+    saveBtn.title = "";
+    loadBtn.title = "";
+    const meta = await cloudRequest(
+      BOT_API + "/api/backup?duolingoUserId=" + encodeURIComponent(myId) + "&meta=1",
+      { method: "GET", headers: { authorization: "Bearer " + (getToken() || "") } }
+    );
+    if (status) {
+      status.textContent = meta && meta.hasBackup
+        ? "Последний бэкап: " + fmtTime(meta.savedAt)
+        : "Бэкапов пока нет · один на аккаунт";
+    }
+  }
+
+  /** Сохраняет все аккаунты в облако (тот же формат, что и экспорт). */
+  async function cloudSave() {
+    const myId = getMyId();
+    const jwt = getToken();
+    if (!myId || !jwt) { showToast("Сначала привяжите Telegram", true); return; }
+    // показываем предупреждение о перезаписи только если бэкап уже есть
+    const meta = await cloudRequest(
+      BOT_API + "/api/backup?duolingoUserId=" + encodeURIComponent(myId) + "&meta=1",
+      { method: "GET", headers: { authorization: "Bearer " + jwt } }
+    );
+    const ok = await showConfirm(
+      meta && meta.hasBackup
+        ? "Сохранить данные в облако? Существующий бэкап будет перезаписан."
+        : "Сохранить данные в облако?",
+      "Облачное сохранение",
+    );
+    if (!ok) return;
+    showToast("Сохраняю в облако…");
+    const ids = Object.keys((DATA._store && DATA._store.accounts) || {});
+    const payload = {
+      type: "duolingo-helper-accounts",
+      version: 2,
+      exportedAt: new Date().toISOString(),
+      encrypted: false,
+      accounts: buildExportAccounts(ids, true),
+    };
+    const res = await cloudRequest(BOT_API + "/api/backup", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      data: JSON.stringify({ duolingoUserId: myId, jwt, data: payload }),
+    });
+    if (res && res.ok) {
+      showToast("✓ Бэкап сохранён в облаке");
+      updateCloudBlock();
+    } else {
+      showToast("Ошибка сохранения: " + ((res && res.error) || "сервер недоступен"), true);
+    }
+  }
+
+  /** Восстанавливает аккаунты из облачного бэкапа. */
+  async function cloudLoad() {
+    const myId = getMyId();
+    const jwt = getToken();
+    if (!myId || !jwt) { showToast("Сначала привяжите Telegram", true); return; }
+    const res = await cloudRequest(
+      BOT_API + "/api/backup?duolingoUserId=" + encodeURIComponent(myId),
+      { method: "GET", headers: { authorization: "Bearer " + jwt } }
+    );
+    if (!res || !res.ok) {
+      showToast("Ошибка загрузки: " + ((res && res.error) || "сервер недоступен"), true);
+      return;
+    }
+    if (!res.hasBackup || !res.data) {
+      showToast("В облаке пока нет бэкапа", true);
+      return;
+    }
+    const when = res.savedAt ? fmtTime(res.savedAt) : "—";
+    const ok = await showConfirm(
+      `Восстановить бэкап от ${when}? Данные аккаунтов из бэкапа заменят текущие.`,
+      "Облачное сохранение",
+    );
+    if (!ok) return;
+    await importAccountsV2(res.data, { fromCloud: true });
+  }
+
   /** Импорт формата v2: мультиаккаунт с опциональным шифрованием JWT. */
-  async function importAccountsV2(parsed) {
+  async function importAccountsV2(parsed, opts = {}) {
     const accounts = parsed.accounts || [];
     if (!accounts.length) {
       showToast("Файл не содержит аккаунтов", true);
@@ -11557,7 +11702,7 @@ function savePage() {
         showToast("Импорт отменён");
         return;
       }
-    } else if (hasPlainJwt) {
+    } else if (hasPlainJwt && !opts.fromCloud) {
       const ok = await showConfirm(
         "Файл содержит JWT без шифрования. Продолжить импорт?",
         "Импорт данных",

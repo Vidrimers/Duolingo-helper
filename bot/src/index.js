@@ -779,6 +779,18 @@ function cmpVersion(a, b) {
   return 0;
 }
 
+// sub (числовой id) из JWT — для проверки, что запрос от владельца аккаунта
+function jwtSub(jwt) {
+  try {
+    const b64 = String(jwt).split(".")[1] || "";
+    const norm = b64.replace(/-/g, "+").replace(/_/g, "/");
+    const p = JSON.parse(Buffer.from(norm, "base64").toString("utf8"));
+    return p && p.sub != null ? String(p.sub) : null;
+  } catch {
+    return null;
+  }
+}
+
 // полная очистка данных пользователя при отвязке
 function wipeUserData(tgId, duoId) {
   try {
@@ -2432,6 +2444,72 @@ const httpServer = createServer((req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ linked: false }));
     }
+    return;
+  }
+
+  // === ОБЛАЧНЫЙ БЭКАП (управление из скрипта, один бэкап на пользователя) ===
+  if (req.method === "POST" && req.url === "/api/backup") {
+    let body = "";
+    req.on("data", (chunk) => { body += chunk; });
+    req.on("end", () => {
+      try {
+        const { duolingoUserId, jwt, data } = JSON.parse(body || "{}");
+        if (!duolingoUserId || !jwt || !data) {
+          res.writeHead(400, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: "duolingoUserId, jwt and data required" }));
+          return;
+        }
+        if (jwtSub(jwt) !== String(duolingoUserId)) {
+          res.writeHead(403, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: "jwt mismatch" }));
+          return;
+        }
+        // один бэкап на пользователя: старый перезаписывается
+        const enc = encryptJWT(JSON.stringify(data));
+        db.prepare("DELETE FROM backups WHERE duolingo_user_id = ?").run(String(duolingoUserId));
+        db.prepare("INSERT INTO backups (duolingo_user_id, data) VALUES (?, ?)").run(String(duolingoUserId), enc);
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ ok: true, savedAt: Date.now() }));
+      } catch (e) {
+        res.writeHead(500, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: e.message }));
+      }
+    });
+    return;
+  }
+
+  if (req.method === "GET" && req.url.startsWith("/api/backup")) {
+    const url = new URL(req.url, `http://${req.headers.host}`);
+    const duoId = url.searchParams.get("duolingoUserId");
+    const metaOnly = url.searchParams.get("meta") === "1";
+    const auth = String(req.headers.authorization || "");
+    const jwt = auth.replace(/^Bearer\s+/i, "");
+    if (!duoId || !jwt) {
+      res.writeHead(400, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "duolingoUserId and jwt required" }));
+      return;
+    }
+    if (jwtSub(jwt) !== String(duoId)) {
+      res.writeHead(403, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "jwt mismatch" }));
+      return;
+    }
+    const row = db.prepare("SELECT data, created_at FROM backups WHERE duolingo_user_id = ?").get(String(duoId));
+    if (!row) {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ ok: true, hasBackup: false }));
+      return;
+    }
+    if (metaOnly) {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ ok: true, hasBackup: true, savedAt: row.created_at }));
+      return;
+    }
+    const json = decryptJWT(row.data);
+    let data = null;
+    try { data = json ? JSON.parse(json) : null; } catch {}
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ ok: true, hasBackup: true, savedAt: row.created_at, data }));
     return;
   }
 
