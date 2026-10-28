@@ -407,6 +407,30 @@ function dateStrInTz(tz, date) {
   return `${p.year}-${p.month}-${p.day}`;
 }
 
+// день недели даты YYYY-MM-DD (0 = вс … 6 = сб)
+function weekdayOfDateStr(dateStr) {
+  return new Date(dateStr + "T12:00:00").getDay();
+}
+
+// понедельник недели, содержащей dateStr (YYYY-MM-DD)
+function mondayStrOf(dateStr) {
+  const d = new Date(dateStr + "T12:00:00");
+  d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+// «22–28 окт» / «28 сен – 4 окт»
+function fmtRange(startStr, endStr) {
+  const months = ["янв", "фев", "мар", "апр", "мая", "июн", "июл", "авг", "сен", "окт", "ноя", "дек"];
+  const a = new Date(startStr + "T12:00:00");
+  const b = new Date(endStr + "T12:00:00");
+  const am = months[a.getMonth()];
+  const bm = months[b.getMonth()];
+  return am === bm
+    ? `${a.getDate()}–${b.getDate()} ${bm}`
+    : `${a.getDate()} ${am} – ${b.getDate()} ${bm}`;
+}
+
 function wallClockToSeconds(timeZone, year, month, day, hour, minute, second) {
   const guess = Date.UTC(year, month - 1, day, hour, minute, second);
   const parts = tzParts(timeZone, new Date(guess));
@@ -684,7 +708,7 @@ async function startFriendsScan(user, daysLimit, chatId, messageId, tgId) {
 }
 
 // === УВЕДОМЛЕНИЯ: настройки ===
-const NOTIFY_COLS = { practice: "remind_practice", league: "league_overtake", updates: "script_updates", follows: "follow_changes" };
+const NOTIFY_COLS = { practice: "remind_practice", league: "league_overtake", updates: "script_updates", follows: "follow_changes", digest: "digest" };
 
 function getNotifyPrefs(tgId) {
   const row = db.prepare("SELECT * FROM notify_prefs WHERE tg_user_id = ?").get(tgId);
@@ -693,21 +717,25 @@ function getNotifyPrefs(tgId) {
     league_overtake: row ? Number(row.league_overtake) : 1,
     script_updates: row ? Number(row.script_updates) : 1,
     follow_changes: row ? Number(row.follow_changes) : 1,
+    digest: row ? Number(row.digest) : 1,
     last_reminder_date: row ? row.last_reminder_date : null,
+    last_digest_date: row ? row.last_digest_date : null,
   };
 }
 
 function upsertNotifyPrefs(tgId, p) {
   db.prepare(`
-    INSERT INTO notify_prefs (tg_user_id, remind_practice, league_overtake, script_updates, follow_changes, last_reminder_date)
-    VALUES (?, ?, ?, ?, ?, ?)
+    INSERT INTO notify_prefs (tg_user_id, remind_practice, league_overtake, script_updates, follow_changes, digest, last_reminder_date, last_digest_date)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(tg_user_id) DO UPDATE SET
       remind_practice = excluded.remind_practice,
       league_overtake = excluded.league_overtake,
       script_updates = excluded.script_updates,
       follow_changes = excluded.follow_changes,
-      last_reminder_date = excluded.last_reminder_date
-  `).run(tgId, p.remind_practice, p.league_overtake, p.script_updates, p.follow_changes, p.last_reminder_date ?? null);
+      digest = excluded.digest,
+      last_reminder_date = excluded.last_reminder_date,
+      last_digest_date = excluded.last_digest_date
+  `).run(tgId, p.remind_practice, p.league_overtake, p.script_updates, p.follow_changes, p.digest, p.last_reminder_date ?? null, p.last_digest_date ?? null);
 }
 
 function toggleNotify(tgId, key) {
@@ -731,6 +759,7 @@ function notifyKeyboard(prefs) {
       [{ text: `🔥 Пора позаниматься: ${flag(prefs.remind_practice)}`, callback_data: "notify_toggle_practice" }],
       [{ text: `🏆 Обход в лиге: ${flag(prefs.league_overtake)}`, callback_data: "notify_toggle_league" }],
       [{ text: `👥 Кто подписался / отписался: ${flag(prefs.follow_changes)}`, callback_data: "notify_toggle_follows" }],
+      [{ text: `📬 Дайджест: ${flag(prefs.digest)}`, callback_data: "notify_toggle_digest" }],
       [{ text: `🚀 Обновления скрипта: ${flag(prefs.script_updates)}`, callback_data: "notify_toggle_updates" }],
       [{ text: "← Назад", callback_data: "menu_settings" }],
     ],
@@ -760,6 +789,7 @@ function wipeUserData(tgId, duoId) {
       db.prepare("DELETE FROM league_snapshot WHERE duolingo_user_id = ?").run(id);
       db.prepare("DELETE FROM friends_snapshot WHERE duolingo_user_id = ?").run(id);
       db.prepare("DELETE FROM pending_changes WHERE duolingo_user_id = ?").run(id);
+      db.prepare("DELETE FROM xp_farm_log WHERE duolingo_user_id = ?").run(id);
       db.prepare("DELETE FROM link_codes WHERE duolingo_user_id = ?").run(id);
       db.prepare("DELETE FROM script_installs WHERE duolingo_user_id = ?").run(id);
       db.prepare("DELETE FROM users WHERE duolingo_user_id = ?").run(id);
@@ -1837,6 +1867,13 @@ bot.on("message:text", async (ctx) => {
     xpRunning.add(ctx.from.id);
     try {
       const earned = await runXpFarm(user, target);
+      // лог накруток — для дайджеста
+      if (earned > 0) {
+        try {
+          db.prepare("INSERT INTO xp_farm_log (duolingo_user_id, amount, ts) VALUES (?, ?, ?)")
+            .run(String(user.duolingo_user_id), earned, Date.now());
+        } catch {}
+      }
       const statsText = await buildStatsText(user);
       await ctx.api.editMessageText(
         statusMsg.chat.id,
@@ -2569,7 +2606,114 @@ async function checkFollowChanges() {
   }
 }
 
-// 4) «Обновления скрипта» — версия с GitHub
+// 4) «Дайджест» — воскресенье 20:00 по таймзоне аккаунта
+async function checkWeeklyDigest() {
+  const rows = db.prepare(`
+    SELECT u.tg_user_id, u.duolingo_user_id, u.jwt_encrypted, u.timezone, u.linked_at
+    FROM users u
+    WHERE u.tg_user_id IS NOT NULL
+      AND u.tg_user_id NOT IN (SELECT tg_user_id FROM banned_users)
+  `).all();
+  const now = new Date();
+  for (const u of rows) {
+    try {
+      const prefs = getNotifyPrefs(u.tg_user_id);
+      if (!prefs.digest) continue;
+      let tz = u.timezone;
+      if (!tz) {
+        const jwt0 = decryptJWT(u.jwt_encrypted);
+        if (!jwt0) continue;
+        const r0 = await fetch(
+          `https://www.duolingo.com/2017-06-30/users/${u.duolingo_user_id}?fields=timezone`,
+          { headers: { accept: "application/json", cookie: `jwt_token=${jwt0}` } }
+        );
+        const d0 = await r0.json();
+        tz = d0.timezone || "Europe/Moscow";
+        db.prepare("UPDATE users SET timezone = ? WHERE tg_user_id = ?").run(tz, u.tg_user_id);
+      }
+      const todayUser = dateStrInTz(tz, now);
+      if (weekdayOfDateStr(todayUser) !== 0) continue; // только воскресенье
+      if (Number(tzParts(tz, now).hour) < 20) continue;
+      if (prefs.last_digest_date === todayUser) continue;
+
+      // период: с max(понедельник недели, дата привязки)
+      const monday = mondayStrOf(todayUser);
+      const linked = String(u.linked_at || "").slice(0, 10);
+      const start = linked && linked > monday ? linked : monday;
+      const startMs = new Date(start + "T00:00:00").getTime();
+
+      // подписчики — из снапшота проверки подписок
+      let followers = null;
+      try {
+        const snap = db.prepare("SELECT data FROM friends_snapshot WHERE duolingo_user_id = ?").get(String(u.duolingo_user_id));
+        const obj = snap ? JSON.parse(snap.data || "null") : null;
+        if (obj && typeof obj === "object") followers = Object.keys(obj).length;
+      } catch {}
+
+      // подписки/отписки за период
+      let followed = 0;
+      let unfollowed = 0;
+      try {
+        const rc = db.prepare(
+          "SELECT kind, COUNT(*) AS n FROM pending_changes WHERE duolingo_user_id = ? AND ts >= ? GROUP BY kind"
+        ).all(String(u.duolingo_user_id), startMs);
+        for (const r of rc) {
+          if (r.kind === "followed_me") followed = Number(r.n) || 0;
+          if (r.kind === "unfollowed_me") unfollowed = Number(r.n) || 0;
+        }
+      } catch {}
+
+      // XP за неделю и накручено
+      let weekXp = 0;
+      try {
+        const r = db.prepare("SELECT SUM(xp) AS s FROM user_stats WHERE duolingo_user_id = ? AND date >= ?")
+          .get(String(u.duolingo_user_id), start);
+        weekXp = Number(r && r.s) || 0;
+      } catch {}
+      let farmedXp = 0;
+      try {
+        const r = db.prepare("SELECT SUM(amount) AS s FROM xp_farm_log WHERE duolingo_user_id = ? AND ts >= ?")
+          .get(String(u.duolingo_user_id), startMs);
+        farmedXp = Number(r && r.s) || 0;
+      } catch {}
+
+      // активность по последнему скану
+      let actBlock = "📊 <i>Активность: нет данных — запустите «🔍 Активность» в разделе «👥 Друзья».</i>";
+      try {
+        const scan = loadFriendScan(u.duolingo_user_id);
+        const items = scan ? (scan.items || []) : [];
+        if (items.length) {
+          const scanRow = db.prepare("SELECT scanned_at FROM friend_scan WHERE duolingo_user_id = ?").get(String(u.duolingo_user_id));
+          const scanned = scanRow ? new Date(scanRow.scanned_at) : null;
+          const active = items.filter((i) => Number(i.inactiveDays) < 7).length;
+          const inactive = items.length - active;
+          const scanDate = scanned
+            ? `${scanned.getDate()}.${String(scanned.getMonth() + 1).padStart(2, "0")}`
+            : "?";
+          actBlock =
+            `📊 <i>Активность (по проверке от ${scanDate}):</i>\n` +
+            `✅ Активны: <b>${active}</b> · 💤 Неактивны (7+ дн.): <b>${inactive}</b>`;
+        }
+      } catch {}
+
+      const net = followed - unfollowed;
+      const netStr = net > 0 ? ` (+${net})` : net < 0 ? ` (−${Math.abs(net)})` : "";
+      const text =
+        `📬 <b>Дайджест за неделю (${fmtRange(start, todayUser)})</b>\n\n` +
+        `👥 Подписчиков: <b>${followers == null ? "—" : followers}</b>${netStr}\n` +
+        `🔄 Подписался: +${followed} · Отписался: −${unfollowed}\n` +
+        `⚡ XP за неделю: <b>+${Number(weekXp).toLocaleString("ru")}</b>\n` +
+        `🎁 Из них накручено XP: <b>+${Number(farmedXp).toLocaleString("ru")}</b>\n\n` +
+        actBlock;
+
+      await bot.api.sendMessage(u.tg_user_id, text, { parse_mode: "HTML" }).catch(() => {});
+      prefs.last_digest_date = todayUser;
+      upsertNotifyPrefs(u.tg_user_id, prefs);
+    } catch {}
+  }
+}
+
+// 5) «Обновления скрипта» — версия с GitHub
 async function checkScriptUpdates() {
   try {
     const res = await fetch("https://raw.githubusercontent.com/Vidrimers/Duolingo-helper/master/duo-helper.user.js");
@@ -2613,6 +2757,8 @@ checkLeagueOvertakes();
 setInterval(checkLeagueOvertakes, 30 * 60 * 1000);
 checkFollowChanges();
 setInterval(checkFollowChanges, 30 * 60 * 1000);
+checkWeeklyDigest();
+setInterval(checkWeeklyDigest, 30 * 60 * 1000);
 checkScriptUpdates();
 setInterval(checkScriptUpdates, 6 * 60 * 60 * 1000);
 

@@ -98,7 +98,9 @@ db.exec(`
     league_overtake INTEGER DEFAULT 1,
     script_updates INTEGER DEFAULT 1,
     follow_changes INTEGER DEFAULT 1,
-    last_reminder_date TEXT
+    digest INTEGER DEFAULT 1,
+    last_reminder_date TEXT,
+    last_digest_date TEXT
   );
 
   CREATE TABLE IF NOT EXISTS league_snapshot (
@@ -122,6 +124,13 @@ db.exec(`
     name TEXT,
     ts INTEGER NOT NULL,
     delivered INTEGER DEFAULT 0
+  );
+
+  CREATE TABLE IF NOT EXISTS xp_farm_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    duolingo_user_id TEXT NOT NULL,
+    amount INTEGER NOT NULL,
+    ts INTEGER NOT NULL
   );
 
   CREATE TABLE IF NOT EXISTS bot_kv (
@@ -159,6 +168,12 @@ try {
 } catch {}
 try {
   db.exec(`ALTER TABLE notify_prefs ADD COLUMN follow_changes INTEGER DEFAULT 1`);
+} catch {}
+try {
+  db.exec(`ALTER TABLE notify_prefs ADD COLUMN digest INTEGER DEFAULT 1`);
+} catch {}
+try {
+  db.exec(`ALTER TABLE notify_prefs ADD COLUMN last_digest_date TEXT`);
 } catch {}
 
 export default db;
