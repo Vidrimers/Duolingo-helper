@@ -2699,10 +2699,15 @@ async function checkLeagueOvertakes() {
           }
         }
         if (overtakers.length) {
-          const text = overtakers.length === 1
-            ? `🏆 <b>Тебя обогнал ${overtakers[0].name}</b>\n\nНа ${Number(overtakers[0].gap).toLocaleString("ru")} очков.`
-            : `🏆 <b>Тебя обогнали</b>\n\n` + overtakers.map((t) => `${t.name} — на ${Number(t.gap).toLocaleString("ru")} очков`).join("\n");
-          await bot.api.sendMessage(u.tg_user_id, text, { parse_mode: "HTML" }).catch(() => {});
+          const place = myIdx + 1;
+          const text = (overtakers.length === 1
+            ? `🏆 <b>Тебя обогнал ${escapeHtml(overtakers[0].name)}</b>\nНа ${Number(overtakers[0].gap).toLocaleString("ru")} очков.`
+            : `🏆 <b>Тебя обогнали</b>\n\n` + overtakers.map((t) => `${escapeHtml(t.name)} — на ${Number(t.gap).toLocaleString("ru")} очков`).join("\n")) +
+            `\n\n📍 Сейчас твоё место в лиге: <b>${place}</b>`;
+          await bot.api.sendMessage(u.tg_user_id, text, {
+            parse_mode: "HTML",
+            reply_markup: { inline_keyboard: [[{ text: "🎯 Фарм до места", callback_data: "farm_menu" }]] },
+          }).catch(() => {});
         }
       }
       // сохраняем снапшот (первый прогон — просто базовая линия)
