@@ -6915,7 +6915,7 @@
   /** Отвязка Telegram. */
   async function unlinkTelegram(duoId, btn, statusEl) {
     const ok = await showConfirm(
-      "Отвязать Telegram?\nСвязь между Duolingo и Telegram будет удалена.",
+      "Отвязать Telegram?\nСвязь между Duolingo и Telegram будет удалена.\nВсе данные и настройки на сервере бота тоже будут удалены (статистика, уведомления, друзья, история действий).",
       "Отвязка Telegram",
     );
     if (!ok) return;
@@ -6940,7 +6940,7 @@
         btn.dataset.mode = "link";
         btn.classList.remove("dh-btn-danger");
         if (statusEl) statusEl.textContent = "";
-        showToast("✓ Telegram отвязан");
+        showToast("✓ Telegram отвязан, данные удалены");
       } else {
         btn.textContent = "Отвязать";
         btn.disabled = false;

@@ -111,14 +111,8 @@ function mainMenuKeyboard(isAdmin) {
 function settingsMenuKeyboard() {
   return {
     inline_keyboard: [
-      [
-        { text: "🔔 Уведомления", callback_data: "settings_notify" },
-        { text: "☁️ Бэкап", callback_data: "settings_backup" },
-      ],
-      [
-        { text: "🔗 Линковка", callback_data: "settings_link" },
-        { text: "📋 Помощь", callback_data: "settings_help" },
-      ],
+      [{ text: "🔔 Уведомления", callback_data: "settings_notify" }],
+      [{ text: "🔗 Линковка", callback_data: "settings_link" }],
       [{ text: "← Назад", callback_data: "menu_main" }],
     ],
   };
@@ -747,6 +741,27 @@ function cmpVersion(a, b) {
     if (x !== y) return x < y ? -1 : 1;
   }
   return 0;
+}
+
+// полная очистка данных пользователя при отвязке
+function wipeUserData(tgId, duoId) {
+  try {
+    if (duoId) {
+      const id = String(duoId);
+      db.prepare("DELETE FROM backups WHERE duolingo_user_id = ?").run(id);
+      db.prepare("DELETE FROM user_stats WHERE duolingo_user_id = ?").run(id);
+      db.prepare("DELETE FROM action_log WHERE duolingo_user_id = ?").run(id);
+      db.prepare("DELETE FROM friend_scan WHERE duolingo_user_id = ?").run(id);
+      db.prepare("DELETE FROM league_snapshot WHERE duolingo_user_id = ?").run(id);
+      db.prepare("DELETE FROM link_codes WHERE duolingo_user_id = ?").run(id);
+      db.prepare("DELETE FROM script_installs WHERE duolingo_user_id = ?").run(id);
+      db.prepare("DELETE FROM users WHERE duolingo_user_id = ?").run(id);
+    }
+    if (tgId) {
+      db.prepare("DELETE FROM users WHERE tg_user_id = ?").run(tgId);
+      db.prepare("DELETE FROM notify_prefs WHERE tg_user_id = ?").run(tgId);
+    }
+  } catch {}
 }
 
 // обработка инлайн-кнопок
@@ -1632,11 +1647,82 @@ bot.on("callback_query", async (ctx) => {
     return;
   }
 
+  // === ЛИНКОВКА ===
+  if (data === "settings_link") {
+    const user = db.prepare("SELECT * FROM users WHERE tg_user_id = ?").get(ctx.from.id);
+    if (!user) {
+      await safeEdit(ctx,
+        "🔗 <b>Линковка</b>\n\n" +
+        "❌ Аккаунт не привязан.\nИспользуйте кнопку «Привязать Telegram» в скрипте Duolingo Helper.",
+        {
+          parse_mode: "HTML",
+          reply_markup: { inline_keyboard: [[{ text: "← Назад", callback_data: "menu_settings" }]] },
+        }
+      );
+      return;
+    }
+    const tgName = user.tg_username || ctx.from.username || String(user.tg_user_id);
+    await safeEdit(ctx,
+      `🔗 <b>Линковка</b>\n\n` +
+      `✅ Аккаунт привязан\n\n` +
+      `👤 <b>${user.duolingo_username || user.duolingo_user_id}</b> · <code>${user.duolingo_user_id}</code>\n` +
+      `📱 @${tgName} · <code>${user.tg_user_id}</code>\n` +
+      `📅 Привязан: ${user.linked_at}`,
+      {
+        parse_mode: "HTML",
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: "🔓 Отвязать аккаунт", callback_data: "settings_unlink" }],
+            [{ text: "← Назад", callback_data: "menu_settings" }],
+          ],
+        },
+      }
+    );
+    return;
+  }
+
+  if (data === "settings_unlink") {
+    const user = db.prepare("SELECT * FROM users WHERE tg_user_id = ?").get(ctx.from.id);
+    if (!user) {
+      await safeEdit(ctx, "🔗 <b>Линковка</b>\n\n❌ Аккаунт не привязан.", {
+        parse_mode: "HTML",
+        reply_markup: { inline_keyboard: [[{ text: "← Назад", callback_data: "menu_settings" }]] },
+      });
+      return;
+    }
+    await safeEdit(ctx,
+      "🔓 <b>Отвязка аккаунта</b>\n\n" +
+      "⚠️ Отвязать аккаунт?\n" +
+      "Все данные и настройки будут удалены с сервера:\n" +
+      "статистика, уведомления, друзья, история действий.",
+      {
+        parse_mode: "HTML",
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: "✅ Да, отвязать", callback_data: "settings_unlink_go" }],
+            [{ text: "← Назад", callback_data: "settings_link" }],
+          ],
+        },
+      }
+    );
+    return;
+  }
+
+  if (data === "settings_unlink_go") {
+    const user = db.prepare("SELECT * FROM users WHERE tg_user_id = ?").get(ctx.from.id);
+    if (user) wipeUserData(user.tg_user_id, user.duolingo_user_id);
+    await safeEdit(ctx,
+      "✅ Аккаунт отвязан.\n\nВсе данные удалены с сервера.",
+      {
+        parse_mode: "HTML",
+        reply_markup: { inline_keyboard: [[{ text: "← В меню", callback_data: "menu_main" }]] },
+      }
+    );
+    return;
+  }
+
   // заглушки — «в разработке»
   const stubs = {
-    settings_backup: "☁️ Бэкап",
-    settings_link: "🔗 Линковка",
-    settings_help: "📋 Помощь",
     admin_cleanup: "🗑 Очистка данных",
     admin_logs: "📋 Логи",
   };
@@ -1688,10 +1774,8 @@ bot.command("unlink", async (ctx) => {
     ctx.reply("❌ Аккаунт не привязан.");
     return;
   }
-  // TODO: подтверждение через inline-кнопки
-  db.prepare("DELETE FROM users WHERE tg_user_id = ?").run(tgId);
-  db.prepare("DELETE FROM backups WHERE duolingo_user_id = ?").run(user.duolingo_user_id);
-  ctx.reply("✅ Аккаунт отвязан. Бэкапы удалены.");
+  wipeUserData(tgId, user.duolingo_user_id);
+  ctx.reply("✅ Аккаунт отвязан. Все данные удалены с сервера.");
 });
 
 // /bugreport — отправка бага
@@ -2129,8 +2213,9 @@ const httpServer = createServer((req, res) => {
           res.end(JSON.stringify({ error: "duolingoUserId required" }));
           return;
         }
-        db.prepare("DELETE FROM users WHERE duolingo_user_id = ?").run(String(duolingoUserId));
-        db.prepare("DELETE FROM backups WHERE duolingo_user_id = ?").run(String(duolingoUserId));
+        // полная очистка — как при отвязке в боте
+        const linked = db.prepare("SELECT tg_user_id FROM users WHERE duolingo_user_id = ?").get(String(duolingoUserId));
+        wipeUserData(linked ? linked.tg_user_id : null, String(duolingoUserId));
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ ok: true }));
       } catch (e) {
