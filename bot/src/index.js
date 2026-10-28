@@ -2392,7 +2392,7 @@ async function checkPracticeReminders() {
       if (!prefs.remind_practice) continue;
       let tz = u.timezone;
       // ранняя отсечка по кешированной таймзоне
-      if (tz && Number(tzParts(tz, now).hour) < 23) continue;
+      if (tz && Number(tzParts(tz, now).hour) < 21) continue;
       if (tz && prefs.last_reminder_date === dateStrInTz(tz, now)) continue;
       const jwt = decryptJWT(u.jwt_encrypted);
       if (!jwt) continue;
@@ -2406,7 +2406,7 @@ async function checkPracticeReminders() {
         db.prepare("UPDATE users SET timezone = ? WHERE tg_user_id = ?").run(tz, u.tg_user_id);
       }
       const todayUser = dateStrInTz(tz, now);
-      if (Number(tzParts(tz, now).hour) < 23) continue;
+      if (Number(tzParts(tz, now).hour) < 21) continue;
       if (prefs.last_reminder_date === todayUser) continue;
       const lastExt = d.streakData && d.streakData.currentStreak && d.streakData.currentStreak.lastExtendedDate;
       if (lastExt && lastExt >= todayUser) {
@@ -2415,10 +2415,15 @@ async function checkPracticeReminders() {
         continue;
       }
       await bot.api.sendMessage(u.tg_user_id,
-        "🔥 <b>Скоро полночь!</b>\n\nСегодня вы ещё не занимались — пора позаниматься.",
+        "🔥 <b>Пора позаниматься!</b>\n\nСегодня вы ещё не занимались. Позанимайся либо получи XP, чтобы не потерять серию.",
         {
           parse_mode: "HTML",
-          reply_markup: { inline_keyboard: [[{ text: "🌐 Открыть сайт", url: "https://www.duolingo.com" }]] },
+          reply_markup: {
+            inline_keyboard: [[
+              { text: "🎁 Получить XP", callback_data: "xp_get" },
+              { text: "🌐 Открыть сайт", url: "https://www.duolingo.com" },
+            ]],
+          },
         }
       ).catch(() => {});
       markReminder(u.tg_user_id, todayUser);
