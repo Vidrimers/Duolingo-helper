@@ -18,4 +18,14 @@ export const config = {
   adminTgId: Number(process.env.ADMIN_TG_ID),
   httpPort: Number(process.env.BOT_HTTP_PORT) || 3777,
   jwtEncryptKey: process.env.JWT_ENCRYPT_KEY || "",
+  // Донаты: публичные ссылки и адреса кошельков (кнопки скрываются, если не заданы)
+  donationAlertsUrl: process.env.DONATION_ALERTS_URL || "",
+  kaspaAddress: process.env.KASPA_ADDRESS || "",
+  tonAddress: process.env.TON_ADDRESS || "",
+  usdtAddress: process.env.USDT_ADDRESS || "",
+  // API балансов кошельков (с дефолтами — заполнять не обязательно)
+  kaspaApiUrl: process.env.KASPA_API_URL || "https://api.kaspa.org",
+  tonApiUrl: process.env.TON_API_URL || "https://toncenter.com/api/v2",
+  tronApiUrl: process.env.TRON_API_URL || "https://api.trongrid.io",
+  tronApiKey: process.env.TRON_API_KEY || "",
 };

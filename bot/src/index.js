@@ -174,6 +174,7 @@ function adminMenuKeyboard() {
       ],
       [
         { text: "📋 Логи", callback_data: "admin_logs" },
+        { text: "💰 Баланс кошельков", callback_data: "admin_balance" },
       ],
       [{ text: "← Назад", callback_data: "menu_main" }],
     ],
@@ -301,6 +302,7 @@ function statsKeyboard() {
     inline_keyboard: [
       [{ text: "🎁 Получить XP", callback_data: "xp_get" }],
       [{ text: "🔥 Серия дней", callback_data: "streak_get" }],
+      [{ text: "💝 Донат", callback_data: "donate_menu" }],
       [{ text: "← Назад", callback_data: "menu_main" }],
     ],
   };
@@ -799,6 +801,143 @@ function wipeUserData(tgId, duoId) {
       db.prepare("DELETE FROM notify_prefs WHERE tg_user_id = ?").run(tgId);
     }
   } catch {}
+}
+
+// === ДОНАТЫ: кошельки и балансы (логика из yaroytdownload) ===
+const USDT_TRC20_CONTRACT = "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t";
+
+// TRON base58check-адрес → hex-параметр для balanceOf(address)
+function tronAddressToParam(addr) {
+  const A = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+  let n = 0n;
+  for (const c of String(addr)) {
+    const i = A.indexOf(c);
+    if (i < 0) return null;
+    n = n * 58n + BigInt(i);
+  }
+  const hex = n.toString(16).padStart(50, "0"); // 25 байт: 41 + адрес + checksum
+  return hex.slice(2, 42).padStart(64, "0");
+}
+
+async function getKaspaBalance(address) {
+  const res = await fetch(`${config.kaspaApiUrl}/addresses/${address}/balance`);
+  const d = await res.json();
+  const b = parseInt(d.balance, 10);
+  return Number.isFinite(b) ? b / 100000000 : null;
+}
+
+async function getTonBalance(address) {
+  const res = await fetch(`${config.tonApiUrl}/getAddressBalance?address=${encodeURIComponent(address)}`);
+  const d = await res.json();
+  const b = parseInt(d.result, 10);
+  return Number.isFinite(b) ? b / 1000000000 : null;
+}
+
+async function getUsdtBalance(address) {
+  const param = tronAddressToParam(address);
+  if (!param) return null;
+  const headers = { "Content-Type": "application/json" };
+  if (config.tronApiKey) headers["TRON-PRO-API-KEY"] = config.tronApiKey;
+  const res = await fetch(`${config.tronApiUrl}/wallet/triggerconstantcontract`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({
+      owner_address: address,
+      contract_address: USDT_TRC20_CONTRACT,
+      function_selector: "balanceOf(address)",
+      parameter: param,
+    }),
+  });
+  const d = await res.json();
+  const hex = d && d.constant_result && d.constant_result[0];
+  if (!hex) return null;
+  return parseInt(hex, 16) / 1000000;
+}
+
+async function getAllBalances() {
+  const balances = {};
+  if (config.kaspaAddress) balances.kaspa = await getKaspaBalance(config.kaspaAddress).catch(() => null);
+  if (config.tonAddress) balances.ton = await getTonBalance(config.tonAddress).catch(() => null);
+  if (config.usdtAddress) balances.usdt = await getUsdtBalance(config.usdtAddress).catch(() => null);
+  return balances;
+}
+
+function fmtBalance(balance, currency) {
+  if (balance == null) return `❌ Ошибка получения ${currency}`;
+  if (balance === 0) return `0.00 ${currency}`;
+  return balance.toLocaleString("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 6 }) + ` ${currency}`;
+}
+
+function buildBalanceMessage(balances) {
+  let msg = "💰 <b>Баланс кошельков:</b>\n\n";
+  if (config.kaspaAddress) msg += `💎 <b>Kaspa:</b> ${fmtBalance(balances.kaspa, "KAS")}\n`;
+  if (config.tonAddress) msg += `💠 <b>TON:</b> ${fmtBalance(balances.ton, "TON")}\n`;
+  if (config.usdtAddress) msg += `💵 <b>USDT:</b> ${fmtBalance(balances.usdt, "USDT")}\n`;
+  if (!config.kaspaAddress && !config.tonAddress && !config.usdtAddress) msg += "ℹ️ Кошельки не настроены";
+  return msg;
+}
+
+function donateMenuText() {
+  return (
+    "💝 <b>Поддержать проект</b>\n\n" +
+    "Если вам нравится Duolingo Helper и вы хотите поддержать его развитие — вы можете сделать донат.\n\n" +
+    "Ваша поддержка помогает:\n" +
+    "• Развивать новые функции\n" +
+    "• Поддерживать стабильную работу\n" +
+    "• Оплачивать серверы бота\n\n" +
+    "Выберите удобный способ доната:"
+  );
+}
+
+function donateMenuKeyboard() {
+  const rows = [];
+  if (config.donationAlertsUrl) rows.push([{ text: "🎁 DonationAlerts", url: config.donationAlertsUrl }]);
+  rows.push([{ text: "🌐 Все способы", url: "https://vidrimers.site/donate" }]);
+  const crypto = [];
+  if (config.kaspaAddress) crypto.push({ text: "💎 Kaspa", callback_data: "donate_kaspa" });
+  if (config.tonAddress) crypto.push({ text: "💠 TON", callback_data: "donate_ton" });
+  if (config.usdtAddress) crypto.push({ text: "💵 USDT (TRC-20)", callback_data: "donate_usdt" });
+  for (let i = 0; i < crypto.length; i += 2) rows.push(crypto.slice(i, i + 2));
+  rows.push([{ text: "← Назад", callback_data: "menu_main" }]);
+  return { inline_keyboard: rows };
+}
+
+function donateAddressView(kind) {
+  const map = {
+    kaspa: {
+      icon: "💎", label: "Kaspa",
+      title: "💎 <b>Kaspa (KAS)</b>",
+      addr: config.kaspaAddress,
+      info: "ℹ️ Kaspa — быстрая и масштабируемая криптовалюта с мгновенными транзакциями",
+    },
+    ton: {
+      icon: "💠", label: "TON",
+      title: "💠 <b>TON (Toncoin)</b>",
+      addr: config.tonAddress,
+      info: "ℹ️ TON — блокчейн от создателей Telegram с низкими комиссиями",
+    },
+    usdt: {
+      icon: "💵", label: "USDT",
+      title: "💵 <b>USDT (TRC-20)</b>",
+      addr: config.usdtAddress,
+      info: "⚠️ <b>Важно:</b> используйте только сеть TRON (TRC-20)!\nОтправка через другие сети приведёт к потере средств.",
+    },
+  };
+  const m = map[kind];
+  if (!m || !m.addr) {
+    return {
+      text: `❌ ${m ? m.label : "Кошелёк"} адрес не настроен`,
+      kb: { inline_keyboard: [[{ text: "← Назад", callback_data: "donate_menu" }]] },
+    };
+  }
+  return {
+    text:
+      `${m.title}\n\n` +
+      `Адрес кошелька:\n<code>${m.addr}</code>\n\n` +
+      `📋 Нажмите на адрес, чтобы скопировать\n\n` +
+      m.info,
+    kb: { inline_keyboard: [[{ text: "← Назад к донатам", callback_data: "donate_menu" }]] },
+  };
 }
 
 // обработка инлайн-кнопок
@@ -1758,6 +1897,56 @@ bot.on("callback_query", async (ctx) => {
     return;
   }
 
+  // === ДОНАТЫ ===
+  if (data === "donate_menu") {
+    await ctx.answerCallbackQuery("Открываю меню донатов").catch(() => {});
+    // отдельным сообщением, чтобы не затирать исходное (дайджест/статистика)
+    await ctx.reply(donateMenuText(), {
+      parse_mode: "HTML",
+      reply_markup: donateMenuKeyboard(),
+    }).catch(() => {});
+    bot.api.sendMessage(config.adminTgId,
+      `💝 <b>Донат меню</b>\n👤 @${ctx.from.username || ctx.from.id} (ID: <code>${ctx.from.id}</code>) открыл меню донатов`,
+      { parse_mode: "HTML" }
+    ).catch(() => {});
+    return;
+  }
+
+  if (data === "donate_kaspa" || data === "donate_ton" || data === "donate_usdt") {
+    const kind = data.replace("donate_", "");
+    const view = donateAddressView(kind);
+    await safeEdit(ctx, view.text, {
+      parse_mode: "HTML",
+      reply_markup: view.kb,
+    });
+    const meta = kind === "kaspa" ? { icon: "💎", label: "Kaspa" } : kind === "ton" ? { icon: "💠", label: "TON" } : { icon: "💵", label: "USDT" };
+    bot.api.sendMessage(config.adminTgId,
+      `${meta.icon} <b>Донат: ${meta.label}</b>\n👤 @${ctx.from.username || ctx.from.id} (ID: <code>${ctx.from.id}</code>) открыл адрес ${meta.label}`,
+      { parse_mode: "HTML" }
+    ).catch(() => {});
+    return;
+  }
+
+  if (data === "admin_balance") {
+    if (ctx.from.id !== config.adminTgId) {
+      await ctx.answerCallbackQuery("⛔ Нет доступа");
+      return;
+    }
+    await safeEdit(ctx, "💰 <b>Баланс кошельков</b>\n\n⏳ Получаю балансы...", { parse_mode: "HTML" });
+    try {
+      const balances = await getAllBalances();
+      await safeEdit(ctx, buildBalanceMessage(balances), {
+        parse_mode: "HTML",
+        reply_markup: { inline_keyboard: [[{ text: "← В админку", callback_data: "menu_admin" }]] },
+      });
+    } catch {
+      await safeEdit(ctx, "❌ Ошибка получения балансов. Попробуйте позже.", {
+        reply_markup: { inline_keyboard: [[{ text: "← В админку", callback_data: "menu_admin" }]] },
+      });
+    }
+    return;
+  }
+
   // заглушки — «в разработке»
   const stubs = {
     admin_cleanup: "🗑 Очистка данных",
@@ -2706,7 +2895,10 @@ async function checkWeeklyDigest() {
         `🎁 Из них накручено XP: <b>+${Number(farmedXp).toLocaleString("ru")}</b>\n\n` +
         actBlock;
 
-      await bot.api.sendMessage(u.tg_user_id, text, { parse_mode: "HTML" }).catch(() => {});
+      await bot.api.sendMessage(u.tg_user_id, text, {
+        parse_mode: "HTML",
+        reply_markup: { inline_keyboard: [[{ text: "💝 Донат", callback_data: "donate_menu" }]] },
+      }).catch(() => {});
       prefs.last_digest_date = todayUser;
       upsertNotifyPrefs(u.tg_user_id, prefs);
     } catch {}
