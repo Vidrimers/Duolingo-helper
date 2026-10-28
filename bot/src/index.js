@@ -684,7 +684,7 @@ async function startFriendsScan(user, daysLimit, chatId, messageId, tgId) {
 }
 
 // === УВЕДОМЛЕНИЯ: настройки ===
-const NOTIFY_COLS = { practice: "remind_practice", league: "league_overtake", updates: "script_updates" };
+const NOTIFY_COLS = { practice: "remind_practice", league: "league_overtake", updates: "script_updates", follows: "follow_changes" };
 
 function getNotifyPrefs(tgId) {
   const row = db.prepare("SELECT * FROM notify_prefs WHERE tg_user_id = ?").get(tgId);
@@ -692,8 +692,22 @@ function getNotifyPrefs(tgId) {
     remind_practice: row ? Number(row.remind_practice) : 1,
     league_overtake: row ? Number(row.league_overtake) : 1,
     script_updates: row ? Number(row.script_updates) : 1,
+    follow_changes: row ? Number(row.follow_changes) : 1,
     last_reminder_date: row ? row.last_reminder_date : null,
   };
+}
+
+function upsertNotifyPrefs(tgId, p) {
+  db.prepare(`
+    INSERT INTO notify_prefs (tg_user_id, remind_practice, league_overtake, script_updates, follow_changes, last_reminder_date)
+    VALUES (?, ?, ?, ?, ?, ?)
+    ON CONFLICT(tg_user_id) DO UPDATE SET
+      remind_practice = excluded.remind_practice,
+      league_overtake = excluded.league_overtake,
+      script_updates = excluded.script_updates,
+      follow_changes = excluded.follow_changes,
+      last_reminder_date = excluded.last_reminder_date
+  `).run(tgId, p.remind_practice, p.league_overtake, p.script_updates, p.follow_changes, p.last_reminder_date ?? null);
 }
 
 function toggleNotify(tgId, key) {
@@ -701,23 +715,13 @@ function toggleNotify(tgId, key) {
   if (!col) return;
   const p = getNotifyPrefs(tgId);
   p[col] = p[col] ? 0 : 1;
-  db.prepare(`
-    INSERT INTO notify_prefs (tg_user_id, remind_practice, league_overtake, script_updates)
-    VALUES (?, ?, ?, ?)
-    ON CONFLICT(tg_user_id) DO UPDATE SET
-      remind_practice = excluded.remind_practice,
-      league_overtake = excluded.league_overtake,
-      script_updates = excluded.script_updates
-  `).run(tgId, p.remind_practice, p.league_overtake, p.script_updates);
+  upsertNotifyPrefs(tgId, p);
 }
 
 function markReminder(tgId, date) {
   const p = getNotifyPrefs(tgId);
-  db.prepare(`
-    INSERT INTO notify_prefs (tg_user_id, remind_practice, league_overtake, script_updates, last_reminder_date)
-    VALUES (?, ?, ?, ?, ?)
-    ON CONFLICT(tg_user_id) DO UPDATE SET last_reminder_date = excluded.last_reminder_date
-  `).run(tgId, p.remind_practice, p.league_overtake, p.script_updates, date);
+  p.last_reminder_date = date;
+  upsertNotifyPrefs(tgId, p);
 }
 
 function notifyKeyboard(prefs) {
@@ -726,6 +730,7 @@ function notifyKeyboard(prefs) {
     inline_keyboard: [
       [{ text: `🔥 Пора позаниматься: ${flag(prefs.remind_practice)}`, callback_data: "notify_toggle_practice" }],
       [{ text: `🏆 Обход в лиге: ${flag(prefs.league_overtake)}`, callback_data: "notify_toggle_league" }],
+      [{ text: `👥 Кто подписался / отписался: ${flag(prefs.follow_changes)}`, callback_data: "notify_toggle_follows" }],
       [{ text: `🚀 Обновления скрипта: ${flag(prefs.script_updates)}`, callback_data: "notify_toggle_updates" }],
       [{ text: "← Назад", callback_data: "menu_settings" }],
     ],
@@ -753,6 +758,8 @@ function wipeUserData(tgId, duoId) {
       db.prepare("DELETE FROM action_log WHERE duolingo_user_id = ?").run(id);
       db.prepare("DELETE FROM friend_scan WHERE duolingo_user_id = ?").run(id);
       db.prepare("DELETE FROM league_snapshot WHERE duolingo_user_id = ?").run(id);
+      db.prepare("DELETE FROM friends_snapshot WHERE duolingo_user_id = ?").run(id);
+      db.prepare("DELETE FROM pending_changes WHERE duolingo_user_id = ?").run(id);
       db.prepare("DELETE FROM link_codes WHERE duolingo_user_id = ?").run(id);
       db.prepare("DELETE FROM script_installs WHERE duolingo_user_id = ?").run(id);
       db.prepare("DELETE FROM users WHERE duolingo_user_id = ?").run(id);
@@ -2331,8 +2338,18 @@ const httpServer = createServer((req, res) => {
             db.prepare("UPDATE action_log SET delivered = 1 WHERE duolingo_user_id = ? AND delivered = 0").run(String(duolingoUserId));
           }
         } catch {}
+        // события подписок → в «Изменения» скрипта
+        let pendingChanges = [];
+        try {
+          pendingChanges = db.prepare(
+            "SELECT kind, user_id AS userId, username, name, ts FROM pending_changes WHERE duolingo_user_id = ? AND delivered = 0 ORDER BY id ASC LIMIT 50"
+          ).all(String(duolingoUserId));
+          if (pendingChanges.length) {
+            db.prepare("UPDATE pending_changes SET delivered = 1 WHERE duolingo_user_id = ? AND delivered = 0").run(String(duolingoUserId));
+          }
+        } catch {}
         res.writeHead(200, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ ok: true, synced: Array.isArray(xpLog) ? xpLog.length : 0, pendingActions }));
+        res.end(JSON.stringify({ ok: true, synced: Array.isArray(xpLog) ? xpLog.length : 0, pendingActions, pendingChanges }));
       } catch (e) {
         res.writeHead(500, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ error: e.message }));
@@ -2469,7 +2486,85 @@ async function checkLeagueOvertakes() {
   }
 }
 
-// 3) «Обновления скрипта» — версия с GitHub
+// 3) «Кто подписался / отписался» — дифф подписчиков со снапшотом
+function escapeHtml(s) {
+  return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+function profileLink(f) {
+  const label = escapeHtml(f.name || f.username || f.id);
+  return f.username
+    ? `<a href="https://www.duolingo.com/profile/${encodeURIComponent(f.username)}">${label}</a>`
+    : label;
+}
+
+function insertPendingChange(duoId, kind, f, ts) {
+  try {
+    db.prepare("INSERT INTO pending_changes (duolingo_user_id, kind, user_id, username, name, ts) VALUES (?, ?, ?, ?, ?, ?)")
+      .run(String(duoId), kind, String(f.id), f.username || "", f.name || "", ts);
+  } catch {}
+}
+
+async function checkFollowChanges() {
+  const rows = db.prepare(`
+    SELECT u.tg_user_id, u.duolingo_user_id, u.jwt_encrypted
+    FROM users u
+    WHERE u.tg_user_id IS NOT NULL
+      AND u.tg_user_id NOT IN (SELECT tg_user_id FROM banned_users)
+  `).all();
+  for (const u of rows) {
+    try {
+      const prefs = getNotifyPrefs(u.tg_user_id);
+      if (!prefs.follow_changes) continue;
+      const jwt = decryptJWT(u.jwt_encrypted);
+      if (!jwt) continue;
+      const followers = await fetchUserList(jwt, u.duolingo_user_id, "followers");
+      const cur = new Map(followers.map((f) => [String(f.userId), f]));
+      const myId = String(u.duolingo_user_id);
+      let prev = null;
+      try {
+        const snap = db.prepare("SELECT data FROM friends_snapshot WHERE duolingo_user_id = ?").get(myId);
+        prev = snap ? JSON.parse(snap.data || "null") : null;
+      } catch {}
+      const snapObj = {};
+      for (const [id, f] of cur) snapObj[id] = { username: f.username || "", name: f.name || "" };
+      db.prepare(`
+        INSERT INTO friends_snapshot (duolingo_user_id, data, scanned_at)
+        VALUES (?, ?, ?)
+        ON CONFLICT(duolingo_user_id) DO UPDATE SET data = excluded.data, scanned_at = excluded.scanned_at
+      `).run(myId, JSON.stringify(snapObj), Date.now());
+      if (!prev || typeof prev !== "object") continue; // первый прогон — базовая линия
+      const prevIds = new Set(Object.keys(prev));
+      const followed = [];
+      const unfollowed = [];
+      for (const [id, f] of cur) {
+        if (!prevIds.has(id)) followed.push({ id, username: f.username || "", name: f.name || f.username || id });
+      }
+      for (const id of prevIds) {
+        if (!cur.has(id)) {
+          const p = prev[id] || {};
+          unfollowed.push({ id, username: p.username || "", name: p.name || p.username || id });
+        }
+      }
+      if (!followed.length && !unfollowed.length) continue;
+      // одним сообщением, со ссылками на профили
+      const all = [
+        ...followed.map((f) => ({ f, line: `✅ ${profileLink(f)} подписался` })),
+        ...unfollowed.map((f) => ({ f, line: `❌ ${profileLink(f)} отписался` })),
+      ];
+      const shown = all.slice(0, 20);
+      const hidden = all.length - shown.length;
+      const text = `👥 <b>Изменения</b>\n\n` + shown.map((s) => s.line).join("\n") + (hidden > 0 ? `\n…и ещё ${hidden}` : "");
+      await bot.api.sendMessage(u.tg_user_id, text, { parse_mode: "HTML" }).catch(() => {});
+      // события → в «Изменения» скрипта (с дедупом на его стороне)
+      const now = Date.now();
+      for (const f of followed) insertPendingChange(myId, "followed_me", f, now);
+      for (const f of unfollowed) insertPendingChange(myId, "unfollowed_me", f, now);
+    } catch {}
+  }
+}
+
+// 4) «Обновления скрипта» — версия с GitHub
 async function checkScriptUpdates() {
   try {
     const res = await fetch("https://raw.githubusercontent.com/Vidrimers/Duolingo-helper/master/duo-helper.user.js");
@@ -2511,6 +2606,8 @@ checkPracticeReminders();
 setInterval(checkPracticeReminders, 15 * 60 * 1000);
 checkLeagueOvertakes();
 setInterval(checkLeagueOvertakes, 30 * 60 * 1000);
+checkFollowChanges();
+setInterval(checkFollowChanges, 30 * 60 * 1000);
 checkScriptUpdates();
 setInterval(checkScriptUpdates, 6 * 60 * 60 * 1000);
 

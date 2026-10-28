@@ -97,6 +97,7 @@ db.exec(`
     remind_practice INTEGER DEFAULT 1,
     league_overtake INTEGER DEFAULT 1,
     script_updates INTEGER DEFAULT 1,
+    follow_changes INTEGER DEFAULT 1,
     last_reminder_date TEXT
   );
 
@@ -104,6 +105,23 @@ db.exec(`
     duolingo_user_id TEXT PRIMARY KEY,
     data TEXT NOT NULL,
     scanned_at INTEGER NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS friends_snapshot (
+    duolingo_user_id TEXT PRIMARY KEY,
+    data TEXT NOT NULL,
+    scanned_at INTEGER NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS pending_changes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    duolingo_user_id TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    username TEXT,
+    name TEXT,
+    ts INTEGER NOT NULL,
+    delivered INTEGER DEFAULT 0
   );
 
   CREATE TABLE IF NOT EXISTS bot_kv (
@@ -138,6 +156,9 @@ try {
 } catch {}
 try {
   db.exec(`ALTER TABLE users ADD COLUMN timezone TEXT`);
+} catch {}
+try {
+  db.exec(`ALTER TABLE notify_prefs ADD COLUMN follow_changes INTEGER DEFAULT 1`);
 } catch {}
 
 export default db;

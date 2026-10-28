@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Duolingo Helper
 // @namespace    https://github.com/Vidrimers/Duolingo-helper
-// @version      0.9.4
+// @version      0.9.5
 // @description  Проверка взаимной подписки на профилях Duolingo. Панель, бейджи, кеш.
 // @author       Vidrimers
 // @match        *://*.duolingo.com/*
@@ -6783,10 +6783,11 @@
           }),
           timeout: 5000,
           onload(r) {
-            // действия бота → в историю (undo там)
+            // действия бота → в историю (undo там), события подписок → в «Изменения»
             try {
               const d = JSON.parse(r.responseText || "null");
               if (d && Array.isArray(d.pendingActions)) mergeBotActions(d.pendingActions);
+              if (d && Array.isArray(d.pendingChanges)) mergeBotChanges(d.pendingChanges);
             } catch {}
           },
           onerror() {},
@@ -7416,6 +7417,46 @@ function savePage() {
       if (DATA.actionLog.length > 200) DATA.actionLog.length = 200;
       saveData();
       if (typeof renderHistory === "function") renderHistory();
+    }
+  }
+
+  /** Единая запись в «Изменения» с дедупом: одно событие — одна строка за сутки. */
+  function addChangeEntry(entry) {
+    DATA.friendChanges = DATA.friendChanges || [];
+    const ts = entry.ts || Date.now();
+    const dup = DATA.friendChanges.some(
+      (c) =>
+        c.kind === entry.kind &&
+        String(c.userId) === String(entry.userId) &&
+        Math.abs((c.ts || 0) - ts) < 24 * 60 * 60 * 1000,
+    );
+    if (dup) return false;
+    DATA.friendChanges.unshift({ ...entry, ts, seen: false });
+    if (DATA.friendChanges.length > 300) DATA.friendChanges.length = 300;
+    DATA.friendChangesUnread = (DATA.friendChangesUnread || 0) + 1;
+    return true;
+  }
+
+  /** События подписок, замеченные ботом, — в «Изменения» (с дедупом). */
+  function mergeBotChanges(list) {
+    if (!Array.isArray(list) || !list.length) return;
+    let changed = false;
+    for (const p of list) {
+      if (!p || !p.kind || !p.userId) continue;
+      const ok = addChangeEntry({
+        ts: p.ts || Date.now(),
+        kind: p.kind,
+        dir: p.kind === "unfollowed_me" ? "minus" : "plus",
+        userId: String(p.userId),
+        username: p.username || "",
+        name: p.name || p.username || String(p.userId),
+        via: "bot",
+      });
+      if (ok) changed = true;
+    }
+    if (changed) {
+      saveData();
+      if (typeof renderChanges === "function") renderChanges();
     }
   }
 
@@ -8052,17 +8093,15 @@ function savePage() {
     (DATA.blockList || []).forEach((b) => myBlockIds.add(String(b.userId)));
 
     const add = (kind, dir, id, meta, extra) => {
-      DATA.friendChanges.unshift({
+      addChangeEntry({
         ts: now,
         kind,
         dir,
         userId: id,
         username: (meta && meta.username) || (extra && extra.username) || "",
         name: (meta && (meta.displayName || meta.name || meta.username)) || id,
-        seen: false,
         ...(extra || {}),
       });
-      DATA.friendChangesUnread = (DATA.friendChangesUnread || 0) + 1;
     };
 
     const metaOf = (map, id) => map && map[id] ? map[id] : null;
