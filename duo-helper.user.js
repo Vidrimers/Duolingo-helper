@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Duolingo Helper
 // @namespace    https://github.com/Vidrimers/Duolingo-helper
-// @version      0.10.0
+// @version      0.10.1
 // @description  Проверка взаимной подписки на профилях Duolingo. Панель, бейджи, кеш.
 // @author       Vidrimers
 // @match        *://*.duolingo.com/*
@@ -3802,9 +3802,10 @@
                         Облачные сохранения
                         <small id="dh-cloud-status">Бэкап на сервере бота · один на аккаунт</small>
                     </div>
-                    <div class="dh-row" style="gap:6px">
+                    <div class="dh-row" style="gap:6px;flex-wrap:wrap">
                         <button class="dh-btn" id="dh-cloud-save" style="padding:5px 10px;font-size:11px" title="Сначала привяжите Telegram">☁️ Сохранить</button>
                         <button class="dh-btn" id="dh-cloud-load" style="padding:5px 10px;font-size:11px" title="Сначала привяжите Telegram">📥 Восстановить</button>
+                        <button class="dh-btn" id="dh-cloud-delete" style="padding:5px 10px;font-size:11px" title="Сначала привяжите Telegram">🗑 Удалить</button>
                     </div>
                 </div>
             </div>
@@ -3958,6 +3959,7 @@
       importFile: modal.querySelector("#dh-import-file"),
       cloudSave: modal.querySelector("#dh-cloud-save"),
       cloudLoad: modal.querySelector("#dh-cloud-load"),
+      cloudDelete: modal.querySelector("#dh-cloud-delete"),
       cloudStatus: modal.querySelector("#dh-cloud-status"),
       licenseLink: modal.querySelector("#dh-license-link"),
       statsToggle: modal.querySelector("#dh-stats-toggle"),
@@ -11462,6 +11464,7 @@ function savePage() {
     els.exportBtn.addEventListener("click", () => showExportModal());
   if (els.cloudSave) els.cloudSave.addEventListener("click", () => cloudSave());
   if (els.cloudLoad) els.cloudLoad.addEventListener("click", () => cloudLoad());
+  if (els.cloudDelete) els.cloudDelete.addEventListener("click", () => cloudDelete());
     if (els.licenseLink) {
       els.licenseLink.addEventListener("click", (e) => {
         e.preventDefault();
@@ -11588,6 +11591,7 @@ function savePage() {
   async function updateCloudBlock() {
     const saveBtn = els.cloudSave;
     const loadBtn = els.cloudLoad;
+    const delBtn = els.cloudDelete;
     const status = els.cloudStatus;
     if (!saveBtn || !loadBtn) return;
     const myId = getMyId();
@@ -11596,6 +11600,7 @@ function savePage() {
       loadBtn.disabled = true;
       saveBtn.title = "Сначала привяжите Telegram";
       loadBtn.title = "Сначала привяжите Telegram";
+      if (delBtn) { delBtn.disabled = true; delBtn.title = "Сначала привяжите Telegram"; }
       if (status) status.textContent = "Привяжите Telegram, чтобы сохранять в облаке";
     };
     if (!myId) { lock(); return; }
@@ -11612,8 +11617,13 @@ function savePage() {
       BOT_API + "/api/backup?duolingoUserId=" + encodeURIComponent(myId) + "&meta=1",
       { method: "GET", headers: { authorization: "Bearer " + (getToken() || "") } }
     );
+    const has = !!(meta && meta.hasBackup);
+    if (delBtn) {
+      delBtn.disabled = !has;
+      delBtn.title = has ? "" : "Нет бэкапа для удаления";
+    }
     if (status) {
-      status.textContent = meta && meta.hasBackup
+      status.textContent = has
         ? "Последний бэкап: " + fmtTime(meta.savedAt)
         : "Бэкапов пока нет · один на аккаунт";
     }
@@ -11682,6 +11692,29 @@ function savePage() {
     );
     if (!ok) return;
     await importAccountsV2(res.data, { fromCloud: true });
+  }
+
+  /** Удаляет облачный бэкап с сервера (действие необратимо). */
+  async function cloudDelete() {
+    const myId = getMyId();
+    const jwt = getToken();
+    if (!myId || !jwt) { showToast("Сначала привяжите Telegram", true); return; }
+    const ok = await showConfirm(
+      "Удалить облачный бэкап? Это действие нельзя отменить.",
+      "Облачное сохранение",
+    );
+    if (!ok) return;
+    showToast("Удаляю бэкап…");
+    const res = await cloudRequest(
+      BOT_API + "/api/backup?duolingoUserId=" + encodeURIComponent(myId),
+      { method: "DELETE", headers: { authorization: "Bearer " + jwt } }
+    );
+    if (res && res.ok) {
+      showToast("✓ Бэкап удалён");
+      updateCloudBlock();
+    } else {
+      showToast("Ошибка удаления: " + ((res && res.error) || "сервер недоступен"), true);
+    }
   }
 
   /** Импорт формата v2: мультиаккаунт с опциональным шифрованием JWT. */

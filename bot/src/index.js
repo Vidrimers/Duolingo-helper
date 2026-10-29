@@ -854,6 +854,8 @@ async function getUsdtBalance(address) {
     method: "POST",
     headers,
     body: JSON.stringify({
+      // visible: true — адреса в base58, иначе TronGrid читает их как hex и падает с TRC-20 error
+      visible: true,
       owner_address: address,
       contract_address: USDT_TRC20_CONTRACT,
       function_selector: "balanceOf(address)",
@@ -2475,6 +2477,27 @@ const httpServer = createServer((req, res) => {
         res.end(JSON.stringify({ error: e.message }));
       }
     });
+    return;
+  }
+
+  if (req.method === "DELETE" && req.url.startsWith("/api/backup")) {
+    const url = new URL(req.url, `http://${req.headers.host}`);
+    const duoId = url.searchParams.get("duolingoUserId");
+    const auth = String(req.headers.authorization || "");
+    const jwt = auth.replace(/^Bearer\s+/i, "");
+    if (!duoId || !jwt) {
+      res.writeHead(400, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "duolingoUserId and jwt required" }));
+      return;
+    }
+    if (jwtSub(jwt) !== String(duoId)) {
+      res.writeHead(403, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "jwt mismatch" }));
+      return;
+    }
+    const info = db.prepare("DELETE FROM backups WHERE duolingo_user_id = ?").run(String(duoId));
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ ok: true, deleted: info.changes > 0 }));
     return;
   }
 
