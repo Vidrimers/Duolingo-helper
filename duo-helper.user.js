@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Duolingo Helper
 // @namespace    https://github.com/Vidrimers/Duolingo-helper
-// @version      0.10.3
+// @version      0.10.4
 // @description  Проверка взаимной подписки на профилях Duolingo. Панель, бейджи, кеш.
 // @author       Vidrimers
 // @match        *://*.duolingo.com/*
@@ -10076,9 +10076,9 @@ function savePage() {
     setBadgeState("checking", `Проверка @${username}…`);
 
     try {
-      // свой профиль — не проверяем
-      const me0 = await getMe();
-      if (me0 && me0.username && isOwnProfile(username)) {
+      // свой профиль — не проверяем (isOwnProfile работает и без свежего getMe: DATA.me + JWT)
+      await getMe();
+      if (isOwnProfile(username)) {
         hideBadge();
         setStatus(
           "idle",
@@ -11029,6 +11029,10 @@ function savePage() {
       )
         .trim()
         .replace(/^@/, "");
+      if (u && isOwnProfile(u)) {
+        showToast("Это твой профиль");
+        return;
+      }
       const entry = u ? DATA.followCache[u.toLowerCase()] : null;
       const text = entry
         ? `@${u}: ${entry.followsMe ? "подписан(а) на вас" : "НЕ подписан(а) на вас"} (проверено ${fmtTime(entry.checkedAt)})`
@@ -11601,7 +11605,8 @@ function savePage() {
       loadBtn.disabled = true;
       saveBtn.title = "Сначала привяжите Telegram";
       loadBtn.title = "Сначала привяжите Telegram";
-      if (delBtn) { delBtn.disabled = true; delBtn.title = "Сначала привяжите Telegram"; }
+      if (loadBtn) loadBtn.style.display = "";
+      if (delBtn) { delBtn.disabled = true; delBtn.title = "Сначала привяжите Telegram"; delBtn.style.display = ""; }
       if (status) status.textContent = "Привяжите Telegram, чтобы сохранять в облаке";
     };
     if (!myId) { lock(); return; }
@@ -11611,17 +11616,22 @@ function savePage() {
     );
     if (!linked || !linked.linked) { lock(); return; }
     saveBtn.disabled = false;
-    loadBtn.disabled = false;
     saveBtn.title = "";
-    loadBtn.title = "";
     const meta = await cloudRequest(
       BOT_API + "/api/backup?duolingoUserId=" + encodeURIComponent(myId) + "&meta=1",
       { method: "GET", headers: { authorization: "Bearer " + (getToken() || "") } }
     );
     const has = !!(meta && meta.hasBackup);
+    // пока бэкапа нет — «Восстановить»/«Удалить» прячем: операциям нечего делать
+    if (loadBtn) {
+      loadBtn.style.display = has ? "" : "none";
+      loadBtn.disabled = false;
+      loadBtn.title = "";
+    }
     if (delBtn) {
-      delBtn.disabled = !has;
-      delBtn.title = has ? "" : "Нет бэкапа для удаления";
+      delBtn.style.display = has ? "" : "none";
+      delBtn.disabled = false;
+      delBtn.title = "";
     }
     if (status) {
       status.textContent = has
