@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Duolingo Helper
 // @namespace    https://github.com/Vidrimers/Duolingo-helper
-// @version      0.10.1
+// @version      0.10.2
 // @description  Проверка взаимной подписки на профилях Duolingo. Панель, бейджи, кеш.
 // @author       Vidrimers
 // @match        *://*.duolingo.com/*
@@ -6797,6 +6797,7 @@
             totalXp,
             streak,
             excludeList: DATA.excludeList || [],
+            scriptVersion: (typeof GM_info !== "undefined" && GM_info.script && GM_info.script.version) || "",
           }),
           timeout: 5000,
           onload(r) {

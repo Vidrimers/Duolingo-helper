@@ -1280,10 +1280,20 @@ bot.on("callback_query", async (ctx) => {
     const codeCount = db.prepare("SELECT COUNT(*) as n FROM link_codes WHERE used = 0 AND expires_at > ?").get(Date.now()).n;
     const installCount = db.prepare("SELECT COUNT(*) as n FROM script_installs").get().n;
     const banCount = db.prepare("SELECT COUNT(*) as n FROM banned_users").get().n;
+    // версии скрипта: сколько человек на каждой (по последнему sync-stats)
+    const verRows = db.prepare("SELECT version, COUNT(*) as n FROM script_installs GROUP BY version").all();
+    let verLine = "";
+    if (verRows.length) {
+      const known = verRows.filter((r) => r.version).sort((a, b) => cmpVersion(b.version, a.version));
+      const unknown = verRows.find((r) => !r.version);
+      const parts = known.map((r) => `${r.version} — ${r.n}`);
+      if (unknown) parts.push(`без версии — ${unknown.n}`);
+      verLine = `\n   📈 ${parts.join(" · ")}`;
+    }
     await ctx.editMessageText(
       `📊 <b>Статистика бота</b>\n\n` +
       `🔗 Привязок Telegram: <b>${userCount}</b>\n` +
-      `📦 Установок скрипта: <b>${installCount}</b>\n` +
+      `📦 Установок скрипта: <b>${installCount}</b>${verLine}\n` +
       `💾 Бэкапов: <b>${backupCount}</b>\n` +
       `🔑 Активных кодов: <b>${codeCount}</b>\n` +
       `🚫 Забанено: <b>${banCount}</b>`,
@@ -1353,7 +1363,7 @@ bot.on("callback_query", async (ctx) => {
     for (const r of rows) {
       const name = r.username || r.duolingo_user_id;
       text += `📦 <b>${name}</b> · <code>${r.duolingo_user_id}</code>\n`;
-      text += `   📅 ${r.first_seen}\n\n`;
+      text += `   📅 ${r.first_seen}${r.version ? " · v" + r.version : ""}\n\n`;
     }
     const kb = [];
     const nav = [];
@@ -2566,7 +2576,7 @@ const httpServer = createServer((req, res) => {
     req.on("data", (chunk) => { body += chunk; });
     req.on("end", () => {
       try {
-        const { duolingoUserId, duolingoUsername, xpLog, totalXp, streak, excludeList } = JSON.parse(body || "{}");
+        const { duolingoUserId, duolingoUsername, xpLog, totalXp, streak, excludeList, scriptVersion } = JSON.parse(body || "{}");
         if (!duolingoUserId) {
           res.writeHead(400, { "Content-Type": "application/json" });
           res.end(JSON.stringify({ error: "duolingoUserId required" }));
@@ -2583,7 +2593,7 @@ const httpServer = createServer((req, res) => {
         try {
           const existing = db.prepare("SELECT duolingo_user_id FROM script_installs WHERE duolingo_user_id = ?").get(String(duolingoUserId));
           if (!existing) {
-            db.prepare("INSERT OR IGNORE INTO script_installs (duolingo_user_id, username) VALUES (?, ?)").run(String(duolingoUserId), duolingoUsername || null);
+            db.prepare("INSERT OR IGNORE INTO script_installs (duolingo_user_id, username, version) VALUES (?, ?, ?)").run(String(duolingoUserId), duolingoUsername || null, scriptVersion || null);
             // уведомление админу
             const uname = duolingoUsername || duolingoUserId;
             bot.api.sendMessage(config.adminTgId,
@@ -2594,9 +2604,13 @@ const httpServer = createServer((req, res) => {
               `📅 ${new Date().toLocaleString("ru")}`,
               { parse_mode: "HTML" }
             ).catch(() => {});
-          } else if (duolingoUsername) {
-            // обновляем имя если сменилось
-            db.prepare("UPDATE script_installs SET username = ? WHERE duolingo_user_id = ?").run(duolingoUsername, String(duolingoUserId));
+          } else {
+            if (duolingoUsername) {
+              db.prepare("UPDATE script_installs SET username = ? WHERE duolingo_user_id = ?").run(duolingoUsername, String(duolingoUserId));
+            }
+            if (scriptVersion) {
+              db.prepare("UPDATE script_installs SET version = ? WHERE duolingo_user_id = ?").run(String(scriptVersion), String(duolingoUserId));
+            }
           }
         } catch {}
         // обновляем имя в users + уведомление при смене

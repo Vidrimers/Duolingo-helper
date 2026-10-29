@@ -60,6 +60,7 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS script_installs (
     duolingo_user_id TEXT PRIMARY KEY,
     username TEXT,
+    version TEXT,
     first_seen TEXT DEFAULT (datetime('now'))
   );
 
@@ -174,6 +175,10 @@ try {
 } catch {}
 try {
   db.exec(`ALTER TABLE notify_prefs ADD COLUMN last_digest_date TEXT`);
+} catch {}
+// миграция: версия скрипта в установках (статистика для админа)
+try {
+  db.exec(`ALTER TABLE script_installs ADD COLUMN version TEXT`);
 } catch {}
 
 export default db;
