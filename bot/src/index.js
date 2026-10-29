@@ -239,46 +239,56 @@ async function buildStatsText(user) {
     }
   } catch {}
 
-  // записываем дневной XP (не затираем синхронизированные данные)
+  // дневной/недельный XP — из разницы итогов total_xp (привязаны к реальному итогу Duolingo);
+  // SUM(xp) не используется: колонка xp исторически размазана по дням и завышена
   const today = localDateStr();
-  const todayRow = db.prepare("SELECT xp, total_xp FROM user_stats WHERE duolingo_user_id = ? AND date = ?").get(user.duolingo_user_id, today);
-  const yesterday = localDateStr(new Date(Date.now() - 86400000));
-  const prevRow = db.prepare("SELECT total_xp FROM user_stats WHERE duolingo_user_id = ? AND date = ?").get(user.duolingo_user_id, yesterday);
-  // базовая линия дня = итог на конец вчерашнего дня.
-  // Из сегодняшней пары (total_xp − xp) — она не портится из-за чужих total_xp,
-  // иначе берём вчерашний итог (только саму вчерашнюю строку, не «последнюю доступную»)
-  let baseline = null;
-  if (todayRow && todayRow.total_xp != null) baseline = todayRow.total_xp - todayRow.xp;
-  else if (prevRow && prevRow.total_xp != null) baseline = prevRow.total_xp;
-  const dayXp = baseline != null ? Math.max(0, totalXp - baseline) : 0;
+  const weekStart = localDateStr(new Date(Date.now() - 7 * 86400000));
+  const anchor = (before) =>
+    db.prepare("SELECT total_xp FROM user_stats WHERE duolingo_user_id = ? AND date < ? AND total_xp IS NOT NULL ORDER BY date DESC LIMIT 1")
+      .get(user.duolingo_user_id, before);
+  const todayBase = anchor(today);
+  const weekBase = anchor(weekStart);
+  const dayXp = todayBase ? totalXp - Number(todayBase.total_xp) : null;
   db.prepare(`
     INSERT INTO user_stats (duolingo_user_id, date, xp, streak, total_xp)
     VALUES (?, ?, ?, ?, ?)
     ON CONFLICT(duolingo_user_id, date) DO UPDATE SET
-      xp = MAX(user_stats.xp, excluded.xp),
+      xp = COALESCE(excluded.xp, user_stats.xp),
       streak = COALESCE(excluded.streak, user_stats.streak),
       total_xp = COALESCE(excluded.total_xp, user_stats.total_xp)
   `).run(user.duolingo_user_id, today, dayXp, streak, totalXp);
 
-  // сегодня / неделя из user_stats
-  const todayXpRow = db.prepare("SELECT xp FROM user_stats WHERE duolingo_user_id = ? AND date = ?").get(user.duolingo_user_id, today);
-  const weekStart = localDateStr(new Date(Date.now() - 7 * 86400000));
-  const weekRow = db.prepare("SELECT SUM(xp) as total FROM user_stats WHERE duolingo_user_id = ? AND date >= ?").get(user.duolingo_user_id, weekStart);
-  const todayXp = todayXpRow ? todayXpRow.xp : 0;
-  const weekXp = weekRow && weekRow.total ? weekRow.total : 0;
+  let todayXp = dayXp != null ? dayXp : 0;
+  if (dayXp == null) {
+    const tRow = db.prepare("SELECT xp FROM user_stats WHERE duolingo_user_id = ? AND date = ?").get(user.duolingo_user_id, today);
+    todayXp = Number(tRow && tRow.xp) || 0;
+  }
+  let weekXp;
+  if (weekBase) weekXp = totalXp - Number(weekBase.total_xp);
+  else {
+    const wRow = db.prepare("SELECT SUM(xp) as total FROM user_stats WHERE duolingo_user_id = ? AND date >= ?").get(user.duolingo_user_id, weekStart);
+    weekXp = wRow && wRow.total ? wRow.total : 0;
+  }
 
-  // график за 7 дней
+  // график за 7 дней (значения — разницы total_xp; +1 строка вниз как база)
   const days = ["Вс", "Пн", "Вт", "Ср", "Чт", "Пт", "Сб"];
-  const statsRows = db.prepare("SELECT date, xp FROM user_stats WHERE duolingo_user_id = ? ORDER BY date DESC LIMIT 7").all(user.duolingo_user_id);
+  const statsRows = db.prepare("SELECT date, xp, total_xp FROM user_stats WHERE duolingo_user_id = ? ORDER BY date DESC LIMIT 8").all(user.duolingo_user_id);
   let chart = "";
   if (statsRows.length > 0) {
-    const maxXp = Math.max(1, ...statsRows.map((r) => r.xp));
-    const revRows = [...statsRows].reverse();
+    const valOf = (r, nxt) =>
+      r.total_xp != null && nxt && nxt.total_xp != null
+        ? Number(r.total_xp) - Number(nxt.total_xp)
+        : Number(r.xp) || 0;
+    const revRows = statsRows
+      .slice(0, 7)
+      .map((r, i) => ({ date: r.date, xp: valOf(r, statsRows[i + 1]) }))
+      .reverse();
+    const maxXp = Math.max(1, ...revRows.map((r) => r.xp));
     chart = "\n\n📈 <b>XP за 7 дней:</b>\n<pre>";
     for (const r of revRows) {
       const d = new Date(r.date + "T12:00:00");
       const dayLabel = days[d.getDay()];
-      const barLen = Math.round((r.xp / maxXp) * 12);
+      const barLen = Math.max(0, Math.min(12, Math.round((r.xp / maxXp) * 12)));
       const bar = "█".repeat(barLen) + "░".repeat(12 - barLen);
       chart += `${dayLabel} ${bar} ${Number(r.xp).toLocaleString("ru")}\n`;
     }
@@ -292,8 +302,8 @@ async function buildStatsText(user) {
     `🏆 <b>XP в лиге:</b> ${leagueXp == null ? "—" : Number(leagueXp).toLocaleString("ru")}\n` +
     `🔥 <b>Streak:</b> ${streak} дней\n` +
     `📅 <b>Сегодня:</b> ${todayStatus}\n` +
-    `⚡ <b>Сегодня:</b> +${Number(todayXp).toLocaleString("ru")}\n` +
-    `📅 <b>Неделя:</b> +${Number(weekXp).toLocaleString("ru")}` + chart
+    `⚡ <b>Сегодня:</b> ${fmtSigned(todayXp)}\n` +
+    `📅 <b>Неделя:</b> ${fmtSigned(weekXp)}` + chart
   );
 }
 
@@ -766,6 +776,11 @@ function notifyKeyboard(prefs) {
       [{ text: "← Назад", callback_data: "menu_settings" }],
     ],
   };
+}
+
+function fmtSigned(n) {
+  const v = Math.round(Number(n) || 0);
+  return (v < 0 ? "−" : "+") + Math.abs(v).toLocaleString("ru");
 }
 
 function cmpVersion(a, b) {
@@ -2641,27 +2656,24 @@ const httpServer = createServer((req, res) => {
         } catch {}
 
         // сохраняем записи xpLog в user_stats.
-        // total_xp для каждой даты = итог на КОНЕЦ этой даты:
-        // текущий totalXp минус XP всех более поздних дат.
-        // Иначе текущий итог затирает вчерашние строки и ломает расчёт дня.
+        // total_xp пишем только для последней даты (реальный итог Duolingo);
+        // исторические строки не пересчитываем — старый расчёт «итог минус поздние xp»
+        // сдвигал базу дня и раздувал дневной XP. Неделя/день считаются из разниц total_xp.
         if (Array.isArray(xpLog)) {
           const entries = xpLog.filter((e) => e && e.date).sort((a, b) => (a.date < b.date ? -1 : 1));
           const total = totalXp != null ? Number(totalXp) : null;
-          let laterXp = 0;
           for (let i = entries.length - 1; i >= 0; i--) {
             const entry = entries[i];
             const entryXp = Number(entry.xp) || 0;
-            const endTotal = total != null ? total - laterXp : null;
             const isLatest = i === entries.length - 1;
             db.prepare(`
               INSERT INTO user_stats (duolingo_user_id, date, xp, streak, total_xp)
               VALUES (?, ?, ?, ?, ?)
               ON CONFLICT(duolingo_user_id, date) DO UPDATE SET
-                xp = MAX(user_stats.xp, excluded.xp),
+                xp = excluded.xp,
                 streak = COALESCE(excluded.streak, user_stats.streak),
                 total_xp = COALESCE(excluded.total_xp, user_stats.total_xp)
-            `).run(String(duolingoUserId), entry.date, entryXp, isLatest ? (streak ?? null) : null, endTotal);
-            laterXp += entryXp;
+            `).run(String(duolingoUserId), entry.date, entryXp, isLatest ? (streak ?? null) : null, isLatest ? total : null);
           }
         }
         // незакрытые действия бота → в историю скрипта (undo там)
@@ -2972,12 +2984,20 @@ async function checkWeeklyDigest() {
         }
       } catch {}
 
-      // XP за неделю и накручено
+      // XP за неделю — из разниц итогов total_xp (fallback — SUM(xp)), и накручено
       let weekXp = 0;
       try {
-        const r = db.prepare("SELECT SUM(xp) AS s FROM user_stats WHERE duolingo_user_id = ? AND date >= ?")
+        const inWin = db.prepare("SELECT total_xp FROM user_stats WHERE duolingo_user_id = ? AND date >= ? AND total_xp IS NOT NULL ORDER BY date DESC LIMIT 1")
           .get(String(u.duolingo_user_id), start);
-        weekXp = Number(r && r.s) || 0;
+        const base = db.prepare("SELECT total_xp FROM user_stats WHERE duolingo_user_id = ? AND date < ? AND total_xp IS NOT NULL ORDER BY date DESC LIMIT 1")
+          .get(String(u.duolingo_user_id), start);
+        if (inWin && base) {
+          weekXp = Number(inWin.total_xp) - Number(base.total_xp);
+        } else {
+          const r = db.prepare("SELECT SUM(xp) AS s FROM user_stats WHERE duolingo_user_id = ? AND date >= ?")
+            .get(String(u.duolingo_user_id), start);
+          weekXp = Number(r && r.s) || 0;
+        }
       } catch {}
       let farmedXp = 0;
       try {
@@ -3011,7 +3031,7 @@ async function checkWeeklyDigest() {
         `📬 <b>Дайджест за неделю (${fmtRange(start, todayUser)})</b>\n\n` +
         `👥 Подписчиков: <b>${followers == null ? "—" : followers}</b>${netStr}\n` +
         `🔄 Подписался: +${followed} · Отписался: −${unfollowed}\n` +
-        `⚡ XP за неделю: <b>+${Number(weekXp).toLocaleString("ru")}</b>\n` +
+        `⚡ XP за неделю: <b>${fmtSigned(weekXp)}</b>\n` +
         `🎁 Из них накручено XP: <b>+${Number(farmedXp).toLocaleString("ru")}</b>\n\n` +
         actBlock;
 
