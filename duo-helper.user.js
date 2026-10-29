@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Duolingo Helper
 // @namespace    https://github.com/Vidrimers/Duolingo-helper
-// @version      0.10.2
+// @version      0.10.3
 // @description  Проверка взаимной подписки на профилях Duolingo. Панель, бейджи, кеш.
 // @author       Vidrimers
 // @match        *://*.duolingo.com/*
@@ -11872,6 +11872,9 @@ function savePage() {
   // ========== ЗАПУСК ==========
   function init() {
     createUI();
+    // sync-stats к боту не должен зависеть от открытия «📊 Статистика»: при заходе и каждые 30 минут
+    try { collectStats(); } catch {}
+    setInterval(() => { try { collectStats(); } catch {} }, 30 * 60 * 1000);
     hookHistory();
     installHeartsHook();
     syncHeartsFlag();
