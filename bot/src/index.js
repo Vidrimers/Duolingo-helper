@@ -806,6 +806,11 @@ function jwtSub(jwt) {
   }
 }
 
+// облачный бэкап доступен только после привязки TG (строка в users)
+function isTgLinked(duoId) {
+  return !!db.prepare("SELECT 1 AS ok FROM users WHERE duolingo_user_id = ?").get(String(duoId));
+}
+
 // полная очистка данных пользователя при отвязке
 function wipeUserData(tgId, duoId) {
   try {
@@ -2491,6 +2496,11 @@ const httpServer = createServer((req, res) => {
           res.end(JSON.stringify({ error: "jwt mismatch" }));
           return;
         }
+        if (!isTgLinked(duolingoUserId)) {
+          res.writeHead(403, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: "not linked" }));
+          return;
+        }
         // один бэкап на пользователя: старый перезаписывается
         const enc = encryptJWT(JSON.stringify(data));
         db.prepare("DELETE FROM backups WHERE duolingo_user_id = ?").run(String(duolingoUserId));
@@ -2520,6 +2530,11 @@ const httpServer = createServer((req, res) => {
       res.end(JSON.stringify({ error: "jwt mismatch" }));
       return;
     }
+    if (!isTgLinked(duoId)) {
+      res.writeHead(403, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "not linked" }));
+      return;
+    }
     const info = db.prepare("DELETE FROM backups WHERE duolingo_user_id = ?").run(String(duoId));
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(JSON.stringify({ ok: true, deleted: info.changes > 0 }));
@@ -2540,6 +2555,11 @@ const httpServer = createServer((req, res) => {
     if (jwtSub(jwt) !== String(duoId)) {
       res.writeHead(403, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ error: "jwt mismatch" }));
+      return;
+    }
+    if (!isTgLinked(duoId)) {
+      res.writeHead(403, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "not linked" }));
       return;
     }
     const row = db.prepare("SELECT data, created_at FROM backups WHERE duolingo_user_id = ?").get(String(duoId));

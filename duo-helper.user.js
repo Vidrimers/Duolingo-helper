@@ -11665,7 +11665,7 @@ function savePage() {
       showToast("✓ Бэкап сохранён в облаке");
       updateCloudBlock();
     } else {
-      showToast("Ошибка сохранения: " + ((res && res.error) || "сервер недоступен"), true);
+      showToast(res && res.error === "not linked" ? "Сначала привяжите Telegram" : "Ошибка сохранения: " + ((res && res.error) || "сервер недоступен"), true);
     }
   }
 
@@ -11679,7 +11679,7 @@ function savePage() {
       { method: "GET", headers: { authorization: "Bearer " + jwt } }
     );
     if (!res || !res.ok) {
-      showToast("Ошибка загрузки: " + ((res && res.error) || "сервер недоступен"), true);
+      showToast(res && res.error === "not linked" ? "Сначала привяжите Telegram" : "Ошибка загрузки: " + ((res && res.error) || "сервер недоступен"), true);
       return;
     }
     if (!res.hasBackup || !res.data) {
@@ -11714,7 +11714,7 @@ function savePage() {
       showToast("✓ Бэкап удалён");
       updateCloudBlock();
     } else {
-      showToast("Ошибка удаления: " + ((res && res.error) || "сервер недоступен"), true);
+      showToast(res && res.error === "not linked" ? "Сначала привяжите Telegram" : "Ошибка удаления: " + ((res && res.error) || "сервер недоступен"), true);
     }
   }
 
