@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Duolingo Helper
 // @namespace    https://github.com/Vidrimers/Duolingo-helper
-// @version      0.11.2
+// @version      0.11.3
 // @description  Проверка взаимной подписки на профилях Duolingo. Панель, бейджи, кеш.
 // @author       Vidrimers
 // @match        *://*.duolingo.com/*
@@ -259,6 +259,153 @@
       "tags.delConfirmTitle": "Удаление метки",
       "tags.deleted": "Метка удалена",
       "tags.needProfile": "Сначала открой профиль пользователя",
+      // вкладка «Инструменты»: общее
+      "tool.risk": "— на свой страх и риск",
+      "tool.hearts": "Защита сердец",
+      "tool.heartsBlock": "Блокировать списание сердец",
+      "tool.heartsDesc": "Не даёт Duolingo уменьшать сердца при ошибках в уроках",
+      "tool.heartsStatus": "Статус: ",
+      "tool.lessons": "⚠️ Уроки {risk}",
+      "tool.short": "Короткие уроки",
+      "tool.shortDesc": "Вместо полного урока 1–2 простых задания",
+      "tool.solver": "Автосолвер",
+      "tool.solverDesc": "Сам подставляет ответы в уроках",
+      "tool.stories": "Короткие stories",
+      "tool.storiesDesc": "Убирает вопросы и диалоги, оставляет заголовки",
+      "tool.solveNow": "Решить сейчас",
+      "tool.ap": "Автопрактика",
+      "tool.apDesc": "Решает уроки подряд без участия",
+      "tool.apCountTitle": "Количество уроков",
+      "tool.start": "Старт",
+      "tool.stop": "Стоп",
+      "tool.xp": "⚠️ XP / буст {risk}",
+      "tool.xpDesc": "Накрутка XP (реальное начисление, чит). Поле — цель в XP.",
+      "tool.xpSessionsTitle": "Экспериментально — может не начислять XP",
+      "tool.xpNote1": "* Sessions — экспериментально, может не начислять XP",
+      "tool.xpNote2": "Stories — истории Duolingo; за «пройденную» историю реально дают XP.",
+      "tool.xpNote3": "Sessions — имитация учебной сессии/урока без прохождения.",
+      "tool.quests": "⚠️ Квесты {risk}",
+      "tool.questsDesc": "Инъекция прогресса в daily / weekly / friends / family / monthly. Нарушает правила Duolingo.",
+      "tool.questClaimAll": "Забрать все",
+      "tool.gems": "⚠️ Гемы (алмазы) {risk}",
+      "tool.gemsDesc": "Сбор rewardBundles (SKILL_COMPLETION).",
+      "tool.gemsOnce": "Собрать",
+      "tool.gemsFarm": "Фарм",
+      "tool.gemsFastTitle": "8 потоков одновременно — быстрее, но опаснее (rate limit)",
+      "tool.gemsFastNote": "* Фарм ×8 — 8 параллельных запросов. Быстрее, но выше риск rate limit.",
+      "tool.freeMax": "⚠️ Free Max / Super {risk}",
+      "tool.freeMaxDesc": "Подмена ответа GET /users — клиент видит Super/Max. Разблокирует клиентские функции, серверную подписку не даёт.",
+      "tool.freeMaxLabel": "Free Max / Super",
+      "tool.freeMaxSub": "Подменяет hasPlus и gold_subscription",
+      "tool.stk": "⚠️ Streak {risk}",
+      "tool.stkDesc": "Восстановление/накрутка дней серии через подмену дат в sessions. Нарушает правила Duolingo.",
+      "tool.stkRun": "Накрутить дни",
+      "tool.lb": "⚠️ Лига {risk}",
+      "tool.lbDesc": "Таблица лиги, вступление, накрутка до целевого места и реакции.",
+      "tool.lbTable": "Таблица",
+      "tool.lbJoin": "Вступить",
+      "tool.lbFarm": "Фарм до места",
+      // защита сердец / уроки
+      "heart.synced": "Сердца синхронизированы с сервером: {n}",
+      "heart.on": "Защита сердец включена",
+      "heart.off": "Защита сердец выключена",
+      "lesson.on": "Короткие уроки включены",
+      "lesson.off": "Короткие уроки выключены",
+      "lesson.solverOn": "Автосолвер включён",
+      "lesson.solverOff": "Автосолвер выключен",
+      "lesson.storiesOn": "Короткие stories включены",
+      "lesson.storiesOff": "Короткие stories выключены",
+      "lesson.state": "короткие уроки: {a} · автосолвер: {b} · stories: {c}",
+      "lesson.onWord": "вкл",
+      "lesson.offWord": "выкл",
+      "lesson.solveSent": "Отправлен solve…",
+      "lesson.solveTry": "Автосолвер: пробую решить",
+      // автопрактика
+      "ap.running": "Автопрактика уже идёт",
+      "ap.start": "Автопрактика: старт ({n} уроков)",
+      "ap.progress": "Урок {done} / {target}…",
+      "ap.done": "Готово: {n} уроков",
+      "ap.doneToast": "✓ Автопрактика завершена",
+      "ap.stopped": "Остановлено",
+      "ap.stopToast": "Автопрактика остановлена",
+      "ap.timeout": "Таймаут — урок не загрузился",
+      // квесты
+      "quest.loading": "Загрузка {label}…",
+      "quest.readyEmpty": "{label}: готово (0)",
+      "quest.nothing": "{label}: нечего забирать",
+      "quest.inject": "{label}: инъекция {n}…",
+      "quest.ready": "{label}: готово ({n})",
+      "quest.metrics": "✓ {label}: {n} метрик",
+      "quest.error": "Ошибка квестов",
+      "quest.monthlyEmpty": "Нет незакрытых monthly-квестов",
+      "quest.claim": "Получить",
+      "quest.claimed": "✓ Получено",
+      "quest.claimLoad": "Загрузка monthly…",
+      "quest.monthlyCount": "Monthly: {n} шт.",
+      "quest.errorMonthly": "Ошибка monthly",
+      "quest.nothingShort": "Нечего забирать",
+      "quest.claimProgress": "Забор {i}/{n}…",
+      "quest.claimedCount": "Забрано: {ok}/{n}",
+      "quest.claimedToast": "✓ Забрано квестов: {n}",
+      // гемы
+      "gems.search": "Поиск наград…",
+      "gems.none": "Нет свободных наград",
+      "gems.noneToast": "Нет свободных gem-наград",
+      "gems.collected": "Собрано: {ok}/{total} (+{gained}) · баланс: {balance}",
+      "gems.toast": "✓ Наград: {n}",
+      "gems.error": "Ошибка сбора гемов",
+      "gems.farm": "Фарм…",
+      "gems.farmPlus": "Фарм… + {n}",
+      "gems.farmStop": "Фарм стоп · +{n} · баланс: {balance}",
+      "gems.farmDone": "✓ Собрано гемов: {n}",
+      "gems.farmEnd": "Фарм завершён",
+      "gems.farmStopped": "Фарм гемов остановлен",
+      "gems.farm8": "Фарм ×8…",
+      "gems.farm8Plus": "Фарм ×8… + {n}",
+      "gems.farm8Stop": "Фарм ×8 стоп · +{n} · баланс: {balance}",
+      // streak
+      "stk.prep": "Подготовка…",
+      "stk.day": "День {i}/{n}… (+{ok})",
+      "stk.sessionErr": "Ошибка создания сессии (HTTP {code}), пауза…",
+      "stk.partial": "+{ok} дн. (из {n})",
+      "stk.done": "Готово: +{ok} дн.",
+      "stk.toast": "✓ Streak накручен на {n}",
+      "stk.failToast": "Не удалось накрутить",
+      "stk.error": "Ошибка streak",
+      "stk.stopped": "Накрутка streak остановлена",
+      // лига
+      "lb.noData": "Нет данных — возможно, ты не в лиге",
+      "lb.you": "ты",
+      "lb.summary": "{tier} · моё место: {rank} · XP: {xp}",
+      "lb.promo": " · повышение",
+      "lb.demo": " · понижение",
+      "lb.loading": "Загрузка лиги…",
+      "lb.noLeague": "Нет активной лиги",
+      "lb.notIn": "Не в лиге или нет данных",
+      "lb.error": "Ошибка загрузки лиги",
+      "lb.joining": "Вступление в лигу…",
+      "lb.checkTable": "Проверь таблицу лиги",
+      "lb.joinSent": "Запрос на вступление отправлен",
+      "lb.joinFailed": "Не удалось вступить в лигу",
+      "lb.farmTo": "Фарм до места #{n}…",
+      "lb.noLeagueJoin": "Нет лиги — пробую вступить…",
+      "lb.joinMiss": "Не удалось попасть в лигу",
+      "lb.goal": "Цель достигнута: #{n}",
+      "lb.goalToast": "🏆 Место #{n}",
+      "lb.farmProgress": "Фарм… место {rank}, цель {target} XP (сейчас {score})",
+      "lb.tooManyErrors": "Слишком много ошибок, стоп",
+      "lb.farmStopped": "Фарм лиги остановлен",
+      // накрутка XP
+      "xp.start": "Накрутка ({mode})… 0 / {target}",
+      "xp.progress": "+{earned} XP (цель {target})",
+      "xp.tooManyErrors": "Слишком много ошибок, стоп",
+      "xp.done": "Готово: +{n} XP",
+      "xp.nothing": "Ничего не начислено",
+      "xp.toast": "✓ +{n} XP",
+      "xp.nothingToast": "XP не начислены",
+      "xp.error": "Ошибка накрутки XP",
+      "xp.stopped": "Накрутка XP остановлена",
+      "xp.boostStatus": "фейк-буст: x2 · {n} мин",
     },
     en: {
       "lang.changed": "Interface language changed",
@@ -449,6 +596,153 @@
       "tags.delConfirmTitle": "Deleting a tag",
       "tags.deleted": "Tag deleted",
       "tags.needProfile": "Open a user's profile first",
+      // Tools tab: common
+      "tool.risk": "— at your own risk",
+      "tool.hearts": "Heart protection",
+      "tool.heartsBlock": "Block heart spending",
+      "tool.heartsDesc": "Stops Duolingo from reducing hearts on mistakes in lessons",
+      "tool.heartsStatus": "Status: ",
+      "tool.lessons": "⚠️ Lessons {risk}",
+      "tool.short": "Short lessons",
+      "tool.shortDesc": "1–2 simple tasks instead of a full lesson",
+      "tool.solver": "Auto solver",
+      "tool.solverDesc": "Fills in answers in lessons by itself",
+      "tool.stories": "Short stories",
+      "tool.storiesDesc": "Removes questions and dialogs, keeps headers",
+      "tool.solveNow": "Solve now",
+      "tool.ap": "Auto-practice",
+      "tool.apDesc": "Solves lessons in a row without you",
+      "tool.apCountTitle": "Number of lessons",
+      "tool.start": "Start",
+      "tool.stop": "Stop",
+      "tool.xp": "⚠️ XP / boost {risk}",
+      "tool.xpDesc": "XP farming (real crediting, cheat). The field is the XP target.",
+      "tool.xpSessionsTitle": "Experimental — may not credit XP",
+      "tool.xpNote1": "* Sessions — experimental, may not credit XP",
+      "tool.xpNote2": "Stories — Duolingo stories; a \"completed\" story really gives XP.",
+      "tool.xpNote3": "Sessions — an imitation of a study session/lesson without solving it.",
+      "tool.quests": "⚠️ Quests {risk}",
+      "tool.questsDesc": "Progress injection into daily / weekly / friends / family / monthly. Violates Duolingo rules.",
+      "tool.questClaimAll": "Claim all",
+      "tool.gems": "⚠️ Gems {risk}",
+      "tool.gemsDesc": "Collecting rewardBundles (SKILL_COMPLETION).",
+      "tool.gemsOnce": "Collect",
+      "tool.gemsFarm": "Farm",
+      "tool.gemsFastTitle": "8 parallel requests — faster but riskier (rate limit)",
+      "tool.gemsFastNote": "* Farm ×8 — 8 parallel requests. Faster, but a higher rate-limit risk.",
+      "tool.freeMax": "⚠️ Free Max / Super {risk}",
+      "tool.freeMaxDesc": "Replaces the GET /users response — the client sees Super/Max. Unlocks client-side features, doesn't grant a server subscription.",
+      "tool.freeMaxLabel": "Free Max / Super",
+      "tool.freeMaxSub": "Replaces hasPlus and gold_subscription",
+      "tool.stk": "⚠️ Streak {risk}",
+      "tool.stkDesc": "Restoring/farming streak days by faking dates in sessions. Violates Duolingo rules.",
+      "tool.stkRun": "Add streak days",
+      "tool.lb": "⚠️ League {risk}",
+      "tool.lbDesc": "League table, joining, farming to a target place and reactions.",
+      "tool.lbTable": "Table",
+      "tool.lbJoin": "Join",
+      "tool.lbFarm": "Farm to place",
+      // hearts / lessons
+      "heart.synced": "Hearts synced with the server: {n}",
+      "heart.on": "Heart protection enabled",
+      "heart.off": "Heart protection disabled",
+      "lesson.on": "Short lessons enabled",
+      "lesson.off": "Short lessons disabled",
+      "lesson.solverOn": "Auto solver enabled",
+      "lesson.solverOff": "Auto solver disabled",
+      "lesson.storiesOn": "Short stories enabled",
+      "lesson.storiesOff": "Short stories disabled",
+      "lesson.state": "short lessons: {a} · auto solver: {b} · stories: {c}",
+      "lesson.onWord": "on",
+      "lesson.offWord": "off",
+      "lesson.solveSent": "Solve sent…",
+      "lesson.solveTry": "Auto solver: trying to solve",
+      // auto-practice
+      "ap.running": "Auto-practice is already running",
+      "ap.start": "Auto-practice: start ({n} lessons)",
+      "ap.progress": "Lesson {done} / {target}…",
+      "ap.done": "Done: {n} lessons",
+      "ap.doneToast": "✓ Auto-practice finished",
+      "ap.stopped": "Stopped",
+      "ap.stopToast": "Auto-practice stopped",
+      "ap.timeout": "Timeout — the lesson didn't load",
+      // quests
+      "quest.loading": "Loading {label}…",
+      "quest.readyEmpty": "{label}: done (0)",
+      "quest.nothing": "{label}: nothing to claim",
+      "quest.inject": "{label}: injecting {n}…",
+      "quest.ready": "{label}: done ({n})",
+      "quest.metrics": "✓ {label}: {n} metrics",
+      "quest.error": "Quests failed",
+      "quest.monthlyEmpty": "No unfinished monthly quests",
+      "quest.claim": "Claim",
+      "quest.claimed": "✓ Claimed",
+      "quest.claimLoad": "Loading monthly…",
+      "quest.monthlyCount": "Monthly: {n}",
+      "quest.errorMonthly": "Monthly failed",
+      "quest.nothingShort": "Nothing to claim",
+      "quest.claimProgress": "Claiming {i}/{n}…",
+      "quest.claimedCount": "Claimed: {ok}/{n}",
+      "quest.claimedToast": "✓ Quests claimed: {n}",
+      // gems
+      "gems.search": "Searching for rewards…",
+      "gems.none": "No free rewards",
+      "gems.noneToast": "No free gem rewards",
+      "gems.collected": "Collected: {ok}/{total} (+{gained}) · balance: {balance}",
+      "gems.toast": "✓ Rewards: {n}",
+      "gems.error": "Gem collecting failed",
+      "gems.farm": "Farming…",
+      "gems.farmPlus": "Farming… + {n}",
+      "gems.farmStop": "Farm stop · +{n} · balance: {balance}",
+      "gems.farmDone": "✓ Gems collected: {n}",
+      "gems.farmEnd": "Farm finished",
+      "gems.farmStopped": "Gem farming stopped",
+      "gems.farm8": "Farming ×8…",
+      "gems.farm8Plus": "Farming ×8… + {n}",
+      "gems.farm8Stop": "Farm ×8 stop · +{n} · balance: {balance}",
+      // streak
+      "stk.prep": "Preparing…",
+      "stk.day": "Day {i}/{n}… (+{ok})",
+      "stk.sessionErr": "Session creation error (HTTP {code}), pausing…",
+      "stk.partial": "+{ok} days (of {n})",
+      "stk.done": "Done: +{ok} days",
+      "stk.toast": "✓ Streak farmed by {n}",
+      "stk.failToast": "Couldn't farm the streak",
+      "stk.error": "Streak farming failed",
+      "stk.stopped": "Streak farming stopped",
+      // league
+      "lb.noData": "No data — you may not be in a league",
+      "lb.you": "you",
+      "lb.summary": "{tier} · my place: {rank} · XP: {xp}",
+      "lb.promo": " · promotion",
+      "lb.demo": " · demotion",
+      "lb.loading": "Loading league…",
+      "lb.noLeague": "No active league",
+      "lb.notIn": "Not in a league or no data",
+      "lb.error": "Failed to load the league",
+      "lb.joining": "Joining the league…",
+      "lb.checkTable": "Check the league table",
+      "lb.joinSent": "Join request sent",
+      "lb.joinFailed": "Couldn't join the league",
+      "lb.farmTo": "Farming to place #{n}…",
+      "lb.noLeagueJoin": "No league — trying to join…",
+      "lb.joinMiss": "Couldn't get into a league",
+      "lb.goal": "Target reached: #{n}",
+      "lb.goalToast": "🏆 Place #{n}",
+      "lb.farmProgress": "Farming… place {rank}, target {target} XP (now {score})",
+      "lb.tooManyErrors": "Too many errors, stopping",
+      "lb.farmStopped": "League farming stopped",
+      // XP farming
+      "xp.start": "Farming ({mode})… 0 / {target}",
+      "xp.progress": "+{earned} XP (target {target})",
+      "xp.tooManyErrors": "Too many errors, stopping",
+      "xp.done": "Done: +{n} XP",
+      "xp.nothing": "Nothing credited",
+      "xp.toast": "✓ +{n} XP",
+      "xp.nothingToast": "No XP credited",
+      "xp.error": "XP farming failed",
+      "xp.stopped": "XP farming stopped",
+      "xp.boostStatus": "fake boost: x2 · {n} min",
     },
   };
 
@@ -3882,62 +4176,62 @@
             <div class="dh-tab-content" data-tab="tools">
                 <div class="dh-acc" data-acc>
                     <button type="button" class="dh-acc-head">
-                        <span class="dh-acc-title">Защита сердец</span>
+                        <span class="dh-acc-title">${t("tool.hearts")}</span>
                         <span class="dh-acc-arrow">▾</span>
                     </button>
                     <div class="dh-acc-body"><div class="dh-acc-inner">
                         <div class="dh-setting-row" style="border-bottom:none;padding:4px 0">
                             <div class="dh-setting-label">
-                                Блокировать списание сердец
-                                <small>Не даёт Duolingo уменьшать сердца при ошибках в уроках</small>
+                                ${t("tool.heartsBlock")}
+                                <small>${t("tool.heartsDesc")}</small>
                             </div>
                             <div class="dh-switch" id="dh-set-hearts"></div>
                         </div>
                         <div class="dh-muted" style="margin-top:6px">
-                            Статус: <strong id="dh-hearts-status">…</strong>
+                            ${t("tool.heartsStatus")}<strong id="dh-hearts-status">…</strong>
                         </div>
                     </div></div>
                 </div>
 
                 <div class="dh-acc" data-acc>
                     <button type="button" class="dh-acc-head">
-                        <span class="dh-acc-title">⚠️ Уроки — на свой страх и риск</span>
+                        <span class="dh-acc-title">${t("tool.lessons", { risk: t("tool.risk") })}</span>
                         <span class="dh-acc-arrow">▾</span>
                     </button>
                     <div class="dh-acc-body"><div class="dh-acc-inner">
                         <div class="dh-setting-row" style="border-bottom:none;padding:4px 0">
                             <div class="dh-setting-label">
-                                Короткие уроки
-                                <small>Вместо полного урока 1–2 простых задания</small>
+                                ${t("tool.short")}
+                                <small>${t("tool.shortDesc")}</small>
                             </div>
                             <div class="dh-switch" id="dh-set-short"></div>
                         </div>
                         <div class="dh-setting-row" style="border-bottom:none;padding:4px 0">
                             <div class="dh-setting-label">
-                                Автосолвер
-                                <small>Сам подставляет ответы в уроках</small>
+                                ${t("tool.solver")}
+                                <small>${t("tool.solverDesc")}</small>
                             </div>
                             <div class="dh-switch" id="dh-set-solver"></div>
                         </div>
                         <div class="dh-setting-row" style="border-bottom:none;padding:4px 0">
                             <div class="dh-setting-label">
-                                Короткие stories
-                                <small>Убирает вопросы и диалоги, оставляет заголовки</small>
+                                ${t("tool.stories")}
+                                <small>${t("tool.storiesDesc")}</small>
                             </div>
                             <div class="dh-switch" id="dh-set-stories"></div>
                         </div>
                         <div class="dh-row" style="margin-top:6px">
-                            <button class="dh-btn dh-btn-primary" id="dh-solve-now">Решить сейчас</button>
+                            <button class="dh-btn dh-btn-primary" id="dh-solve-now">${t("tool.solveNow")}</button>
                         </div>
                         <div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(128,128,128,0.25)">
                             <div class="dh-setting-label" style="margin-bottom:4px">
-                                Автопрактика
-                                <small>Решает уроки подряд без участия</small>
+                                ${t("tool.ap")}
+                                <small>${t("tool.apDesc")}</small>
                             </div>
                             <div class="dh-row" style="gap:6px;align-items:center">
-                                <input class="dh-num-input" id="dh-ap-count" type="number" min="1" max="999" value="10" style="width:56px" title="Количество уроков" />
-                                <button class="dh-btn dh-btn-primary" id="dh-ap-start" style="padding:5px 12px;font-size:11px">Старт</button>
-                                <button class="dh-btn dh-btn-danger" id="dh-ap-stop" style="padding:5px 12px;font-size:11px" disabled>Стоп</button>
+                                <input class="dh-num-input" id="dh-ap-count" type="number" min="1" max="999" value="10" style="width:56px" title="${t("tool.apCountTitle")}" />
+                                <button class="dh-btn dh-btn-primary" id="dh-ap-start" style="padding:5px 12px;font-size:11px">${t("tool.start")}</button>
+                                <button class="dh-btn dh-btn-danger" id="dh-ap-stop" style="padding:5px 12px;font-size:11px" disabled>${t("tool.stop")}</button>
                             </div>
                             <div class="dh-muted dh-op-status" id="dh-ap-status" style="margin-top:4px"></div>
                         </div>
@@ -3947,23 +4241,23 @@
 
                 <div class="dh-acc" data-acc>
                     <button type="button" class="dh-acc-head">
-                        <span class="dh-acc-title">⚠️ XP / буст — на свой страх и риск</span>
+                        <span class="dh-acc-title">${t("tool.xp", { risk: t("tool.risk") })}</span>
                         <span class="dh-acc-arrow">▾</span>
                     </button>
                     <div class="dh-acc-body"><div class="dh-acc-inner">
                         <div class="dh-muted" style="margin-bottom:8px">
-                            Накрутка XP (реальное начисление, чит). Поле — цель в XP.
+                            ${t("tool.xpDesc")}
                         </div>
                         <div class="dh-row" style="margin-bottom:6px">
                             <input class="dh-num-input" id="dh-xp-amount" type="number" min="1" max="99999" value="500" style="width:72px" />
                             <button class="dh-btn dh-btn-primary" id="dh-xp-stories">Stories</button>
-                            <button class="dh-btn dh-btn-danger" id="dh-xp-sessions" title="Экспериментально — может не начислять XP">Sessions *</button>
-                            <button class="dh-btn" id="dh-xp-stop">Стоп</button>
+                            <button class="dh-btn dh-btn-danger" id="dh-xp-sessions" title="${t("tool.xpSessionsTitle")}">Sessions *</button>
+                            <button class="dh-btn" id="dh-xp-stop">${t("tool.stop")}</button>
                         </div>
                         <div class="dh-muted" style="margin-top:2px">
-                            * Sessions — экспериментально, может не начислять XP<br/>
-                            <small>Stories — истории Duolingo; за «пройденную» историю реально дают XP.</small><br/>
-                            <small>Sessions — имитация учебной сессии/урока без прохождения.</small>
+                            ${t("tool.xpNote1")}<br/>
+                            <small>${t("tool.xpNote2")}</small><br/>
+                            <small>${t("tool.xpNote3")}</small>
                         </div>
                         <div class="dh-muted dh-op-status" id="dh-xp-status"></div>
                     </div></div>
@@ -3971,12 +4265,12 @@
 
                 <div class="dh-acc" data-acc>
                     <button type="button" class="dh-acc-head">
-                        <span class="dh-acc-title">⚠️ Квесты — на свой страх и риск</span>
+                        <span class="dh-acc-title">${t("tool.quests", { risk: t("tool.risk") })}</span>
                         <span class="dh-acc-arrow">▾</span>
                     </button>
                     <div class="dh-acc-body"><div class="dh-acc-inner">
                         <div class="dh-muted" style="margin-bottom:8px">
-                            Инъекция прогресса в daily / weekly / friends / family / monthly. Нарушает правила Duolingo.
+                            ${t("tool.questsDesc")}
                         </div>
                         <div class="dh-row" style="margin-bottom:6px">
                             <button class="dh-btn dh-btn-primary" id="dh-quest-daily">Daily</button>
@@ -3986,7 +4280,7 @@
                         <div class="dh-row" style="margin-bottom:6px">
                             <button class="dh-btn" id="dh-quest-family">Family</button>
                             <button class="dh-btn" id="dh-quest-load">Monthly</button>
-                            <button class="dh-btn" id="dh-quest-claim-all">Забрать все</button>
+                            <button class="dh-btn" id="dh-quest-claim-all">${t("tool.questClaimAll")}</button>
                         </div>
                         <div class="dh-muted dh-op-status" id="dh-quest-status"></div>
                         <div id="dh-quest-list" style="margin-top:8px;display:flex;flex-direction:column;gap:6px"></div>
@@ -3995,21 +4289,21 @@
 
                 <div class="dh-acc" data-acc>
                     <button type="button" class="dh-acc-head">
-                        <span class="dh-acc-title">⚠️ Гемы (алмазы) — на свой страх и риск</span>
+                        <span class="dh-acc-title">${t("tool.gems", { risk: t("tool.risk") })}</span>
                         <span class="dh-acc-arrow">▾</span>
                     </button>
                     <div class="dh-acc-body"><div class="dh-acc-inner">
                         <div class="dh-muted" style="margin-bottom:8px">
-                            Сбор rewardBundles (SKILL_COMPLETION).
+                            ${t("tool.gemsDesc")}
                         </div>
                         <div class="dh-row" style="margin-bottom:6px">
-                            <button class="dh-btn dh-btn-primary" id="dh-gems-once">Собрать</button>
-                            <button class="dh-btn dh-btn-danger" id="dh-gems-farm">Фарм</button>
-                            <button class="dh-btn dh-btn-danger" id="dh-gems-farm-fast" title="8 потоков одновременно — быстрее, но опаснее (rate limit)">Фарм ×8 *</button>
-                            <button class="dh-btn" id="dh-gems-stop">Стоп</button>
+                            <button class="dh-btn dh-btn-primary" id="dh-gems-once">${t("tool.gemsOnce")}</button>
+                            <button class="dh-btn dh-btn-danger" id="dh-gems-farm">${t("tool.gemsFarm")}</button>
+                            <button class="dh-btn dh-btn-danger" id="dh-gems-farm-fast" title="${t("tool.gemsFastTitle")}">${t("tool.gemsFarm")} ×8 *</button>
+                            <button class="dh-btn" id="dh-gems-stop">${t("tool.stop")}</button>
                         </div>
                         <div class="dh-muted" style="margin-bottom:4px;font-size:10px">
-                            * Фарм ×8 — 8 параллельных запросов. Быстрее, но выше риск rate limit.
+                            ${t("tool.gemsFastNote")}
                         </div>
                         <div class="dh-muted dh-op-status" id="dh-gems-status"></div>
                     </div></div>
@@ -4017,17 +4311,17 @@
 
                 <div class="dh-acc" data-acc>
                     <button type="button" class="dh-acc-head">
-                        <span class="dh-acc-title">⚠️ Free Max / Super — на свой страх и риск</span>
+                        <span class="dh-acc-title">${t("tool.freeMax", { risk: t("tool.risk") })}</span>
                         <span class="dh-acc-arrow">▾</span>
                     </button>
                     <div class="dh-acc-body"><div class="dh-acc-inner">
                         <div class="dh-muted" style="margin-bottom:8px">
-                            Подмена ответа GET /users — клиент видит Super/Max. Разблокирует клиентские функции, серверную подписку не даёт.
+                            ${t("tool.freeMaxDesc")}
                         </div>
                         <div class="dh-setting-row" style="border-bottom:none;padding:4px 0">
                             <div class="dh-setting-label">
-                                Free Max / Super
-                                <small>Подменяет hasPlus и gold_subscription</small>
+                                ${t("tool.freeMaxLabel")}
+                                <small>${t("tool.freeMaxSub")}</small>
                             </div>
                             <div class="dh-switch" id="dh-set-freesuper"></div>
                         </div>
@@ -4036,17 +4330,17 @@
 
                 <div class="dh-acc" data-acc>
                     <button type="button" class="dh-acc-head">
-                        <span class="dh-acc-title">⚠️ Streak — на свой страх и риск</span>
+                        <span class="dh-acc-title">${t("tool.stk", { risk: t("tool.risk") })}</span>
                         <span class="dh-acc-arrow">▾</span>
                     </button>
                     <div class="dh-acc-body"><div class="dh-acc-inner">
                         <div class="dh-muted" style="margin-bottom:8px">
-                            Восстановление/накрутка дней серии через подмену дат в sessions. Нарушает правила Duolingo.
+                            ${t("tool.stkDesc")}
                         </div>
                         <div class="dh-row" style="margin-bottom:6px">
                             <input class="dh-num-input" id="dh-streak-days" type="number" min="1" max="365" value="7" style="width:64px" />
-                            <button class="dh-btn dh-btn-primary" id="dh-streak-run">Накрутить дни</button>
-                            <button class="dh-btn" id="dh-streak-stop">Стоп</button>
+                            <button class="dh-btn dh-btn-primary" id="dh-streak-run">${t("tool.stkRun")}</button>
+                            <button class="dh-btn" id="dh-streak-stop">${t("tool.stop")}</button>
                         </div>
                         <div class="dh-muted dh-op-status" id="dh-streak-status"></div>
                     </div></div>
@@ -4054,21 +4348,21 @@
 
                 <div class="dh-acc" data-acc>
                     <button type="button" class="dh-acc-head">
-                        <span class="dh-acc-title">⚠️ Лига — на свой страх и риск</span>
+                        <span class="dh-acc-title">${t("tool.lb", { risk: t("tool.risk") })}</span>
                         <span class="dh-acc-arrow">▾</span>
                     </button>
                     <div class="dh-acc-body"><div class="dh-acc-inner">
                         <div class="dh-muted" style="margin-bottom:8px">
-                            Таблица лиги, вступление, накрутка до целевого места и реакции.
+                            ${t("tool.lbDesc")}
                         </div>
                         <div class="dh-row" style="margin-bottom:6px">
-                            <button class="dh-btn dh-btn-primary" id="dh-lb-load">Таблица</button>
-                            <button class="dh-btn" id="dh-lb-join">Вступить</button>
+                            <button class="dh-btn dh-btn-primary" id="dh-lb-load">${t("tool.lbTable")}</button>
+                            <button class="dh-btn" id="dh-lb-join">${t("tool.lbJoin")}</button>
                         </div>
                         <div class="dh-row" style="margin-bottom:6px">
                             <input class="dh-num-input" id="dh-lb-target" type="number" min="1" max="100" value="3" style="width:56px" />
-                            <button class="dh-btn dh-btn-danger" id="dh-lb-farm">Фарм до места</button>
-                            <button class="dh-btn" id="dh-lb-stop">Стоп</button>
+                            <button class="dh-btn dh-btn-danger" id="dh-lb-farm">${t("tool.lbFarm")}</button>
+                            <button class="dh-btn" id="dh-lb-stop">${t("tool.stop")}</button>
                         </div>
                         <div class="dh-muted dh-op-status" id="dh-lb-status"></div>
                         <div id="dh-lb-list" style="margin-top:8px;display:flex;flex-direction:column;gap:4px"></div>
@@ -4468,13 +4762,11 @@
     if (els.setSolver) els.setSolver.classList.toggle("on", solveOn);
     if (els.setStories) els.setStories.classList.toggle("on", storiesOn);
     if (els.lessonStatus) {
-      els.lessonStatus.textContent =
-        "короткие уроки: " +
-        (shortOn ? "вкл" : "выкл") +
-        " · автосолвер: " +
-        (solveOn ? "вкл" : "выкл") +
-        " · stories: " +
-        (storiesOn ? "вкл" : "выкл");
+      els.lessonStatus.textContent = t("lesson.state", {
+        a: shortOn ? t("lesson.onWord") : t("lesson.offWord"),
+        b: solveOn ? t("lesson.onWord") : t("lesson.offWord"),
+        c: storiesOn ? t("lesson.onWord") : t("lesson.offWord"),
+      });
     }
   }
 
@@ -5128,8 +5420,8 @@
         unsafeWindow.__dhSolveOnce(true);
       }
     } catch {}
-    setLessonStatus("Отправлен solve…");
-    showToast("Автосолвер: пробую решить");
+    setLessonStatus(t("lesson.solveSent"));
+    showToast(t("lesson.solveTry"));
   }
 
   // ========== Автопрактика ==========
@@ -5169,7 +5461,7 @@
   function startAutoPractice(count) {
     const st = apState();
     if (st && st.active) {
-      showToast("Автопрактика уже идёт");
+      showToast(t("ap.running"));
       return;
     }
     const prevShort = !!DATA.settings.lessonShortener;
@@ -5187,8 +5479,8 @@
       prevSolver,
     });
     setApRunning(true);
-    setApStatus("Урок 0 / " + count + "…");
-    showToast("Автопрактика: старт (" + count + " уроков)");
+    setApStatus(t("ap.progress", { done: 0, target: count }));
+    showToast(t("ap.start", { n: count }));
     if (location.pathname.indexOf("/practice") !== 0) {
       location.assign("/practice");
     } else {
@@ -5210,11 +5502,11 @@
     saveData();
     syncLessonFlags();
     if (completed) {
-      setApStatus("Готово: " + (st ? st.done : 0) + " уроков");
-      showToast("✓ Автопрактика завершена");
+      setApStatus(t("ap.done", { n: st ? st.done : 0 }));
+      showToast(t("ap.doneToast"));
     } else {
-      setApStatus("Остановлено");
-      showToast("Автопрактика остановлена");
+      setApStatus(t("ap.stopped"));
+      showToast(t("ap.stopToast"));
     }
   }
 
@@ -5222,7 +5514,7 @@
     const st = apState();
     if (!st || !st.active) return;
     setApRunning(true);
-    setApStatus("Урок " + st.done + " / " + st.target + "…");
+    setApStatus(t("ap.progress", { done: st.done, target: st.target }));
     // ждём появления challenge или конца сессии
     let waited = 0;
     const iv = setInterval(() => {
@@ -5245,7 +5537,7 @@
           stopAutoPractice(true);
           return;
         }
-        setApStatus("Урок " + st2.done + " / " + st2.target + "…");
+        setApStatus(t("ap.progress", { done: st2.done, target: st2.target }));
         setTimeout(() => {
           if (apState() && apState().active) location.assign("/practice");
         }, 900);
@@ -5255,7 +5547,7 @@
       if (waited > 120000) {
         clearInterval(iv);
         stopAutoPractice(false);
-        setApStatus("Таймаут — урок не загрузился");
+        setApStatus(t("ap.timeout"));
       }
     }, 600);
   }
@@ -5403,7 +5695,7 @@
       }
     }
     if (patched && !silent) {
-      showToast("Сердца синхронизированы с сервером: " + server.hearts);
+      showToast(t("heart.synced", { n: server.hearts }));
     }
     return { server: server.hearts, patched };
   }
@@ -5627,7 +5919,7 @@
 
   async function fetchQuestData() {
     const myId = getMyId();
-    if (!myId) throw new Error("Не выполнен вход");
+    if (!myId) throw new Error(t("f.notLoggedIn"));
     const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
     const [schemaR, progR] = await Promise.all([
       goalsFetch("GET", `/schema?ui_language=en&_=${Date.now()}`),
@@ -5653,7 +5945,7 @@
   /** Инъекция всех незакрытых квестов выбранного типа одной кнопкой. */
   async function runQuestsByKind(kind, label, btn) {
     if (btn) btn.disabled = true;
-    setQuestStatus("Загрузка " + label + "…");
+    setQuestStatus(t("quest.loading", { label }));
     try {
       const { schema, progressRes, tz, myId } = await fetchQuestData();
       const earned = new Set(
@@ -5705,21 +5997,21 @@
         updates.push({ metric, quantity: 2000 });
       }
       if (!updates.length) {
-        setQuestStatus(label + ": готово (0)");
-        showToast(label + ": нечего забирать");
+        setQuestStatus(t("quest.readyEmpty", { label }));
+        showToast(t("quest.nothing", { label }));
         return;
       }
       updates.push({ metric: "QUESTS", quantity: 1 });
-      setQuestStatus(label + ": инъекция " + updates.length + "…");
+      setQuestStatus(t("quest.inject", { label, n: updates.length }));
       const ts = new Date().toISOString();
       await postGoalBatch(updates, ts, tz, myId);
       await new Promise((r) => setTimeout(r, 800));
       await postGoalBatch(updates, ts, tz, myId);
-      setQuestStatus(label + ": готово (" + updates.length + ")");
-      showToast("✓ " + label + ": " + updates.length + " метрик");
+      setQuestStatus(t("quest.ready", { label, n: updates.length }));
+      showToast(t("quest.metrics", { label, n: updates.length }));
     } catch (e) {
-      setQuestStatus("Ошибка: " + (e && e.message));
-      showToast(e && e.message ? e.message : "Ошибка квестов", true);
+      setQuestStatus(t("f.error", { msg: e && e.message }));
+      showToast(e && e.message ? e.message : t("quest.error"), true);
     } finally {
       if (btn) btn.disabled = false;
     }
@@ -5737,7 +6029,7 @@
     els.questList.innerHTML = "";
     if (!items.length) {
       els.questList.innerHTML =
-        '<div class="dh-muted">Нет незакрытых monthly-квестов</div>';
+        `<div class="dh-muted">${t("quest.monthlyEmpty")}</div>`;
       return;
     }
     const grid = document.createElement("div");
@@ -5754,20 +6046,20 @@
         <div style="width:100%;height:4px;background:rgba(0,0,0,0.1);border-radius:2px;overflow:hidden;flex-shrink:0">
           <div style="width:${pct}%;height:100%;background:#58CC02;border-radius:2px"></div>
         </div>
-        <button class="dh-btn">Получить</button>`;
+        <button class="dh-btn">${t("quest.claim")}</button>`;
       const b = card.querySelector("button");
       b.addEventListener("click", async () => {
         b.disabled = true;
         b.textContent = "…";
         const ok = await claimMonthlyOne(it);
-        b.textContent = ok ? "✓ Получено" : "Ошибка";
+        b.textContent = ok ? t("quest.claimed") : t("check.error");
         if (ok) {
           showToast("✓ " + it.title);
           setTimeout(() => loadMonthlyQuests(), 900);
         } else {
           setTimeout(() => {
             b.disabled = false;
-            b.textContent = "Получить";
+            b.textContent = t("quest.claim");
           }, 2500);
         }
       });
@@ -5866,16 +6158,16 @@
   async function loadMonthlyQuests() {
     const btn = els.questLoad;
     if (btn) btn.disabled = true;
-    setQuestStatus("Загрузка monthly…");
+    setQuestStatus(t("quest.claimLoad"));
     try {
       const data = await fetchQuestData();
       const items = buildMonthlyItems(data.schema, data.progressRes);
       monthlyCache = { ...data, items };
       renderMonthlyList(items);
-      setQuestStatus("Monthly: " + items.length + " шт.");
+      setQuestStatus(t("quest.monthlyCount", { n: items.length }));
     } catch (e) {
-      setQuestStatus("Ошибка: " + (e && e.message));
-      showToast(e && e.message ? e.message : "Ошибка monthly", true);
+      setQuestStatus(t("f.error", { msg: e && e.message }));
+      showToast(e && e.message ? e.message : t("quest.errorMonthly"), true);
     } finally {
       if (btn) btn.disabled = false;
     }
@@ -5907,22 +6199,22 @@
       }
       const items = (monthlyCache && monthlyCache.items) || [];
       if (!items.length) {
-        showToast("Нечего забирать");
-        setQuestStatus("Нечего забирать");
+        showToast(t("quest.nothingShort"));
+        setQuestStatus(t("quest.nothingShort"));
         return;
       }
       let ok = 0;
       for (let i = 0; i < items.length; i++) {
-        setQuestStatus("Забор " + (i + 1) + "/" + items.length + "…");
+        setQuestStatus(t("quest.claimProgress", { i: i + 1, n: items.length }));
         if (await claimMonthlyOne(items[i])) ok++;
         await new Promise((r) => setTimeout(r, 400));
       }
-      setQuestStatus("Забрано: " + ok + "/" + items.length);
-      showToast("✓ Забрано квестов: " + ok);
+      setQuestStatus(t("quest.claimedCount", { ok, n: items.length }));
+      showToast(t("quest.claimedToast", { n: ok }));
       await loadMonthlyQuests();
     } catch (e) {
-      setQuestStatus("Ошибка: " + (e && e.message));
-      showToast(e && e.message ? e.message : "Ошибка", true);
+      setQuestStatus(t("f.error", { msg: e && e.message }));
+      showToast(e && e.message ? e.message : t("check.error"), true);
     } finally {
       if (btn) btn.disabled = false;
     }
@@ -6041,12 +6333,12 @@
   async function claimGemsOnce() {
     const btn = els.gemsOnce;
     if (btn) btn.disabled = true;
-    setGemsStatus("Поиск наград…");
+    setGemsStatus(t("gems.search"));
     try {
       const rewards = await fetchGemRewards();
       if (!rewards.length) {
-        setGemsStatus("Нет свободных наград");
-        showToast("Нет свободных gem-наград");
+        setGemsStatus(t("gems.none"));
+        showToast(t("gems.noneToast"));
         return;
       }
       let ok = 0;
@@ -6059,14 +6351,17 @@
       }
       const gems = await getGemCount();
       setGemsStatus(
-        `Собрано: ${ok}/${rewards.length} (+${gained}) · баланс: ${
-          gems != null ? gems : "—"
-        }`,
+        t("gems.collected", {
+          ok,
+          total: rewards.length,
+          gained,
+          balance: gems != null ? gems : "—",
+        }),
       );
-      showToast("✓ Наград: " + ok);
+      showToast(t("gems.toast", { n: ok }));
     } catch (e) {
-      setGemsStatus("Ошибка: " + (e && e.message));
-      showToast("Ошибка сбора гемов", true);
+      setGemsStatus(t("f.error", { msg: e && e.message }));
+      showToast(t("gems.error"), true);
     } finally {
       if (btn) btn.disabled = false;
     }
@@ -6079,7 +6374,7 @@
     if (els.gemsOnce) els.gemsOnce.disabled = true;
     let total = 0;
     let rounds = 0;
-    setGemsStatus("Фарм…");
+    setGemsStatus(t("gems.farm"));
     try {
       while (gemsRunning) {
         const rewards = await fetchGemRewards();
@@ -6094,14 +6389,14 @@
           if (!gemsRunning) break;
           if (await claimGemReward(r.id)) {
             total += r.amount || 0;
-            setGemsStatus("Фарм… + " + total);
+            setGemsStatus(t("gems.farmPlus", { n: total }));
           }
           await new Promise((r2) => setTimeout(r2, 150));
         }
       }
       const gems = await getGemCount();
-      setGemsStatus(`Фарм стоп · +${total} · баланс: ${gems != null ? gems : "—"}`);
-      showToast(total ? "✓ Собрано гемов: " + total : "Фарм завершён");
+      setGemsStatus(t("gems.farmStop", { n: total, balance: gems != null ? gems : "—" }));
+      showToast(total ? t("gems.farmDone", { n: total }) : t("gems.farmEnd"));
     } finally {
       gemsRunning = false;
       if (els.gemsFarm) els.gemsFarm.disabled = false;
@@ -6111,7 +6406,7 @@
 
   function stopGemsFarm() {
     gemsRunning = false;
-    showToast("Фарм гемов остановлен");
+    showToast(t("gems.farmStopped"));
   }
 
   /** Фарм гемов в 8 потоков — быстрее, но рискованнее. */
@@ -6124,7 +6419,7 @@
     let total = 0;
     let rounds = 0;
     const THREADS = 8;
-    setGemsStatus("Фарм ×8…");
+    setGemsStatus(t("gems.farm8"));
     try {
       while (gemsRunning) {
         const rewards = await fetchGemRewards();
@@ -6142,14 +6437,14 @@
             batch.map((r) => claimGemReward(r.id).then((ok) => (ok ? r.amount || 0 : 0))),
           );
           total += results.reduce((a, b) => a + b, 0);
-          setGemsStatus("Фарм ×8… + " + total);
+          setGemsStatus(t("gems.farm8Plus", { n: total }));
         }
         // небольшая пауза между пачками
         if (gemsRunning) await new Promise((r) => setTimeout(r, 250));
       }
       const gems = await getGemCount();
-      setGemsStatus(`Фарм ×8 стоп · +${total} · баланс: ${gems != null ? gems : "—"}`);
-      showToast(total ? "✓ Собрано гемов: " + total : "Фарм завершён");
+      setGemsStatus(t("gems.farm8Stop", { n: total, balance: gems != null ? gems : "—" }));
+      showToast(total ? t("gems.farmDone", { n: total }) : t("gems.farmEnd"));
     } finally {
       gemsRunning = false;
       if (els.gemsFarm) els.gemsFarm.disabled = false;
@@ -6215,7 +6510,7 @@
 
   async function getUserStreakInfo() {
     const myId = getMyId();
-    if (!myId) throw new Error("Не выполнен вход");
+    if (!myId) throw new Error(t("f.notLoggedIn"));
     const u = await apiGet(
       `${API.users}/${myId}?fields=timezone,streakData,fromLanguage,learningLanguage`,
     );
@@ -6268,7 +6563,7 @@
     );
     streakRunning = true;
     if (els.streakRun) els.streakRun.disabled = true;
-    setStreakStatus("Подготовка…");
+    setStreakStatus(t("stk.prep"));
 
     try {
       const info = await getUserStreakInfo();
@@ -6284,7 +6579,7 @@
 
       let saved = 0;
       for (let i = 0; i < days && streakRunning; i++) {
-        setStreakStatus(`День ${i + 1}/${days}… (+${saved})`);
+        setStreakStatus(t("stk.day", { i: i + 1, n: days, ok: saved }));
 
         const sr = await sessionRequest("POST", `https://www.duolingo.com/2017-06-30/sessions`, {
           challengeTypes: CHALLENGE_TYPES,
@@ -6297,7 +6592,7 @@
           type: "GLOBAL_PRACTICE",
         });
         if (sr.status !== 200 || !sr.body || !sr.body.id) {
-          setStreakStatus(`Ошибка создания сессии (HTTP ${sr.status}), пауза…`);
+          setStreakStatus(t("stk.sessionErr", { code: sr.status }));
           await new Promise((r) => setTimeout(r, 2500));
           continue;
         }
@@ -6327,15 +6622,15 @@
         );
         if (pr.status === 200) {
           saved++;
-          setStreakStatus(`+${saved} дн. (из ${days})`);
+          setStreakStatus(t("stk.partial", { ok: saved, n: days }));
         }
         await new Promise((r) => setTimeout(r, 400 + Math.floor(Math.random() * 400)));
       }
-      setStreakStatus(`Готово: +${saved} дн.`);
-      showToast(saved ? "✓ Streak накручен на " + saved : "Не удалось накрутить");
+      setStreakStatus(t("stk.done", { ok: saved }));
+      showToast(saved ? t("stk.toast", { n: saved }) : t("stk.failToast"));
     } catch (e) {
-      setStreakStatus("Ошибка: " + (e && e.message));
-      showToast("Ошибка streak", true);
+      setStreakStatus(t("f.error", { msg: e && e.message }));
+      showToast(t("stk.error"), true);
     } finally {
       streakRunning = false;
       if (els.streakRun) els.streakRun.disabled = false;
@@ -6344,7 +6639,7 @@
 
   function stopStreakFarm() {
     streakRunning = false;
-    showToast("Накрутка streak остановлена");
+    showToast(t("stk.stopped"));
   }
 
   // ========== League ==========
@@ -6393,7 +6688,7 @@
 
   async function fetchLeaderboard() {
     const myId = getMyId();
-    if (!myId) throw new Error("Не выполнен вход");
+    if (!myId) throw new Error(t("f.notLoggedIn"));
     const res = await lbFetch(
       "GET",
       `${LB_BASE}/users/${myId}?client_unlocked=true&get_reactions=true&_=${Date.now()}`,
@@ -6418,7 +6713,7 @@
     els.lbList.innerHTML = "";
     const rankings = ((data && data.cohort && data.cohort.rankings) || []).slice();
     if (!rankings.length) {
-      els.lbList.innerHTML = '<div class="dh-muted">Нет данных — возможно, ты не в лиге</div>';
+      els.lbList.innerHTML = `<div class="dh-muted">${t("lb.noData")}</div>`;
       return;
     }
     const myId = String(getMyId() || "");
@@ -6438,7 +6733,7 @@
       const rankTxt = medal || (i + 1);
       let gapHtml = "";
       if (me) {
-        gapHtml = '<span class="gap">ты</span>';
+        gapHtml = `<span class="gap">${t("lb.you")}</span>`;
       } else {
         const g = gap > 0 ? "+" + gap : String(gap);
         const cls = gap > 0 ? "up" : gap < 0 ? "down" : "";
@@ -6454,28 +6749,32 @@
 
     const prom = rankings.slice(0, 10).some((u) => String(u.user_id) === myId);
     setLbStatus(
-      `${tierName} · моё место: ${myRankIdx >= 0 ? myRankIdx + 1 : "—"} · XP: ${myScore}${
-        data && data.is_promoted ? " · повышение" : ""
-      }${data && data.is_demoted ? " · понижение" : ""}`,
+      t("lb.summary", {
+        tier: tierName,
+        rank: myRankIdx >= 0 ? myRankIdx + 1 : "—",
+        xp: myScore,
+      }) +
+        (data && data.is_promoted ? t("lb.promo") : "") +
+        (data && data.is_demoted ? t("lb.demo") : ""),
     );
   }
 
   async function loadLeague() {
     const btn = els.lbLoad;
     if (btn) btn.disabled = true;
-    setLbStatus("Загрузка лиги…");
+    setLbStatus(t("lb.loading"));
     try {
       const data = await fetchLeaderboard();
       if (!data) {
-        setLbStatus("Нет активной лиги");
+        setLbStatus(t("lb.noLeague"));
         els.lbList.innerHTML =
-          '<div class="dh-muted">Не в лиге или нет данных</div>';
+          `<div class="dh-muted">${t("lb.notIn")}</div>`;
         return;
       }
       renderLeaderboard(data);
     } catch (e) {
-      setLbStatus("Ошибка: " + (e && e.message));
-      showToast("Ошибка загрузки лиги", true);
+      setLbStatus(t("f.error", { msg: e && e.message }));
+      showToast(t("lb.error"), true);
     } finally {
       if (btn) btn.disabled = false;
     }
@@ -6484,7 +6783,7 @@
   async function joinLeague() {
     const btn = els.lbJoin;
     if (btn) btn.disabled = true;
-    setLbStatus("Вступление в лигу…");
+    setLbStatus(t("lb.joining"));
     try {
       const myId = getMyId();
       // если social выключен — временно включаем
@@ -6525,12 +6824,12 @@
           { DISABLE_SOCIAL: true },
         );
       }
-      setLbStatus("Проверь таблицу лиги");
-      showToast("Запрос на вступление отправлен");
+      setLbStatus(t("lb.checkTable"));
+      showToast(t("lb.joinSent"));
       await loadLeague();
     } catch (e) {
-      setLbStatus("Ошибка: " + (e && e.message));
-      showToast("Не удалось вступить в лигу", true);
+      setLbStatus(t("f.error", { msg: e && e.message }));
+      showToast(t("lb.joinFailed"), true);
     } finally {
       if (btn) btn.disabled = false;
     }
@@ -6544,7 +6843,7 @@
     );
     lbRunning = true;
     if (els.lbFarm) els.lbFarm.disabled = true;
-    setLbStatus("Фарм до места #" + targetRank + "…");
+    setLbStatus(t("lb.farmTo", { n: targetRank }));
 
     try {
       let joins = 0;
@@ -6554,12 +6853,12 @@
         if (!data) {
           if (joins < 3) {
             joins++;
-            setLbStatus("Нет лиги — пробую вступить…");
+            setLbStatus(t("lb.noLeagueJoin"));
             await joinLeague();
             await new Promise((r) => setTimeout(r, 3000));
             continue;
           }
-          setLbStatus("Не удалось попасть в лигу");
+          setLbStatus(t("lb.joinMiss"));
           break;
         }
         fails = 0;
@@ -6578,13 +6877,13 @@
 
         renderLeaderboard(data);
         if (me && (myScore >= targetScore || (myRank > 0 && myRank <= targetRank))) {
-          setLbStatus("Цель достигнута: #" + myRank);
-          showToast("🏆 Место #" + myRank);
+          setLbStatus(t("lb.goal", { n: myRank }));
+          showToast(t("lb.goalToast", { n: myRank }));
           break;
         }
 
         setLbStatus(
-          `Фарм… место ${myRank || "—"}, цель ${targetScore} XP (сейчас ${myScore})`,
+          t("lb.farmProgress", { rank: myRank || "—", target: targetScore, score: myScore }),
         );
         // накрутка XP через stories
         const langs = await getMeLanguages();
@@ -6620,7 +6919,7 @@
         if (res.status !== 200) {
           fails++;
           if (fails >= 5) {
-            setLbStatus("Слишком много ошибок, стоп");
+            setLbStatus(t("lb.tooManyErrors"));
             break;
           }
           await new Promise((r) => setTimeout(r, 2500));
@@ -6628,7 +6927,7 @@
         await new Promise((r) => setTimeout(r, 500 + Math.floor(Math.random() * 500)));
       }
     } catch (e) {
-      setLbStatus("Ошибка: " + (e && e.message));
+      setLbStatus(t("f.error", { msg: e && e.message }));
     } finally {
       lbRunning = false;
       if (els.lbFarm) els.lbFarm.disabled = false;
@@ -6637,7 +6936,7 @@
 
   function stopLeagueFarm() {
     lbRunning = false;
-    showToast("Фарм лиги остановлен");
+    showToast(t("lb.farmStopped"));
   }
 
   // ========== Список друзей ==========
@@ -9005,7 +9304,7 @@ function savePage() {
     }
     setXpStatus(
       on
-        ? "фейк-буст: x2 · " + (DATA.settings.xpBoostMins || 15) + " мин"
+        ? t("xp.boostStatus", { n: DATA.settings.xpBoostMins || 15 })
         : "",
     );
   }
@@ -9191,7 +9490,7 @@ function savePage() {
     xpRunning = true;
     if (els.xpStories) els.xpStories.disabled = true;
     if (els.xpSessions) els.xpSessions.disabled = true;
-    setXpStatus(`Накрутка (${mode})… 0 / ${target}`);
+    setXpStatus(t("xp.start", { mode, target }));
 
     const langs = await getMeLanguages();
     const myId = getMyId();
@@ -9305,22 +9604,22 @@ function savePage() {
         if (got > 0) {
           earned += got;
           fails = 0;
-          setXpStatus(`+${earned} XP (цель ${target})`);
+          setXpStatus(t("xp.progress", { earned, target }));
         } else {
           fails++;
           if (fails >= 5) {
-            setXpStatus("Слишком много ошибок, стоп");
+            setXpStatus(t("xp.tooManyErrors"));
             break;
           }
           await new Promise((r) => setTimeout(r, 1500));
         }
         await new Promise((r) => setTimeout(r, 350 + Math.floor(Math.random() * 350)));
       }
-      setXpStatus(earned ? `Готово: +${earned} XP` : "Ничего не начислено");
-      showToast(earned ? "✓ +" + earned + " XP" : "XP не начислены", !earned);
+      setXpStatus(earned ? t("xp.done", { n: earned }) : t("xp.nothing"));
+      showToast(earned ? t("xp.toast", { n: earned }) : t("xp.nothingToast"), !earned);
     } catch (e) {
-      setXpStatus("Ошибка: " + (e && e.message));
-      showToast("Ошибка накрутки XP", true);
+      setXpStatus(t("f.error", { msg: e && e.message }));
+      showToast(t("xp.error"), true);
     } finally {
       xpRunning = false;
       if (els.xpStories) els.xpStories.disabled = false;
@@ -9330,7 +9629,7 @@ function savePage() {
 
   function stopXpFarm() {
     xpRunning = false;
-    showToast("Накрутка XP остановлена");
+    showToast(t("xp.stopped"));
   }
 
   // ========== Confirm dialog ==========
@@ -11246,8 +11545,8 @@ function savePage() {
         syncHeartsFlag();
         showToast(
           DATA.settings.protectHearts
-            ? "Защита сердец включена"
-            : "Защита сердец выключена",
+            ? t("heart.on")
+            : t("heart.off"),
         );
       });
     }
@@ -11259,8 +11558,8 @@ function savePage() {
         syncLessonFlags();
         showToast(
           DATA.settings.lessonShortener
-            ? "Короткие уроки включены"
-            : "Короткие уроки выключены",
+            ? t("lesson.on")
+            : t("lesson.off"),
         );
       });
     }
@@ -11271,8 +11570,8 @@ function savePage() {
         syncLessonFlags();
         showToast(
           DATA.settings.autoSolver
-            ? "Автосолвер включён"
-            : "Автосолвер выключен",
+            ? t("lesson.solverOn")
+            : t("lesson.solverOff"),
         );
       });
     }
@@ -11283,8 +11582,8 @@ function savePage() {
         syncLessonFlags();
         showToast(
           DATA.settings.storiesShortener
-            ? "Короткие stories включены"
-            : "Короткие stories выключены",
+            ? t("lesson.storiesOn")
+            : t("lesson.storiesOff"),
         );
       });
     }
