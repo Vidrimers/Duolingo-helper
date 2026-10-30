@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Duolingo Helper
 // @namespace    https://github.com/Vidrimers/Duolingo-helper
-// @version      0.11.4
+// @version      0.11.5
 // @description  Проверка взаимной подписки на профилях Duolingo. Панель, бейджи, кеш.
 // @author       Vidrimers
 // @match        *://*.duolingo.com/*
@@ -503,6 +503,94 @@
       "exp.save": "💾 Сохранить страницу",
       "exp.print": "🖨 Печать",
       "exp.footer": "Создано Duolingo Helper · Лицензия CC BY-NC-ND 4.0",
+      // «Настройки»
+      "set.auto": "Автопроверка на профиле",
+      "set.autoDesc": "Сам проверять подписку при открытии профиля",
+      "set.badge": "Показывать бейдж",
+      "set.badgeDesc": "Плашка рядом с именем на профиле",
+      "set.startState": "Стартовое состояние",
+      "set.startStateDesc": "Как показывать окно при заходе на Duolingo",
+      "set.start.remember": "Помнить последнее",
+      "set.start.closed": "Закрыто",
+      "set.start.min": "Свёрнуто",
+      "set.start.open": "Раскрыто",
+      "set.theme": "Тема окна",
+      "set.cache": "Кеш (минут)",
+      "set.cacheDesc": "Не перезапрашивать API, пока результат свежий",
+      "set.delay": "Задержка между запросами (мс)",
+      "set.delayDesc": "Чтобы не словить rate limit",
+      "set.inactive": "Неактивные, дней",
+      "set.inactiveDesc": "Порог для фильтра «Неактивные»",
+      "set.notify": "Уведомления, сек",
+      "set.notifyDesc": "Через сколько пропадают (1–30)",
+      "set.lbgap": "Обновление рейтинга, сек",
+      "set.lbgapDesc": "Как часто обновляются разрывы XP на странице рейтингов (leaderboard) (1–60)",
+      "set.version": "Версия скрипта",
+      "set.checkUpdate": "🔍 Проверить обновления",
+      "set.checkUpdateFail": "Не удалось проверить обновления",
+      "set.resetPos": "Сбросить позицию окна",
+      "set.resetPosDesc": "Вернуть окно в место по умолчанию",
+      "set.resetBtn": "Сброс",
+      "set.posReset": "Позиция окна сброшена",
+      "set.clearCache": "Очистить кеш",
+      "set.clearCacheDesc": "Удалить сохранённые результаты проверок",
+      "set.clearBtn": "Очистить",
+      "set.cacheCleared": "Кеш очищен",
+      "set.data": "Данные",
+      "set.dataDesc": "Экспорт / импорт локальных данных скрипта",
+      "set.exportBtn": "📥 Экспорт",
+      "set.importBtn": "📤 Импорт",
+      "set.cloud": "Облачные сохранения",
+      "set.cloudHint": "Бэкап на сервере бота · один на аккаунт",
+      "set.cloudSave": "☁️ Сохранить",
+      "set.cloudLoad": "📥 Восстановить",
+      "set.cloudDelete": "🗑 Удалить",
+      "set.needTg": "Сначала привяжите Telegram",
+      "set.startStateToast": "Стартовое состояние: {v}",
+      // экспорт / импорт
+      "data.exportTitle": "Экспорт данных",
+      "data.accounts": "Аккаунты:",
+      "data.current": " — текущий",
+      "data.fieldsLine": "<strong>Данные:</strong> настройки, кеш, история, исключения, блоки, метки, изменения, позиция окна",
+      "data.includeJwt": "Включить JWT аккаунтов",
+      "data.encrypt": "Шифровать паролем",
+      "data.password": "Пароль",
+      "data.repeat": "Повтор",
+      "data.jwtWarning": "⚠️ JWT без шифрования — не передавайте файл другим.",
+      "data.download": "Скачать",
+      "data.pwMismatch": "Пароли не совпадают или пустые",
+      "data.pickAccount": "Выбери хотя бы один аккаунт",
+      "data.exported": "✓ Экспорт: {n} акк.",
+      "data.importTitle": "Импорт данных",
+      "data.foreignFile": "Файл от другого аккаунта ({name} · id {id}).\nЗагрузить в текущий ({cur})?",
+      "data.importCancelled": "Импорт отменён",
+      "data.imported": "✓ Данные импортированы",
+      "data.importedN": "✓ Импортировано {n} акк.",
+      "data.importedNw": "✓ Импортировано {n} акк., {e} JWT не расшифрованы",
+      "data.importJsonError": "Ошибка импорта: неверный JSON",
+      "data.readError": "Не удалось прочитать файл",
+      "data.noAccounts": "Файл не содержит аккаунтов",
+      "data.pwPrompt": "Введите пароль для расшифровки JWT",
+      "data.jwtPlain": "Файл содержит JWT без шифрования. Продолжить импорт?",
+      // облачные сохранения
+      "cloud.title": "Облачное сохранение",
+      "cloud.needTg": "Сначала привяжите Telegram",
+      "cloud.statusNeedTg": "Привяжите Telegram, чтобы сохранять в облаке",
+      "cloud.lastBackup": "Последний бэкап: {t}",
+      "cloud.noBackups": "Бэкапов пока нет · один на аккаунт",
+      "cloud.saveConfirm": "Сохранить данные в облако?",
+      "cloud.saveConfirmOverwrite": "Сохранить данные в облако? Существующий бэкап будет перезаписан (сейчас там от {t}).",
+      "cloud.saving": "Сохраняю в облако…",
+      "cloud.saved": "✓ Бэкап сохранён в облаке",
+      "cloud.saveError": "Ошибка сохранения: {e}",
+      "cloud.loadConfirm": "Восстановить бэкап от {t}? Данные аккаунтов из бэкапа заменят текущие.",
+      "cloud.loadError": "Ошибка загрузки: {e}",
+      "cloud.noBackupToast": "В облаке пока нет бэкапа",
+      "cloud.deleteConfirm": "Удалить облачный бэкап? Это действие нельзя отменить.",
+      "cloud.deleting": "Удаляю бэкап…",
+      "cloud.deleted": "✓ Бэкап удалён",
+      "cloud.deleteError": "Ошибка удаления: {e}",
+      "cloud.serverDown": "сервер недоступен",
     },
     en: {
       "lang.changed": "Interface language changed",
@@ -937,6 +1025,94 @@
       "exp.save": "💾 Save page",
       "exp.print": "🖨 Print",
       "exp.footer": "Made with Duolingo Helper · CC BY-NC-ND 4.0 license",
+      // Settings
+      "set.auto": "Auto-check on profile",
+      "set.autoDesc": "Check the follow-back automatically when opening a profile",
+      "set.badge": "Show badge",
+      "set.badgeDesc": "A badge next to the name on the profile",
+      "set.startState": "Start state",
+      "set.startStateDesc": "How to show the window when opening Duolingo",
+      "set.start.remember": "Remember last",
+      "set.start.closed": "Closed",
+      "set.start.min": "Minimized",
+      "set.start.open": "Open",
+      "set.theme": "Window theme",
+      "set.cache": "Cache (minutes)",
+      "set.cacheDesc": "Don't re-request the API while the result is fresh",
+      "set.delay": "Delay between requests (ms)",
+      "set.delayDesc": "To avoid hitting the rate limit",
+      "set.inactive": "Inactive, days",
+      "set.inactiveDesc": "Threshold for the \"Inactive\" filter",
+      "set.notify": "Notifications, sec",
+      "set.notifyDesc": "How long they stay visible (1–30)",
+      "set.lbgap": "Leaderboard refresh, sec",
+      "set.lbgapDesc": "How often XP gaps refresh on leaderboard pages (1–60)",
+      "set.version": "Script version",
+      "set.checkUpdate": "🔍 Check for updates",
+      "set.checkUpdateFail": "Couldn't check for updates",
+      "set.resetPos": "Reset window position",
+      "set.resetPosDesc": "Return the window to its default place",
+      "set.resetBtn": "Reset",
+      "set.posReset": "Window position reset",
+      "set.clearCache": "Clear cache",
+      "set.clearCacheDesc": "Delete saved check results",
+      "set.clearBtn": "Clear",
+      "set.cacheCleared": "Cache cleared",
+      "set.data": "Data",
+      "set.dataDesc": "Export / import of the script's local data",
+      "set.exportBtn": "📥 Export",
+      "set.importBtn": "📤 Import",
+      "set.cloud": "Cloud saves",
+      "set.cloudHint": "Backup on the bot's server · one per account",
+      "set.cloudSave": "☁️ Save",
+      "set.cloudLoad": "📥 Restore",
+      "set.cloudDelete": "🗑 Delete",
+      "set.needTg": "Link Telegram first",
+      "set.startStateToast": "Start state: {v}",
+      // export / import
+      "data.exportTitle": "Export data",
+      "data.accounts": "Accounts:",
+      "data.current": " — current",
+      "data.fieldsLine": "<strong>Data:</strong> settings, cache, history, exceptions, blocks, tags, changes, window position",
+      "data.includeJwt": "Include account JWTs",
+      "data.encrypt": "Encrypt with a password",
+      "data.password": "Password",
+      "data.repeat": "Repeat",
+      "data.jwtWarning": "⚠️ Unencrypted JWT — don't share the file with others.",
+      "data.download": "Download",
+      "data.pwMismatch": "Passwords don't match or are empty",
+      "data.pickAccount": "Pick at least one account",
+      "data.exported": "✓ Export: {n} acc.",
+      "data.importTitle": "Import data",
+      "data.foreignFile": "The file is from another account ({name} · id {id}).\nLoad into the current one ({cur})?",
+      "data.importCancelled": "Import cancelled",
+      "data.imported": "✓ Data imported",
+      "data.importedN": "✓ Imported: {n} acc.",
+      "data.importedNw": "✓ Imported: {n} acc., {e} JWTs not decrypted",
+      "data.importJsonError": "Import failed: invalid JSON",
+      "data.readError": "Couldn't read the file",
+      "data.noAccounts": "The file contains no accounts",
+      "data.pwPrompt": "Enter the password to decrypt the JWT",
+      "data.jwtPlain": "The file contains unencrypted JWTs. Continue the import?",
+      // cloud saves
+      "cloud.title": "Cloud save",
+      "cloud.needTg": "Link Telegram first",
+      "cloud.statusNeedTg": "Link Telegram to save to the cloud",
+      "cloud.lastBackup": "Last backup: {t}",
+      "cloud.noBackups": "No backups yet · one per account",
+      "cloud.saveConfirm": "Save data to the cloud?",
+      "cloud.saveConfirmOverwrite": "Save data to the cloud? The existing backup will be overwritten (currently from {t}).",
+      "cloud.saving": "Saving to the cloud…",
+      "cloud.saved": "✓ Backup saved to the cloud",
+      "cloud.saveError": "Save failed: {e}",
+      "cloud.loadConfirm": "Restore the backup from {t}? Account data from the backup will replace the current data.",
+      "cloud.loadError": "Load failed: {e}",
+      "cloud.noBackupToast": "There is no backup in the cloud yet",
+      "cloud.deleteConfirm": "Delete the cloud backup? This action can't be undone.",
+      "cloud.deleting": "Deleting the backup…",
+      "cloud.deleted": "✓ Backup deleted",
+      "cloud.deleteError": "Delete failed: {e}",
+      "cloud.serverDown": "server unavailable",
     },
   };
 
@@ -4567,36 +4743,36 @@
             <div class="dh-tab-content" data-tab="settings">
                 <div class="dh-setting-row">
                     <div class="dh-setting-label">
-                        Автопроверка на профиле
-                        <small>Сам проверять подписку при открытии профиля</small>
+                        ${t("set.auto")}
+                        <small>${t("set.autoDesc")}</small>
                     </div>
                     <div class="dh-switch" id="dh-set-auto"></div>
                 </div>
                 <div class="dh-setting-row">
                     <div class="dh-setting-label">
-                        Показывать бейдж
-                        <small>Плашка рядом с именем на профиле</small>
+                        ${t("set.badge")}
+                        <small>${t("set.badgeDesc")}</small>
                     </div>
                     <div class="dh-switch" id="dh-set-badge"></div>
                 </div>
                 <div class="dh-setting-row">
                     <div class="dh-setting-label">
-                        Стартовое состояние
-                        <small>Как показывать окно при заходе на Duolingo</small>
+                        ${t("set.startState")}
+                        <small>${t("set.startStateDesc")}</small>
                     </div>
                     <div class="dh-select" id="dh-set-start" style="width:160px;flex:0 0 160px">
-                        <span class="dh-select-text">Помнить последнее</span><span class="dh-select-arrow">▾</span>
+                        <span class="dh-select-text">${t("set.start.remember")}</span><span class="dh-select-arrow">▾</span>
                         <div class="dh-select-options">
-                            <div class="dh-select-option" data-start="remember">Помнить последнее</div>
-                            <div class="dh-select-option" data-start="closed">Закрыто</div>
-                            <div class="dh-select-option" data-start="min">Свёрнуто</div>
-                            <div class="dh-select-option" data-start="open">Раскрыто</div>
+                            <div class="dh-select-option" data-start="remember">${t("set.start.remember")}</div>
+                            <div class="dh-select-option" data-start="closed">${t("set.start.closed")}</div>
+                            <div class="dh-select-option" data-start="min">${t("set.start.min")}</div>
+                            <div class="dh-select-option" data-start="open">${t("set.start.open")}</div>
                         </div>
                     </div>
                 </div>
                 <div class="dh-setting-row">
                     <div class="dh-setting-label">
-                        Тема окна
+                        ${t("set.theme")}
                     </div>
                     <div class="dh-select" id="dh-set-theme" style="width:160px;flex:0 0 160px">
                         <span class="dh-select-text">Win95</span><span class="dh-select-arrow">▾</span>
@@ -4629,79 +4805,79 @@
                 </div>
                 <div class="dh-setting-row">
                     <div class="dh-setting-label">
-                        Кеш (минут)
-                        <small>Не перезапрашивать API, пока результат свежий</small>
+                        ${t("set.cache")}
+                        <small>${t("set.cacheDesc")}</small>
                     </div>
                     <input class="dh-num-input" id="dh-set-cache" type="number" min="1" max="1440" />
                 </div>
                 <div class="dh-setting-row">
                     <div class="dh-setting-label">
-                        Задержка между запросами (мс)
-                        <small>Чтобы не словить rate limit</small>
+                        ${t("set.delay")}
+                        <small>${t("set.delayDesc")}</small>
                     </div>
                     <input class="dh-num-input" id="dh-set-delay" type="number" min="0" max="5000" step="50" />
                 </div>
                 <div class="dh-setting-row">
                     <div class="dh-setting-label">
-                        Неактивные, дней
-                        <small>Порог для фильтра «Неактивные»</small>
+                        ${t("set.inactive")}
+                        <small>${t("set.inactiveDesc")}</small>
                     </div>
                     <input class="dh-num-input" id="dh-set-inactive" type="number" min="1" max="365" />
                 </div>
                 <div class="dh-setting-row">
                     <div class="dh-setting-label">
-                        Уведомления, сек
-                        <small>Через сколько пропадают (1–30)</small>
+                        ${t("set.notify")}
+                        <small>${t("set.notifyDesc")}</small>
                     </div>
                     <input class="dh-num-input" id="dh-set-notify" type="number" min="1" max="30" />
                 </div>
                 <div class="dh-setting-row">
                     <div class="dh-setting-label">
-                        Обновление рейтинга, сек
-                        <small>Как часто обновляются разрывы XP на странице рейтингов (leaderboard) (1–60)</small>
+                        ${t("set.lbgap")}
+                        <small>${t("set.lbgapDesc")}</small>
                     </div>
                     <input class="dh-num-input" id="dh-set-lbgap" type="number" min="1" max="60" />
                 </div>
                 <div class="dh-setting-row">
                     <div class="dh-setting-label">
-                        Версия скрипта
+                        ${t("set.version")}
                         <small id="dh-current-version">…</small>
                     </div>
-                    <button class="dh-btn" id="dh-check-update" style="padding:5px 10px;font-size:11px">🔍 Проверить обновления</button>
+                    <button class="dh-btn" id="dh-check-update" style="padding:5px 10px;font-size:11px">${t("set.checkUpdate")}</button>
                 </div>
                 <div class="dh-setting-row">
                     <div class="dh-setting-label">
-                        Сбросить позицию окна
-                        <small>Вернуть окно в место по умолчанию</small>
+                        ${t("set.resetPos")}
+                        <small>${t("set.resetPosDesc")}</small>
                     </div>
-                    <button class="dh-btn" id="dh-reset-pos" style="padding:5px 10px;font-size:11px">Сброс</button>
+                    <button class="dh-btn" id="dh-reset-pos" style="padding:5px 10px;font-size:11px">${t("set.resetBtn")}</button>
                 </div>
                 <div class="dh-setting-row">
                     <div class="dh-setting-label">
-                        Очистить кеш
-                        <small>Удалить сохранённые результаты проверок</small>
+                        ${t("set.clearCache")}
+                        <small>${t("set.clearCacheDesc")}</small>
                     </div>
-                    <button class="dh-btn dh-btn-danger" id="dh-clear-cache" style="padding:5px 10px;font-size:11px">Очистить</button>
+                    <button class="dh-btn dh-btn-danger" id="dh-clear-cache" style="padding:5px 10px;font-size:11px">${t("set.clearBtn")}</button>
                 </div>
                 <div class="dh-setting-row" style="border-bottom:none">
                     <div class="dh-setting-label">
-                        Данные
-                        <small>Экспорт / импорт локальных данных скрипта</small>
+                        ${t("set.data")}
+                        <small>${t("set.dataDesc")}</small>
                     </div>
                     <div class="dh-row" style="gap:6px">
-                        <button class="dh-btn" id="dh-export" style="padding:5px 10px;font-size:11px">📥 Экспорт</button>
-                        <button class="dh-btn" id="dh-import" style="padding:5px 10px;font-size:11px">📤 Импорт</button>
+                        <button class="dh-btn" id="dh-export" style="padding:5px 10px;font-size:11px">${t("set.exportBtn")}</button>
+                        <button class="dh-btn" id="dh-import" style="padding:5px 10px;font-size:11px">${t("set.importBtn")}</button>
                     </div>
                 </div>
                 <div class="dh-setting-row" style="border-bottom:none">
                     <div class="dh-setting-label">
-                        Облачные сохранения
-                        <small id="dh-cloud-status">Бэкап на сервере бота · один на аккаунт</small>
+                        ${t("set.cloud")}
+                        <small id="dh-cloud-status">${t("set.cloudHint")}</small>
                     </div>
                     <div class="dh-row" style="gap:6px;flex-wrap:wrap">
-                        <button class="dh-btn" id="dh-cloud-save" style="padding:5px 10px;font-size:11px" title="Сначала привяжите Telegram">☁️ Сохранить</button>
-                        <button class="dh-btn" id="dh-cloud-load" style="padding:5px 10px;font-size:11px" title="Сначала привяжите Telegram">📥 Восстановить</button>
-                        <button class="dh-btn" id="dh-cloud-delete" style="padding:5px 10px;font-size:11px" title="Сначала привяжите Telegram">🗑 Удалить</button>
+                        <button class="dh-btn" id="dh-cloud-save" style="padding:5px 10px;font-size:11px" title="${t("set.needTg")}">${t("set.cloudSave")}</button>
+                        <button class="dh-btn" id="dh-cloud-load" style="padding:5px 10px;font-size:11px" title="${t("set.needTg")}">${t("set.cloudLoad")}</button>
+                        <button class="dh-btn" id="dh-cloud-delete" style="padding:5px 10px;font-size:11px" title="${t("set.needTg")}">${t("set.cloudDelete")}</button>
                     </div>
                 </div>
             </div>
@@ -7144,10 +7320,10 @@
 
   /** Метки стартового состояния (нужны и в syncSwitches, и в bindEvents). */
   const startLabels = {
-    remember: "Помнить последнее",
-    closed: "Закрыто",
-    min: "Свёрнуто",
-    open: "Раскрыто",
+    remember: t("set.start.remember"),
+    closed: t("set.start.closed"),
+    min: t("set.start.min"),
+    open: t("set.start.open"),
   };
 
   /** Синхронизирует тумблеры и числовые поля с DATA.settings. */
@@ -11015,10 +11191,10 @@ function savePage() {
           } else if (result === "current") {
             showToast("✓ Обновлений нет, версия актуальна");
           } else {
-            showToast("Не удалось проверить обновления", true);
+            showToast(t("set.checkUpdateFail"), true);
           }
         } finally {
-          btn.textContent = "🔍 Проверить обновления";
+          btn.textContent = t("set.checkUpdate");
           btn.disabled = false;
         }
       });
@@ -11382,14 +11558,14 @@ function savePage() {
     overlay.className = "dh-confirm-overlay dh-theme-" + theme;
     overlay.innerHTML = `
       <div class="dh-confirm-box" style="width:420px">
-        <div class="dh-confirm-title">Экспорт данных</div>
+        <div class="dh-confirm-title">${t("data.exportTitle")}</div>
         <div class="dh-confirm-body" style="max-height:55vh;overflow-y:auto;line-height:1.5">
-          <div style="margin-bottom:10px"><strong>Аккаунты:</strong></div>
+          <div style="margin-bottom:10px"><strong>${t("data.accounts")}</strong></div>
           <div id="dh-exp-accounts" style="margin-bottom:12px;display:flex;flex-direction:column;gap:4px">
             ${accIds.map((id) => {
               const a = accounts[id];
               const name = (a.me && a.me.username) || a.username || id;
-              const me = id === curId ? " — текущий" : "";
+              const me = id === curId ? t("data.current") : "";
               return `<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px">
                 <input type="checkbox" data-exp-acc="${id}" checked style="margin:0" />
                 ${name} (${id})${me}
@@ -11397,33 +11573,33 @@ function savePage() {
             }).join("")}
           </div>
           <div style="margin-bottom:10px;font-size:11px;color:#888">
-            <strong>Данные:</strong> настройки, кеш, история, исключения, блоки, метки, изменения, позиция окна
+            ${t("data.fieldsLine")}
           </div>
           <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;margin-bottom:6px">
             <input type="checkbox" id="dh-exp-jwt" checked style="margin:0" />
-            Включить JWT аккаунтов
+            ${t("data.includeJwt")}
           </label>
           <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;margin-bottom:10px">
             <input type="checkbox" id="dh-exp-encrypt" checked style="margin:0" />
-            Шифровать паролем
+            ${t("data.encrypt")}
           </label>
           <div id="dh-exp-pass-fields">
             <div class="dh-setting-row" style="border-bottom:none;padding:3px 0">
-              <div class="dh-setting-label">Пароль</div>
+              <div class="dh-setting-label">${t("data.password")}</div>
               <input class="dh-input" id="dh-exp-pass" type="password" style="width:160px" />
             </div>
             <div class="dh-setting-row" style="border-bottom:none;padding:3px 0">
-              <div class="dh-setting-label">Повтор</div>
+              <div class="dh-setting-label">${t("data.repeat")}</div>
               <input class="dh-input" id="dh-exp-pass2" type="password" style="width:160px" />
             </div>
           </div>
           <div id="dh-exp-warn" style="display:none;font-size:11px;color:#c0392b;margin-top:6px">
-            ⚠️ JWT без шифрования — не передавайте файл другим.
+            ${t("data.jwtWarning")}
           </div>
         </div>
         <div class="dh-confirm-actions">
-          <button class="dh-btn" data-exp="cancel">Отмена</button>
-          <button class="dh-btn dh-btn-primary" data-exp="download">Скачать</button>
+          <button class="dh-btn" data-exp="cancel">${t("ui.cancel")}</button>
+          <button class="dh-btn dh-btn-primary" data-exp="download">${t("data.download")}</button>
         </div>
       </div>`;
     shadow.appendChild(overlay);
@@ -11456,7 +11632,7 @@ function savePage() {
         password = (overlay.querySelector("#dh-exp-pass") || {}).value || "";
         const pass2 = (overlay.querySelector("#dh-exp-pass2") || {}).value || "";
         if (!password || password !== pass2) {
-          showToast("Пароли не совпадают или пустые", true);
+          showToast(t("data.pwMismatch"), true);
           return;
         }
       }
@@ -11466,7 +11642,7 @@ function savePage() {
         if (cb.checked) selected.push(cb.dataset.expAcc);
       });
       if (!selected.length) {
-        showToast("Выбери хотя бы один аккаунт", true);
+        showToast(t("data.pickAccount"), true);
         return;
       }
 
@@ -11496,7 +11672,7 @@ function savePage() {
       aEl.click();
       setTimeout(() => URL.revokeObjectURL(aEl.href), 1000);
       close();
-      showToast("✓ Экспорт: " + outAccounts.length + " акк.");
+      showToast(t("data.exported", { n: outAccounts.length }));
     });
   }
 
@@ -11544,7 +11720,7 @@ function savePage() {
         DATA.settings.winPos = null;
         saveData();
         applyWinPos();
-        showToast("Позиция окна сброшена");
+        showToast(t("set.posReset"));
       });
     }
 
@@ -11668,7 +11844,7 @@ function savePage() {
             saveData();
             syncSwitches();
             els.setStart.classList.remove("open");
-            showToast("Стартовое состояние: " + startLabels[DATA.settings.startState]);
+            showToast(t("set.startStateToast", { v: startLabels[DATA.settings.startState] }));
           });
         });
       }
@@ -12074,7 +12250,7 @@ function savePage() {
     els.clearCache.addEventListener("click", () => {
       DATA.followCache = {};
       saveData();
-      showToast("Кеш очищен");
+      showToast(t("set.cacheCleared"));
     });
 
     els.refreshPage.addEventListener("click", () => location.reload());
@@ -12151,10 +12327,10 @@ function savePage() {
             const curId = currentAccountId();
             if (fileAccId && fileAccId !== curId) {
               const okGo = await showConfirm(
-                `Файл от другого аккаунта (${fileAccName || "?"} · id ${fileAccId}).\nЗагрузить в текущий (${curId})?`,
-                "Импорт данных",
+                t("data.foreignFile", { name: fileAccName || "?", id: fileAccId, cur: curId }),
+                t("data.importTitle"),
               );
-              if (!okGo) { showToast("Импорт отменён"); return; }
+              if (!okGo) { showToast(t("data.importCancelled")); return; }
             }
 
             if (incoming.settings && typeof incoming.settings === "object") {
@@ -12175,13 +12351,13 @@ function savePage() {
             updateListBadges();
             updateTagsBadge();
             updateChangesBadge();
-            showToast("✓ Данные импортированы");
+            showToast(t("data.imported"));
           } catch (e) {
             console.warn("[DuoHelper] import failed", e);
-            showToast("Ошибка импорта: неверный JSON", true);
+            showToast(t("data.importJsonError"), true);
           }
         };
-        reader.onerror = () => showToast("Не удалось прочитать файл", true);
+        reader.onerror = () => showToast(t("data.readError"), true);
         reader.readAsText(file);
       });
     }
@@ -12216,11 +12392,11 @@ function savePage() {
     const lock = () => {
       saveBtn.disabled = true;
       loadBtn.disabled = true;
-      saveBtn.title = "Сначала привяжите Telegram";
-      loadBtn.title = "Сначала привяжите Telegram";
+      saveBtn.title = t("set.needTg");
+      loadBtn.title = t("set.needTg");
       if (loadBtn) loadBtn.style.display = "";
-      if (delBtn) { delBtn.disabled = true; delBtn.title = "Сначала привяжите Telegram"; delBtn.style.display = ""; }
-      if (status) status.textContent = "Привяжите Telegram, чтобы сохранять в облаке";
+      if (delBtn) { delBtn.disabled = true; delBtn.title = t("set.needTg"); delBtn.style.display = ""; }
+      if (status) status.textContent = t("cloud.statusNeedTg");
     };
     if (!myId) { lock(); return; }
     const linked = await cloudRequest(
@@ -12248,8 +12424,8 @@ function savePage() {
     }
     if (status) {
       status.textContent = has
-        ? "Последний бэкап: " + fmtTime(meta.savedAt)
-        : "Бэкапов пока нет · один на аккаунт";
+        ? t("cloud.lastBackup", { t: fmtTime(meta.savedAt) })
+        : t("cloud.noBackups");
     }
   }
 
@@ -12257,7 +12433,7 @@ function savePage() {
   async function cloudSave() {
     const myId = getMyId();
     const jwt = getToken();
-    if (!myId || !jwt) { showToast("Сначала привяжите Telegram", true); return; }
+    if (!myId || !jwt) { showToast(t("cloud.needTg"), true); return; }
     // показываем предупреждение о перезаписи только если бэкап уже есть
     const meta = await cloudRequest(
       BOT_API + "/api/backup?duolingoUserId=" + encodeURIComponent(myId) + "&meta=1",
@@ -12265,12 +12441,12 @@ function savePage() {
     );
     const ok = await showConfirm(
       meta && meta.hasBackup
-        ? `Сохранить данные в облако? Существующий бэкап будет перезаписан (сейчас там от ${fmtTime(meta.savedAt)}).`
-        : "Сохранить данные в облако?",
-      "Облачное сохранение",
+        ? t("cloud.saveConfirmOverwrite", { t: fmtTime(meta.savedAt) })
+        : t("cloud.saveConfirm"),
+      t("cloud.title"),
     );
     if (!ok) return;
-    showToast("Сохраняю в облако…");
+    showToast(t("cloud.saving"));
     const ids = Object.keys((DATA._store && DATA._store.accounts) || {});
     const payload = {
       type: "duolingo-helper-accounts",
@@ -12285,10 +12461,10 @@ function savePage() {
       data: JSON.stringify({ duolingoUserId: myId, jwt, data: payload }),
     });
     if (res && res.ok) {
-      showToast("✓ Бэкап сохранён в облаке");
+      showToast(t("cloud.saved"));
       updateCloudBlock();
     } else {
-      showToast(res && res.error === "not linked" ? "Сначала привяжите Telegram" : "Ошибка сохранения: " + ((res && res.error) || "сервер недоступен"), true);
+      showToast(res && res.error === "not linked" ? t("cloud.needTg") : t("cloud.saveError", { e: (res && res.error) || t("cloud.serverDown") }), true);
     }
   }
 
@@ -12296,23 +12472,23 @@ function savePage() {
   async function cloudLoad() {
     const myId = getMyId();
     const jwt = getToken();
-    if (!myId || !jwt) { showToast("Сначала привяжите Telegram", true); return; }
+    if (!myId || !jwt) { showToast(t("cloud.needTg"), true); return; }
     const res = await cloudRequest(
       BOT_API + "/api/backup?duolingoUserId=" + encodeURIComponent(myId),
       { method: "GET", headers: { authorization: "Bearer " + jwt } }
     );
     if (!res || !res.ok) {
-      showToast(res && res.error === "not linked" ? "Сначала привяжите Telegram" : "Ошибка загрузки: " + ((res && res.error) || "сервер недоступен"), true);
+      showToast(res && res.error === "not linked" ? t("cloud.needTg") : t("cloud.loadError", { e: (res && res.error) || t("cloud.serverDown") }), true);
       return;
     }
     if (!res.hasBackup || !res.data) {
-      showToast("В облаке пока нет бэкапа", true);
+      showToast(t("cloud.noBackupToast"), true);
       return;
     }
     const when = res.savedAt ? fmtTime(res.savedAt) : "—";
     const ok = await showConfirm(
-      `Восстановить бэкап от ${when}? Данные аккаунтов из бэкапа заменят текущие.`,
-      "Облачное сохранение",
+      t("cloud.loadConfirm", { t: when }),
+      t("cloud.title"),
     );
     if (!ok) return;
     await importAccountsV2(res.data, { fromCloud: true });
@@ -12322,22 +12498,22 @@ function savePage() {
   async function cloudDelete() {
     const myId = getMyId();
     const jwt = getToken();
-    if (!myId || !jwt) { showToast("Сначала привяжите Telegram", true); return; }
+    if (!myId || !jwt) { showToast(t("cloud.needTg"), true); return; }
     const ok = await showConfirm(
-      "Удалить облачный бэкап? Это действие нельзя отменить.",
-      "Облачное сохранение",
+      t("cloud.deleteConfirm"),
+      t("cloud.title"),
     );
     if (!ok) return;
-    showToast("Удаляю бэкап…");
+    showToast(t("cloud.deleting"));
     const res = await cloudRequest(
       BOT_API + "/api/backup?duolingoUserId=" + encodeURIComponent(myId),
       { method: "DELETE", headers: { authorization: "Bearer " + jwt } }
     );
     if (res && res.ok) {
-      showToast("✓ Бэкап удалён");
+      showToast(t("cloud.deleted"));
       updateCloudBlock();
     } else {
-      showToast(res && res.error === "not linked" ? "Сначала привяжите Telegram" : "Ошибка удаления: " + ((res && res.error) || "сервер недоступен"), true);
+      showToast(res && res.error === "not linked" ? t("cloud.needTg") : t("cloud.deleteError", { e: (res && res.error) || t("cloud.serverDown") }), true);
     }
   }
 
@@ -12345,7 +12521,7 @@ function savePage() {
   async function importAccountsV2(parsed, opts = {}) {
     const accounts = parsed.accounts || [];
     if (!accounts.length) {
-      showToast("Файл не содержит аккаунтов", true);
+      showToast(t("data.noAccounts"), true);
       return;
     }
 
@@ -12354,17 +12530,17 @@ function savePage() {
     let password = "";
 
     if (hasEncrypted) {
-      password = await showPasswordPrompt("Введите пароль для расшифровки JWT");
+      password = await showPasswordPrompt(t("data.pwPrompt"));
       if (password === null) {
-        showToast("Импорт отменён");
+        showToast(t("data.importCancelled"));
         return;
       }
     } else if (hasPlainJwt && !opts.fromCloud) {
       const ok = await showConfirm(
-        "Файл содержит JWT без шифрования. Продолжить импорт?",
-        "Импорт данных",
+        t("data.jwtPlain"),
+        t("data.importTitle"),
       );
-      if (!ok) { showToast("Импорт отменён"); return; }
+      if (!ok) { showToast(t("data.importCancelled")); return; }
     }
 
     const store = DATA._store || {};
@@ -12420,8 +12596,8 @@ function savePage() {
     refreshUiForAccount();
     showToast(
       errors
-        ? `✓ Импортировано ${imported} акк., ${errors} JWT не расшифрованы`
-        : `✓ Импортировано ${imported} акк.`,
+        ? t("data.importedNw", { n: imported, e: errors })
+        : t("data.importedN", { n: imported }),
       errors > 0,
     );
   }
@@ -12441,7 +12617,7 @@ function savePage() {
             <input class="dh-input" id="dh-prompt-input" type="text" style="width:100%" value="${(defaultValue || "").replace(/"/g, "&quot;")}" />
           </div>
           <div class="dh-confirm-actions">
-            <button class="dh-btn" data-prompt="cancel">Отмена</button>
+            <button class="dh-btn" data-prompt="cancel">${t("ui.cancel")}</button>
             <button class="dh-btn dh-btn-primary" data-prompt="ok">OK</button>
           </div>
         </div>`;
@@ -12469,7 +12645,7 @@ function savePage() {
             <input class="dh-input" id="dh-pass-input" type="password" style="width:100%" />
           </div>
           <div class="dh-confirm-actions">
-            <button class="dh-btn" data-pass="cancel">Отмена</button>
+            <button class="dh-btn" data-pass="cancel">${t("ui.cancel")}</button>
             <button class="dh-btn dh-btn-primary" data-pass="ok">OK</button>
           </div>
         </div>`;
