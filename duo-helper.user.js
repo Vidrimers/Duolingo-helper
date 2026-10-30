@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Duolingo Helper
 // @namespace    https://github.com/Vidrimers/Duolingo-helper
-// @version      0.11.1
+// @version      0.11.2
 // @description  Проверка взаимной подписки на профилях Duolingo. Панель, бейджи, кеш.
 // @author       Vidrimers
 // @match        *://*.duolingo.com/*
@@ -111,6 +111,154 @@
       "check.noData": "Нет данных проверки",
       "check.copied": "Скопировано",
       "check.copyFailed": "Не удалось скопировать",
+      // вкладка «Друзья»
+      "friends.search": "Поиск по имени",
+      "friends.load": "Обновить",
+      "friends.history": "История",
+      "friends.exclude": "Исключения",
+      "friends.blocks": "Блоки",
+      "friends.changes": "Изменения",
+      "friends.back": "← Друзья",
+      "friends.fAll": "Все",
+      "friends.fNobody": "❌ Не подписаны",
+      "friends.fMutual": "✅ Взаимно",
+      "friends.fActivity": "📊 Активность",
+      "friends.unfAll": "Отписаться от всех",
+      "friends.unfNonf": "Отписаться от неподписанных",
+      "friends.scan": "Проверить активность",
+      "friends.stop": "Стоп",
+      "friends.unfInactive": "Отписаться от неактивных",
+      "friends.blockInactive": "Заблокировать неактивных",
+      "friends.needScan": "Сначала пройди «Проверить активность»",
+      "friends.sortXpDesc": "Больше XP",
+      "friends.sortXpAsc": "Меньше XP",
+      "friends.sortStreakDesc": "Больше дней",
+      "friends.sortStreakAsc": "Меньше дней",
+      "friends.sortNameAsc": "По имени A→Z",
+      "friends.sortNameDesc": "По имени Z→A",
+      "friends.countInactive": "Показано: {shown} · проверяется: {base} (подписки ∪ подписчики)",
+      "friends.countFollowing": "Показано: {shown} · всего: {n} подписок",
+      // исключения и блоки
+      "excl.empty": "Исключений нет",
+      "excl.count": "Исключений: {n}",
+      "excl.remove": "Убрать",
+      "excl.removed": "Убран из исключений",
+      "excl.added": "В исключениях",
+      "excl.addTitle": "В исключения (не трогать при массовых действиях)",
+      "excl.rmTitle": "Убрать из исключений",
+      "blocks.empty": "Блок-лист пуст",
+      "blocks.count": "Заблокировано: {n}",
+      "blocks.unblock": "Разблокировать",
+      "blocks.unblocked": "Разблокирован {u}",
+      "blocks.unblockFailed": "Не удалось разблокировать",
+      // история действий
+      "hist.empty": "История пуста",
+      "hist.title": "История действий",
+      "hist.clear": "Очистить",
+      "hist.clearConfirm": "Очистить всю историю действий?",
+      "hist.cleared": "История очищена",
+      "hist.undo": "Вернуть",
+      "hist.undone": "Возвращено",
+      "hist.undoFailed": "Не удалось вернуть",
+      "hist.unfNonf": "Отписка от неподписанных",
+      "hist.blockInactive": "Блокировка неактивных",
+      "hist.unfOne": "Отписка от {u}",
+      "hist.blockOne": "Блокировка {u}",
+      "hist.action": "действие",
+      // изменения
+      "chg.empty": "Изменений пока нет — обнови список друзей ещё раз, чтобы появилось сравнение",
+      "chg.unfollowedYou": "отписался от тебя",
+      "chg.followedYou": "подписался на тебя",
+      "chg.youUnfollowed": "ты отписался",
+      "chg.youBlocked": "ты заблокировал",
+      "chg.youFollowed": "ты подписался",
+      "chg.rename": "имя: {from} → {to}",
+      "chg.count": "Изменений: {n}",
+      "chg.clearConfirm": "Очистить все изменения?",
+      "chg.cleared": "Изменения очищены",
+      // массовые действия
+      "m.titleUnfNonf": "Отписка от неподписанных",
+      "m.titleUnfAll": "Отписка от всех",
+      "m.titleUnfInactive": "Отписка от неактивных",
+      "m.titleBlock": "Блокировка неактивных",
+      "m.noneNonf": "Нет «неподписанных» в списке",
+      "m.confirmNonf": "Отписаться от {n} пользователей, которые не подписаны на вас?",
+      "m.noneAll": "Нет подписок для отписки",
+      "m.confirmAll": "Отписаться от {n} пользователей? Исключения (🛡) не тронем.",
+      "m.confirmAll2": "Точно отписаться от {n} человек? Это действие нельзя отменить одной кнопкой (undo есть в «Истории»).",
+      "m.confirmTitle": "Подтверждение",
+      "m.needScan": "Сначала проверь активность",
+      "m.confirmInactive": "Отписаться от {n} неактивных подписок (порог {d} дн.)?",
+      "m.confirmBlock": "Заблокировать {n} неактивных подписок (порог {d} дн.)?",
+      "m.progressUnf": "Отписка {i}/{n}…",
+      "m.progressAll": "Отписка от всех {i}/{n}…",
+      "m.progressInactive": "Отписка от неактивных {i}/{n}…",
+      "m.progressBlock": "Блокировка {i}/{n}…",
+      "m.logNonf": "отписка от {n} неподписанных",
+      "m.logAll": "отписка от {n} пользователей",
+      "m.logInactive": "отписка от {n} неактивных",
+      "m.logBlock": "блокировка {n} неактивных",
+      "m.doneUnf": "Отписался от {ok} / {n}",
+      "m.doneAll": "Отписался от всех: {ok} / {n}",
+      "m.doneInactive": "Отписался от неактивных: {ok} / {n}",
+      "m.doneBlock": "Заблокировано: {ok} / {n}",
+      "m.toastUnf": "✓ Отписка завершена: {n}",
+      "m.toastInactive": "✓ Отписка от неактивных: {n}",
+      "m.toastBlock": "✓ Блокировка: {n}",
+      // строки списка друзей
+      "f.empty": "Пусто",
+      "f.days": "{n} дн.",
+      "f.idle0": "0 дн.",
+      "f.rowInfo": "{streak} · XP {xp} · без активности {idle}",
+      "f.tagTitle": "Метка",
+      "f.blockTitle": "Заблокировать",
+      "f.unfTitle": "Отписаться",
+      "f.unfDone": "Отписался от {u}",
+      "f.unfFailed": "Не удалось отписаться",
+      "f.blockConfirm": "Заблокировать {u}?",
+      "f.blockDone": "Заблокирован {u}",
+      "f.blockFailed": "Не удалось заблокировать",
+      "f.loading": "Загрузка друзей…",
+      "f.notLoggedIn": "Не выполнен вход",
+      "f.loadFailed": "Не удалось загрузить друзей",
+      "f.error": "Ошибка: {msg}",
+      // общий confirm-диалог
+      "ui.confirmTitle": "Подтверждение",
+      "ui.cancel": "Отмена",
+      "ui.yes": "Да",
+      // проверка активности
+      "s.scanBtnOff": "Кнопка заработает после полной проверки активности",
+      "s.sortOff": "Сортировка заработает после полной проверки активности",
+      "s.needList": "Сначала обнови список друзей",
+      "s.progress": "Проверка активности {done}/{n}…",
+      "s.done": "Проверено: {n} · неактивных: {dead} (порог {d} дн.)",
+      "s.stopped": "Проверка остановлена на {done}/{n} · неактивных: {dead}",
+      "s.toastDone": "✓ Активность проверена: {n} неактивных",
+      "s.toastStopped": "Проверка остановлена",
+      "s.toastStop": "Проверка активности остановлена",
+      // метки
+      "tags.title": "Метки",
+      "tags.forProfile": "Метка для профиля",
+      "tags.forUser": "Метка для @{u}",
+      "tags.text": "Текст",
+      "tags.color": "Цвет",
+      "tags.note": "Заметка",
+      "tags.saveBtn": "Сохранить метку",
+      "tags.people": "Люди с метками",
+      "tags.back": "← Назад",
+      "tags.editorTitle": "🏷 Метка",
+      "tags.remove": "Убрать",
+      "tags.cancel": "Отмена",
+      "tags.save": "Сохранить",
+      "tags.removed": "Метка убрана",
+      "tags.saved": "Метка сохранена",
+      "tags.empty": "Меток пока нет",
+      "tags.editTitle": "Изменить метку",
+      "tags.delTitle": "Удалить метку",
+      "tags.delConfirm": "Удалить метку с {u}?",
+      "tags.delConfirmTitle": "Удаление метки",
+      "tags.deleted": "Метка удалена",
+      "tags.needProfile": "Сначала открой профиль пользователя",
     },
     en: {
       "lang.changed": "Interface language changed",
@@ -153,6 +301,154 @@
       "check.noData": "No check data",
       "check.copied": "Copied",
       "check.copyFailed": "Couldn't copy",
+      // Friends tab
+      "friends.search": "Search by name",
+      "friends.load": "Refresh",
+      "friends.history": "History",
+      "friends.exclude": "Exceptions",
+      "friends.blocks": "Blocks",
+      "friends.changes": "Changes",
+      "friends.back": "← Friends",
+      "friends.fAll": "All",
+      "friends.fNobody": "❌ Not following back",
+      "friends.fMutual": "✅ Mutual",
+      "friends.fActivity": "📊 Activity",
+      "friends.unfAll": "Unfollow everyone",
+      "friends.unfNonf": "Unfollow non-followers",
+      "friends.scan": "Check activity",
+      "friends.stop": "Stop",
+      "friends.unfInactive": "Unfollow inactive",
+      "friends.blockInactive": "Block inactive",
+      "friends.needScan": "Run \"Check activity\" first",
+      "friends.sortXpDesc": "Most XP",
+      "friends.sortXpAsc": "Least XP",
+      "friends.sortStreakDesc": "Longest streak",
+      "friends.sortStreakAsc": "Shortest streak",
+      "friends.sortNameAsc": "Name A→Z",
+      "friends.sortNameDesc": "Name Z→A",
+      "friends.countInactive": "Shown: {shown} · scanning: {base} (following ∪ followers)",
+      "friends.countFollowing": "Shown: {shown} · total: {n} following",
+      // exceptions and blocks
+      "excl.empty": "No exceptions",
+      "excl.count": "Exceptions: {n}",
+      "excl.remove": "Remove",
+      "excl.removed": "Removed from exceptions",
+      "excl.added": "Added to exceptions",
+      "excl.addTitle": "Add to exceptions (skip in mass actions)",
+      "excl.rmTitle": "Remove from exceptions",
+      "blocks.empty": "Block list is empty",
+      "blocks.count": "Blocked: {n}",
+      "blocks.unblock": "Unblock",
+      "blocks.unblocked": "{u} unblocked",
+      "blocks.unblockFailed": "Couldn't unblock",
+      // action history
+      "hist.empty": "History is empty",
+      "hist.title": "Action history",
+      "hist.clear": "Clear",
+      "hist.clearConfirm": "Clear the entire action history?",
+      "hist.cleared": "History cleared",
+      "hist.undo": "Undo",
+      "hist.undone": "Undone",
+      "hist.undoFailed": "Couldn't undo",
+      "hist.unfNonf": "Unfollow non-followers",
+      "hist.blockInactive": "Blocking inactive",
+      "hist.unfOne": "Unfollow {u}",
+      "hist.blockOne": "Block {u}",
+      "hist.action": "action",
+      // changes
+      "chg.empty": "No changes yet — refresh the friends list again to get a comparison",
+      "chg.unfollowedYou": "unfollowed you",
+      "chg.followedYou": "followed you",
+      "chg.youUnfollowed": "you unfollowed",
+      "chg.youBlocked": "you blocked",
+      "chg.youFollowed": "you followed",
+      "chg.rename": "name: {from} → {to}",
+      "chg.count": "Changes: {n}",
+      "chg.clearConfirm": "Clear all changes?",
+      "chg.cleared": "Changes cleared",
+      // mass actions
+      "m.titleUnfNonf": "Unfollowing non-followers",
+      "m.titleUnfAll": "Unfollowing everyone",
+      "m.titleUnfInactive": "Unfollowing inactive",
+      "m.titleBlock": "Blocking inactive",
+      "m.noneNonf": "No non-followers in the list",
+      "m.confirmNonf": "Unfollow {n} users who don't follow you back?",
+      "m.noneAll": "No subscriptions to unfollow",
+      "m.confirmAll": "Unfollow {n} users? Exceptions (🛡) untouched.",
+      "m.confirmAll2": "Really unfollow {n} people? This can't be undone with one button (undo is in \"History\").",
+      "m.confirmTitle": "Confirmation",
+      "m.needScan": "Check activity first",
+      "m.confirmInactive": "Unfollow {n} inactive subscriptions (threshold {d} d.)?",
+      "m.confirmBlock": "Block {n} inactive subscriptions (threshold {d} d.)?",
+      "m.progressUnf": "Unfollowing {i}/{n}…",
+      "m.progressAll": "Unfollowing all {i}/{n}…",
+      "m.progressInactive": "Unfollowing inactive {i}/{n}…",
+      "m.progressBlock": "Blocking {i}/{n}…",
+      "m.logNonf": "unfollow {n} non-followers",
+      "m.logAll": "unfollow {n} users",
+      "m.logInactive": "unfollow {n} inactive",
+      "m.logBlock": "block {n} inactive",
+      "m.doneUnf": "Unfollowed {ok} / {n}",
+      "m.doneAll": "Unfollowed all: {ok} / {n}",
+      "m.doneInactive": "Unfollowed inactive: {ok} / {n}",
+      "m.doneBlock": "Blocked: {ok} / {n}",
+      "m.toastUnf": "✓ Unfollowing done: {n}",
+      "m.toastInactive": "✓ Inactive unfollowed: {n}",
+      "m.toastBlock": "✓ Blocking done: {n}",
+      // friend rows
+      "f.empty": "Empty",
+      "f.days": "{n} d.",
+      "f.idle0": "0 d.",
+      "f.rowInfo": "{streak} · XP {xp} · inactive {idle}",
+      "f.tagTitle": "Tag",
+      "f.blockTitle": "Block",
+      "f.unfTitle": "Unfollow",
+      "f.unfDone": "Unfollowed {u}",
+      "f.unfFailed": "Couldn't unfollow",
+      "f.blockConfirm": "Block {u}?",
+      "f.blockDone": "{u} blocked",
+      "f.blockFailed": "Couldn't block",
+      "f.loading": "Loading friends…",
+      "f.notLoggedIn": "Not logged in",
+      "f.loadFailed": "Couldn't load friends",
+      "f.error": "Error: {msg}",
+      // shared confirm dialog
+      "ui.confirmTitle": "Confirmation",
+      "ui.cancel": "Cancel",
+      "ui.yes": "Yes",
+      // activity check
+      "s.scanBtnOff": "The button works after a full activity check",
+      "s.sortOff": "Sorting works after a full activity check",
+      "s.needList": "Refresh the friends list first",
+      "s.progress": "Checking activity {done}/{n}…",
+      "s.done": "Checked: {n} · inactive: {dead} (threshold {d} d.)",
+      "s.stopped": "Check stopped at {done}/{n} · inactive: {dead}",
+      "s.toastDone": "✓ Activity checked: {n} inactive",
+      "s.toastStopped": "Check stopped",
+      "s.toastStop": "Activity check stopped",
+      // tags
+      "tags.title": "Tags",
+      "tags.forProfile": "Tag for the profile",
+      "tags.forUser": "Tag for @{u}",
+      "tags.text": "Text",
+      "tags.color": "Color",
+      "tags.note": "Note",
+      "tags.saveBtn": "Save tag",
+      "tags.people": "Tagged people",
+      "tags.back": "← Back",
+      "tags.editorTitle": "🏷 Tag",
+      "tags.remove": "Remove",
+      "tags.cancel": "Cancel",
+      "tags.save": "Save",
+      "tags.removed": "Tag removed",
+      "tags.saved": "Tag saved",
+      "tags.empty": "No tags yet",
+      "tags.editTitle": "Edit tag",
+      "tags.delTitle": "Delete tag",
+      "tags.delConfirm": "Delete the tag from {u}?",
+      "tags.delConfirmTitle": "Deleting a tag",
+      "tags.deleted": "Tag deleted",
+      "tags.needProfile": "Open a user's profile first",
     },
   };
 
@@ -3482,22 +3778,22 @@
 
                 <div class="dh-acc" data-acc>
                     <button type="button" class="dh-acc-head">
-                        <span class="dh-acc-title">Метки</span>
+                        <span class="dh-acc-title">${t("tags.title")}</span>
                         <span class="dh-acc-arrow">▾</span>
                     </button>
                     <div class="dh-acc-body"><div class="dh-acc-inner">
                         <div id="dh-tags-form">
                             <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px">
                                 <span style="font-size:16px">🏷</span>
-                                <div class="dh-muted" id="dh-tags-user" style="font-size:11px">Метка для профиля</div>
+                                <div class="dh-muted" id="dh-tags-user" style="font-size:11px">${t("tags.forProfile")}</div>
                             </div>
                             <div style="margin-bottom:8px">
-                                <div style="font-size:10px;opacity:0.6;margin-bottom:3px">Текст</div>
+                                <div style="font-size:10px;opacity:0.6;margin-bottom:3px">${t("tags.text")}</div>
                                 <input class="dh-input" id="dh-tag-label" maxlength="40" style="width:100%" />
                             </div>
                             <div style="display:flex;gap:8px;margin-bottom:10px">
                                 <div style="flex:1">
-                                    <div style="font-size:10px;opacity:0.6;margin-bottom:3px">Цвет</div>
+                                    <div style="font-size:10px;opacity:0.6;margin-bottom:3px">${t("tags.color")}</div>
                                     <input type="hidden" id="dh-tag-color" value="#58cc02" />
                                     <div id="dh-tag-palette" style="display:flex;flex-wrap:wrap;gap:5px">
                                         <button type="button" data-color="#58CC02" class="dh-swatch active" style="width:22px;height:22px;border-radius:50%;background:#58CC02;border:2px solid #fff;box-shadow:0 0 0 1.5px #58CC02;cursor:pointer;padding:0"></button>
@@ -3515,15 +3811,15 @@
                                     </div>
                                 </div>
                                 <div style="flex:1">
-                                    <div style="font-size:10px;opacity:0.6;margin-bottom:3px">Заметка</div>
+                                    <div style="font-size:10px;opacity:0.6;margin-bottom:3px">${t("tags.note")}</div>
                                     <input class="dh-input" id="dh-tag-note" maxlength="120" style="width:100%" />
                                 </div>
                             </div>
-                            <button class="dh-btn dh-btn-primary" id="dh-tag-save" style="width:100%">Сохранить метку</button>
+                            <button class="dh-btn dh-btn-primary" id="dh-tag-save" style="width:100%">${t("tags.saveBtn")}</button>
                         </div>
                         <div class="dh-row" style="margin-top:8px">
-                            <button type="button" id="dh-tags-open" style="background:none;border:none;color:#888;cursor:pointer;font:inherit;font-size:11px;padding:0;text-decoration:underline">Люди с метками<span id="dh-tags-badge" style="display:none;margin-left:3px;color:#888;font-size:11px;font-weight:400;text-decoration:none"></span></button>
-                            <button type="button" id="dh-tags-back" style="display:none;background:none;border:none;color:#888;cursor:pointer;font:inherit;font-size:11px;padding:0;text-decoration:underline">← Назад</button>
+                            <button type="button" id="dh-tags-open" style="background:none;border:none;color:#888;cursor:pointer;font:inherit;font-size:11px;padding:0;text-decoration:underline">${t("tags.people")}<span id="dh-tags-badge" style="display:none;margin-left:3px;color:#888;font-size:11px;font-weight:400;text-decoration:none"></span></button>
+                            <button type="button" id="dh-tags-back" style="display:none;background:none;border:none;color:#888;cursor:pointer;font:inherit;font-size:11px;padding:0;text-decoration:underline">${t("tags.back")}</button>
                         </div>
                         <div id="dh-tags-list" style="display:none;flex-direction:column;gap:4px;margin-top:8px;max-height:36vh;overflow-y:auto;padding-right:8px"></div>
                     </div></div>
@@ -3532,47 +3828,47 @@
 
             <div class="dh-tab-content" data-tab="friends">
                 <div class="dh-row" style="margin-bottom:4px">
-                    <input class="dh-input" id="dh-friends-search" placeholder="Поиск по имени" />
-                    <button class="dh-btn dh-btn-primary" id="dh-friends-load">Обновить</button>
+                    <input class="dh-input" id="dh-friends-search" placeholder="${t("friends.search")}" />
+                    <button class="dh-btn dh-btn-primary" id="dh-friends-load">${t("friends.load")}</button>
                 </div>
                 <div class="dh-muted" style="display:flex;gap:12px;margin-bottom:8px;font-size:11px">
-                    <button type="button" id="dh-history-open" style="background:none;border:none;color:#888;cursor:pointer;font:inherit;font-size:11px;padding:0;text-decoration:underline">История</button>
-                    <button type="button" id="dh-exclude-open" style="background:none;border:none;color:#888;cursor:pointer;font:inherit;font-size:11px;padding:0;text-decoration:underline">Исключения<span id="dh-exclude-badge" style="display:none;margin-left:3px;color:#888;font-size:11px;font-weight:400;text-decoration:none"></span></button>
-                    <button type="button" id="dh-blocks-open" style="background:none;border:none;color:#888;cursor:pointer;font:inherit;font-size:11px;padding:0;text-decoration:underline">Блоки<span id="dh-blocks-badge" style="display:none;margin-left:3px;color:#888;font-size:11px;font-weight:400;text-decoration:none"></span></button>
-                    <button type="button" id="dh-changes-open" style="background:none;border:none;color:#888;cursor:pointer;font:inherit;font-size:11px;padding:0;text-decoration:underline">Изменения<span id="dh-changes-badge" style="display:none;min-width:16px;height:16px;padding:0 4px;margin-left:4px;border-radius:8px;background:#c0392b;color:#fff;font-size:10px;font-weight:700;line-height:16px;text-align:center;vertical-align:middle;text-decoration:none"></span></button>
-                    <button type="button" id="dh-history-back" style="display:none;background:none;border:none;color:#888;cursor:pointer;font:inherit;font-size:11px;padding:0;text-decoration:underline">← Друзья</button>
+                    <button type="button" id="dh-history-open" style="background:none;border:none;color:#888;cursor:pointer;font:inherit;font-size:11px;padding:0;text-decoration:underline">${t("friends.history")}</button>
+                    <button type="button" id="dh-exclude-open" style="background:none;border:none;color:#888;cursor:pointer;font:inherit;font-size:11px;padding:0;text-decoration:underline">${t("friends.exclude")}<span id="dh-exclude-badge" style="display:none;margin-left:3px;color:#888;font-size:11px;font-weight:400;text-decoration:none"></span></button>
+                    <button type="button" id="dh-blocks-open" style="background:none;border:none;color:#888;cursor:pointer;font:inherit;font-size:11px;padding:0;text-decoration:underline">${t("friends.blocks")}<span id="dh-blocks-badge" style="display:none;margin-left:3px;color:#888;font-size:11px;font-weight:400;text-decoration:none"></span></button>
+                    <button type="button" id="dh-changes-open" style="background:none;border:none;color:#888;cursor:pointer;font:inherit;font-size:11px;padding:0;text-decoration:underline">${t("friends.changes")}<span id="dh-changes-badge" style="display:none;min-width:16px;height:16px;padding:0 4px;margin-left:4px;border-radius:8px;background:#c0392b;color:#fff;font-size:10px;font-weight:700;line-height:16px;text-align:center;vertical-align:middle;text-decoration:none"></span></button>
+                    <button type="button" id="dh-history-back" style="display:none;background:none;border:none;color:#888;cursor:pointer;font:inherit;font-size:11px;padding:0;text-decoration:underline">${t("friends.back")}</button>
                 </div>
                 <div class="dh-tabs" style="margin:8px 0" id="dh-friends-filters">
-                    <button class="dh-tab active" data-friend-filter="all">Все</button>
-                    <button class="dh-tab" data-friend-filter="nobody">❌ Не подписаны</button>
-                    <button class="dh-tab" data-friend-filter="mutual">✅ Взаимно</button>
-                    <button class="dh-tab" data-friend-filter="activity">📊 Активность</button>
+                    <button class="dh-tab active" data-friend-filter="all">${t("friends.fAll")}</button>
+                    <button class="dh-tab" data-friend-filter="nobody">${t("friends.fNobody")}</button>
+                    <button class="dh-tab" data-friend-filter="mutual">${t("friends.fMutual")}</button>
+                    <button class="dh-tab" data-friend-filter="activity">${t("friends.fActivity")}</button>
                 </div>
                 <div class="dh-row" id="dh-all-tools" style="display:none;margin:0 0 8px">
-                    <button type="button" id="dh-unfollow-anyone" style="background:none;border:none;color:#c0392b;cursor:pointer;font:inherit;font-size:11px;padding:0;text-decoration:underline">Отписаться от всех</button>
+                    <button type="button" id="dh-unfollow-anyone" style="background:none;border:none;color:#c0392b;cursor:pointer;font:inherit;font-size:11px;padding:0;text-decoration:underline">${t("friends.unfAll")}</button>
                 </div>
                 <div class="dh-row" id="dh-nobody-tools" style="display:none;margin:0 0 8px">
-                    <button class="dh-btn dh-btn-danger" id="dh-unfollow-all" style="padding:5px 10px;font-size:11px">Отписаться от неподписанных</button>
+                    <button class="dh-btn dh-btn-danger" id="dh-unfollow-all" style="padding:5px 10px;font-size:11px">${t("friends.unfNonf")}</button>
                 </div>
                 <div id="dh-inactive-tools" style="display:none;margin:0 0 8px;flex-direction:column;gap:6px">
                     <div class="dh-row">
-                        <button class="dh-btn dh-btn-primary" id="dh-scan-activity" style="padding:5px 10px;font-size:11px">Проверить активность</button>
-                        <button class="dh-btn" id="dh-scan-stop" style="padding:5px 10px;font-size:11px">Стоп</button>
+                        <button class="dh-btn dh-btn-primary" id="dh-scan-activity" style="padding:5px 10px;font-size:11px">${t("friends.scan")}</button>
+                        <button class="dh-btn" id="dh-scan-stop" style="padding:5px 10px;font-size:11px">${t("friends.stop")}</button>
                         <div class="dh-select" id="dh-activity-sort" style="flex:1;min-width:0">
-                            <span class="dh-select-text">Больше XP</span><span class="dh-select-arrow">▾</span>
+                            <span class="dh-select-text">${t("friends.sortXpDesc")}</span><span class="dh-select-arrow">▾</span>
                             <div class="dh-select-options">
-                                <div class="dh-select-option" data-sort="xp_desc">Больше XP</div>
-                                <div class="dh-select-option" data-sort="xp_asc">Меньше XP</div>
-                                <div class="dh-select-option" data-sort="streak_desc">Больше дней</div>
-                                <div class="dh-select-option" data-sort="streak_asc">Меньше дней</div>
-                                <div class="dh-select-option" data-sort="name_asc">По имени A→Z</div>
-                                <div class="dh-select-option" data-sort="name_desc">По имени Z→A</div>
+                                <div class="dh-select-option" data-sort="xp_desc">${t("friends.sortXpDesc")}</div>
+                                <div class="dh-select-option" data-sort="xp_asc">${t("friends.sortXpAsc")}</div>
+                                <div class="dh-select-option" data-sort="streak_desc">${t("friends.sortStreakDesc")}</div>
+                                <div class="dh-select-option" data-sort="streak_asc">${t("friends.sortStreakAsc")}</div>
+                                <div class="dh-select-option" data-sort="name_asc">${t("friends.sortNameAsc")}</div>
+                                <div class="dh-select-option" data-sort="name_desc">${t("friends.sortNameDesc")}</div>
                             </div>
                         </div>
                     </div>
                     <div class="dh-row" id="dh-inactive-mass" style="display:none">
-                        <button class="dh-btn dh-btn-danger" id="dh-unfollow-inactive" title="Сначала пройди «Проверить активность»" style="padding:5px 8px;font-size:11px">Отписаться от неактивных</button>
-                        <button class="dh-btn dh-btn-danger" id="dh-block-inactive" title="Сначала пройди «Проверить активность»" style="padding:5px 8px;font-size:11px">Заблокировать неактивных</button>
+                        <button class="dh-btn dh-btn-danger" id="dh-unfollow-inactive" title="${t("friends.needScan")}" style="padding:5px 8px;font-size:11px">${t("friends.unfInactive")}</button>
+                        <button class="dh-btn dh-btn-danger" id="dh-block-inactive" title="${t("friends.needScan")}" style="padding:5px 8px;font-size:11px">${t("friends.blockInactive")}</button>
                     </div>
                 </div>
                 <div class="dh-muted dh-op-status" id="dh-friends-status"></div>
@@ -7109,16 +7405,16 @@ function savePage() {
   }
   let friendFilter = "all";
 
-  function setFriendsStatus(t, onClear) {
+  function setFriendsStatus(text, onClear) {
     if (!els.friendsStatus) return;
     if (!onClear) {
-      els.friendsStatus.textContent = t;
+      els.friendsStatus.textContent = text;
       els.friendsStatus.style.cssText = "";
       return;
     }
     els.friendsStatus.style.cssText = "display:flex;align-items:center;justify-content:space-between;gap:8px";
     els.friendsStatus.innerHTML =
-      `<span>${t}</span><button class="dh-btn dh-btn-ghost" id="dh-clear-list" style="padding:2px 8px;font-size:10px;text-decoration:underline;background:none;border:none;cursor:pointer;color:inherit;opacity:0.7">Очистить</button>`;
+      `<span>${text}</span><button class="dh-btn dh-btn-ghost" id="dh-clear-list" style="padding:2px 8px;font-size:10px;text-decoration:underline;background:none;border:none;cursor:pointer;color:inherit;opacity:0.7">${t("hist.clear")}</button>`;
     const btn = els.friendsStatus.querySelector("#dh-clear-list");
     if (btn) btn.addEventListener("click", onClear);
   }
@@ -7495,8 +7791,8 @@ function savePage() {
     els.excludeList.innerHTML = "";
     updateListBadges();
     if (!list.length) {
-      els.excludeList.innerHTML = '<div class="dh-muted">Исключений нет</div>';
-      setFriendsStatus("Исключений: 0");
+      els.excludeList.innerHTML = `<div class="dh-muted">${t("excl.empty")}</div>`;
+      setFriendsStatus(t("excl.count", { n: 0 }));
       return;
     }
     for (const u of list) {
@@ -7514,17 +7810,17 @@ function savePage() {
       const b = document.createElement("button");
       b.className = "dh-btn";
       b.style.cssText = "padding:4px 8px;font-size:11px;flex-shrink:0";
-      b.textContent = "Убрать";
+      b.textContent = t("excl.remove");
       b.addEventListener("click", (e) => {
         e.stopPropagation();
         removeExclude(u.userId);
         renderExclusions();
-        showToast("Убран из исключений");
+        showToast(t("excl.removed"));
       });
       row.appendChild(b);
       els.excludeList.appendChild(row);
     }
-    setFriendsStatus("Исключений: " + list.length);
+    setFriendsStatus(t("excl.count", { n: list.length }));
   }
 
   function renderBlockList() {
@@ -7533,8 +7829,8 @@ function savePage() {
     els.blocksList.innerHTML = "";
     updateListBadges();
     if (!list.length) {
-      els.blocksList.innerHTML = '<div class="dh-muted">Блок-лист пуст</div>';
-      setFriendsStatus("Заблокировано: 0");
+      els.blocksList.innerHTML = `<div class="dh-muted">${t("blocks.empty")}</div>`;
+      setFriendsStatus(t("blocks.count", { n: 0 }));
       return;
     }
     for (const u of list) {
@@ -7552,7 +7848,7 @@ function savePage() {
       const b = document.createElement("button");
       b.className = "dh-btn";
       b.style.cssText = "padding:4px 8px;font-size:11px;flex-shrink:0";
-      b.textContent = "Разблокировать";
+      b.textContent = t("blocks.unblock");
       b.addEventListener("click", async (e) => {
         e.stopPropagation();
         b.disabled = true;
@@ -7561,17 +7857,17 @@ function savePage() {
         if (ok) {
           removeBlock(u.userId);
           renderBlockList();
-          showToast("Разблокирован " + (u.name || u.username || u.userId));
+          showToast(t("blocks.unblocked", { u: u.name || u.username || u.userId }));
         } else {
           b.disabled = false;
-          b.textContent = "Разблокировать";
-          showToast("Не удалось разблокировать", true);
+          b.textContent = t("blocks.unblock");
+          showToast(t("blocks.unblockFailed"), true);
         }
       });
       row.appendChild(b);
       els.blocksList.appendChild(row);
     }
-    setFriendsStatus("Заблокировано: " + list.length);
+    setFriendsStatus(t("blocks.count", { n: list.length }));
   }
 
   function hideFriendsSubViews() {
@@ -7611,7 +7907,7 @@ function savePage() {
     els.historyList.innerHTML = "";
     if (!log.length) {
       els.historyList.innerHTML =
-        '<div class="dh-muted">История пуста</div>';
+        `<div class="dh-muted">${t("hist.empty")}</div>`;
       return;
     }
     for (const item of log) {
@@ -7626,14 +7922,14 @@ function savePage() {
           : `${fallback} (${(item.ids || []).length})`;
       const label =
         item.type === "unfollow_mass"
-          ? massLabel("Отписка от неподписанных") + " ❌"
+          ? massLabel(t("hist.unfNonf")) + " ❌"
           : item.type === "block_mass"
-            ? massLabel("Блокировка неактивных")
+            ? massLabel(t("hist.blockInactive"))
             : item.type === "unfollow"
-              ? "Отписка от " + (item.name || item.userId)
+              ? t("hist.unfOne", { u: item.name || item.userId })
               : item.type === "block"
-                ? "Блокировка " + (item.name || item.userId)
-                : item.type || "действие";
+                ? t("hist.blockOne", { u: item.name || item.userId })
+                : item.type || t("hist.action");
       row.innerHTML = `<div class="dh-setting-label" style="min-width:0">
           <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
             ${item.undone ? "↩ " : ""}${label}
@@ -7647,19 +7943,19 @@ function savePage() {
         const b = document.createElement("button");
         b.className = "dh-btn";
         b.style.cssText = "padding:4px 8px;font-size:11px;flex-shrink:0";
-        b.textContent = "Вернуть";
+        b.textContent = t("hist.undo");
         b.addEventListener("click", async (e) => {
           e.stopPropagation();
           b.disabled = true;
           b.textContent = "…";
           const ok = await undoAction(item);
           if (ok) {
-            showToast("Возвращено");
+            showToast(t("hist.undone"));
             renderHistory();
           } else {
             b.disabled = false;
-            b.textContent = "Вернуть";
-            showToast("Не удалось вернуть", true);
+            b.textContent = t("hist.undo");
+            showToast(t("hist.undoFailed"), true);
           }
         });
         row.appendChild(b);
@@ -7764,13 +8060,13 @@ function savePage() {
     if (els.historyBack) els.historyBack.style.display = "";
     updateListBadges();
     renderHistory();
-    setFriendsStatus("История действий", async () => {
-      const ok = await showConfirm("Очистить всю историю действий?", "История");
+    setFriendsStatus(t("hist.title"), async () => {
+      const ok = await showConfirm(t("hist.clearConfirm"), t("friends.history"));
       if (!ok) return;
       DATA.actionLog = [];
       saveData();
       renderHistory();
-      showToast("История очищена");
+      showToast(t("hist.cleared"));
     });
   }
 
@@ -7792,7 +8088,7 @@ function savePage() {
     els.changesList.innerHTML = "";
     if (!changes.length) {
       els.changesList.innerHTML =
-        '<div class="dh-muted">Изменений пока нет — обнови список друзей ещё раз, чтобы появилось сравнение</div>';
+        `<div class="dh-muted">${t("chg.empty")}</div>`;
       return;
     }
     for (const c of changes) {
@@ -7803,19 +8099,19 @@ function savePage() {
       const sign = c.dir === "plus" ? "+" : "−";
       const label =
         c.kind === "unfollowed_me"
-          ? "отписался от тебя"
+          ? t("chg.unfollowedYou")
           : c.kind === "followed_me"
-            ? "подписался на тебя"
+            ? t("chg.followedYou")
             : c.kind === "i_unfollowed"
-              ? "ты отписался"
+              ? t("chg.youUnfollowed")
               : c.kind === "i_blocked"
-                ? "ты заблокировал"
+                ? t("chg.youBlocked")
                 : c.kind === "i_followed"
-                  ? "ты подписался"
+                  ? t("chg.youFollowed")
                   : c.kind === "renamed_user"
                     ? `username: ${c.from || "?"} → ${c.to || "?"}`
                     : c.kind === "renamed_name"
-                      ? `имя: ${c.from || "?"} → ${c.to || "?"}`
+                      ? t("chg.rename", { from: c.from || "?", to: c.to || "?" })
                       : c.kind || "";
       row.innerHTML = `<div class="dh-setting-label" style="min-width:0">
           <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
@@ -7843,15 +8139,15 @@ function savePage() {
       });
       els.changesList.appendChild(row);
     }
-    setFriendsStatus("Изменений: " + changes.length, async () => {
-      const ok = await showConfirm("Очистить все изменения?", "Изменения");
+    setFriendsStatus(t("chg.count", { n: changes.length }), async () => {
+      const ok = await showConfirm(t("chg.clearConfirm"), t("friends.changes"));
       if (!ok) return;
       DATA.friendChanges = [];
       DATA.friendChangesUnread = 0;
       saveData();
       renderChanges();
       updateChangesBadge();
-      showToast("Изменения очищены");
+      showToast(t("chg.cleared"));
     });
   }
 
@@ -8028,19 +8324,19 @@ function savePage() {
     const rows = (friendsCache && friendsCache.rows) || [];
     const targets = rows.filter((r) => !r.followsMe && !isExcluded(r.userId));
     if (!targets.length) {
-      showToast("Нет «неподписанных» в списке");
+      showToast(t("m.noneNonf"));
       return;
     }
     const okGo = await showConfirm(
-      `Отписаться от ${targets.length} пользователей, которые не подписаны на вас?`,
-      "Отписка от неподписанных",
+      t("m.confirmNonf", { n: targets.length }),
+      t("m.titleUnfNonf"),
     );
     if (!okGo) return;
 
     const ids = [];
     let ok = 0;
     for (let i = 0; i < targets.length; i++) {
-      setFriendsStatus(`Отписка ${i + 1}/${targets.length}…`);
+      setFriendsStatus(t("m.progressUnf", { i: i + 1, n: targets.length }));
       const success = await unfollowUser(targets[i].userId);
       if (success) {
         ok++;
@@ -8051,15 +8347,15 @@ function savePage() {
     logAction({
       type: "unfollow_mass",
       ids,
-      name: `отписка от ${ok} неподписанных`,
+      name: t("m.logNonf", { n: ok }),
     });
     if (friendsCache) {
       const idSet = new Set(ids.map(String));
       friendsCache.rows = friendsCache.rows.filter((r) => !idSet.has(String(r.userId)));
     }
     renderFriends();
-    setFriendsStatus(`Отписался от ${ok} / ${targets.length}`);
-    showToast("✓ Отписка завершена: " + ok);
+    setFriendsStatus(t("m.doneUnf", { ok, n: targets.length }));
+    showToast(t("m.toastUnf", { n: ok }));
   }
 
   /** Отписка от всех подписок (кроме исключений). Двойное подтверждение. */
@@ -8067,17 +8363,17 @@ function savePage() {
     const rows = (friendsCache && friendsCache.rows) || [];
     const targets = rows.filter((r) => !isExcluded(r.userId));
     if (!targets.length) {
-      showToast("Нет подписок для отписки");
+      showToast(t("m.noneAll"));
       return;
     }
     const okGo = await showConfirm(
-      `Отписаться от ${targets.length} пользователей? Исключения (🛡) не тронем.`,
-      "Отписка от всех",
+      t("m.confirmAll", { n: targets.length }),
+      t("m.titleUnfAll"),
     );
     if (!okGo) return;
     const okGo2 = await showConfirm(
-      `Точно отписаться от ${targets.length} человек? Это действие нельзя отменить одной кнопкой (undo есть в «Истории»).`,
-      "Подтверждение",
+      t("m.confirmAll2", { n: targets.length }),
+      t("m.confirmTitle"),
     );
     if (!okGo2) return;
 
@@ -8085,7 +8381,7 @@ function savePage() {
     const ids = [];
     let ok = 0;
     for (let i = 0; i < targets.length; i++) {
-      setFriendsStatus(`Отписка от всех ${i + 1}/${targets.length}…`);
+      setFriendsStatus(t("m.progressAll", { i: i + 1, n: targets.length }));
       const success = await unfollowUser(targets[i].userId);
       if (success) {
         ok++;
@@ -8096,15 +8392,15 @@ function savePage() {
     logAction({
       type: "unfollow_mass",
       ids,
-      name: `отписка от ${ok} пользователей`,
+      name: t("m.logAll", { n: ok }),
     });
     if (friendsCache) {
       const idSet = new Set(ids.map(String));
       friendsCache.rows = friendsCache.rows.filter((r) => !idSet.has(String(r.userId)));
     }
     renderFriends();
-    setFriendsStatus(`Отписался от всех: ${ok} / ${targets.length}`);
-    showToast("✓ Отписка завершена: " + ok);
+    setFriendsStatus(t("m.doneAll", { ok, n: targets.length }));
+    showToast(t("m.toastUnf", { n: ok }));
   }
 
   /** Отписка от неактивных среди моих подписок (не подписчиков). */
@@ -8117,12 +8413,12 @@ function savePage() {
         !isExcluded(r.userId),
     );
     if (!targets.length) {
-      showToast("Сначала проверь активность");
+      showToast(t("m.needScan"));
       return;
     }
     const okGo = await showConfirm(
-      `Отписаться от ${targets.length} неактивных подписок (порог ${daysLimit} дн.)?`,
-      "Отписка от неактивных",
+      t("m.confirmInactive", { n: targets.length, d: daysLimit }),
+      t("m.titleUnfInactive"),
     );
     if (!okGo) return;
 
@@ -8130,7 +8426,7 @@ function savePage() {
     const ids = [];
     let ok = 0;
     for (let i = 0; i < targets.length; i++) {
-      setFriendsStatus(`Отписка от неактивных ${i + 1}/${targets.length}…`);
+      setFriendsStatus(t("m.progressInactive", { i: i + 1, n: targets.length }));
       const success = await unfollowUser(targets[i].userId);
       if (success) {
         ok++;
@@ -8141,7 +8437,7 @@ function savePage() {
     logAction({
       type: "unfollow_mass",
       ids,
-      name: `отписка от ${ok} неактивных`,
+      name: t("m.logInactive", { n: ok }),
     });
     if (friendsCache) {
       const idSet = new Set(ids.map(String));
@@ -8153,8 +8449,8 @@ function savePage() {
       }
     }
     renderFriends();
-    setFriendsStatus(`Отписался от неактивных: ${ok} / ${targets.length}`);
-    showToast("✓ Отписка от неактивных: " + ok);
+    setFriendsStatus(t("m.doneInactive", { ok, n: targets.length }));
+    showToast(t("m.toastInactive", { n: ok }));
   }
 
   async function blockUser(targetId) {
@@ -8216,12 +8512,12 @@ function savePage() {
         !isExcluded(r.userId),
     );
     if (!targets.length) {
-      showToast("Сначала проверь активность");
+      showToast(t("m.needScan"));
       return;
     }
     const okGo = await showConfirm(
-      `Заблокировать ${targets.length} неактивных подписок (порог ${daysLimit} дн.)?`,
-      "Блокировка неактивных",
+      t("m.confirmBlock", { n: targets.length, d: daysLimit }),
+      t("m.titleBlock"),
     );
     if (!okGo) return;
 
@@ -8229,7 +8525,7 @@ function savePage() {
     const ids = [];
     let ok = 0;
     for (let i = 0; i < targets.length; i++) {
-      setFriendsStatus(`Блокировка ${i + 1}/${targets.length}…`);
+      setFriendsStatus(t("m.progressBlock", { i: i + 1, n: targets.length }));
       const success = await blockUser(targets[i].userId);
       if (success) {
         ok++;
@@ -8240,7 +8536,7 @@ function savePage() {
     logAction({
       type: "block_mass",
       ids,
-      name: `блокировка ${ok} неактивных`,
+      name: t("m.logBlock", { n: ok }),
     });
     for (const t of targets) {
       if (ids.map(String).includes(String(t.userId))) addBlock(t);
@@ -8250,8 +8546,8 @@ function savePage() {
       friendsCache.rows = friendsCache.rows.filter((r) => !idSet.has(String(r.userId)));
     }
     renderFriends();
-    setFriendsStatus(`Заблокировано: ${ok} / ${targets.length}`);
-    showToast("✓ Блокировка: " + ok);
+    setFriendsStatus(t("m.doneBlock", { ok, n: targets.length }));
+    showToast(t("m.toastBlock", { n: ok }));
   }
 
   function friendsCountLabel(shown) {
@@ -8260,9 +8556,9 @@ function savePage() {
     const followers = cache.followersCount != null ? cache.followersCount : 0;
     if (friendFilter === "inactive") {
       const base = (cache.scanUsers || []).length || following + followers;
-      return `Показано: ${shown} · проверяется: ${base} (подписки ∪ подписчики)`;
+      return t("friends.countInactive", { shown, base });
     }
-    return `Показано: ${shown} · всего: ${following} подписок`;
+    return t("friends.countFollowing", { shown, n: following });
   }
 
   function sortActivityRows(rows) {
@@ -8338,7 +8634,7 @@ function savePage() {
 
     els.friendsList.innerHTML = "";
     if (!rows.length) {
-      els.friendsList.innerHTML = '<div class="dh-muted">Пусто</div>';
+      els.friendsList.innerHTML = `<div class="dh-muted">${t("f.empty")}</div>`;
       setFriendsStatus(friendsCountLabel(0));
       return;
     }
@@ -8355,13 +8651,13 @@ function savePage() {
         const streak = Number(r.streakDays || 0);
         const xp = Number(r.lastXp || 0);
         const idle = Number(r.inactiveDays || 0);
-        const streakTxt = streak > 0 ? `🔥 ${streak} дн.` : "💤 0";
-        const idleTxt = idle > 0 && idle < 999 ? `${idle} дн.` : idle >= 999 ? "∞" : "0 дн.";
+        const streakTxt = streak > 0 ? `🔥 ${t("f.days", { n: streak })}` : "💤 0";
+        const idleTxt = idle > 0 && idle < 999 ? t("f.days", { n: idle }) : idle >= 999 ? "∞" : t("f.idle0");
         row.innerHTML = `<div class="dh-setting-label" style="min-width:0">
             <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
               ${r.name || sub}
             </div>
-            <small>${streakTxt} · XP ${xp} · без активности ${idleTxt}</small>
+            <small>${t("f.rowInfo", { streak: streakTxt, xp, idle: idleTxt })}</small>
           </div>`;
         row.addEventListener("click", () => {
           const u = r.username || r.name;
@@ -8385,10 +8681,10 @@ function savePage() {
           </div>
           <small>${sub}</small>
         </div>
-        <button class="dh-btn" data-tag-edit="1" title="Метка" style="padding:4px 7px;font-size:11px;flex-shrink:0;display:inline-flex;align-items:center;justify-content:center">✏</button>
-        <button class="dh-btn" data-exclude="1" title="${isExcluded(r.userId) ? "Убрать из исключений" : "В исключения (не трогать при массовых действиях)"}" style="padding:4px 7px;font-size:11px;flex-shrink:0;display:inline-flex;align-items:center;justify-content:center">${isExcluded(r.userId) ? "🛡✓" : "🛡"}</button>
-        <button class="dh-btn" data-block="1" title="Заблокировать" style="padding:4px 8px;font-size:13px;line-height:1;flex-shrink:0;width:30px;display:inline-flex;align-items:center;justify-content:center">🚫</button>
-        <button class="dh-btn" data-unfollow="1" title="Отписаться" style="padding:4px 8px;font-size:13px;line-height:1;flex-shrink:0;width:30px;display:inline-flex;align-items:center;justify-content:center">×</button>`;
+        <button class="dh-btn" data-tag-edit="1" title="${t("f.tagTitle")}" style="padding:4px 7px;font-size:11px;flex-shrink:0;display:inline-flex;align-items:center;justify-content:center">✏</button>
+        <button class="dh-btn" data-exclude="1" title="${isExcluded(r.userId) ? t("excl.rmTitle") : t("excl.addTitle")}" style="padding:4px 7px;font-size:11px;flex-shrink:0;display:inline-flex;align-items:center;justify-content:center">${isExcluded(r.userId) ? "🛡✓" : "🛡"}</button>
+        <button class="dh-btn" data-block="1" title="${t("f.blockTitle")}" style="padding:4px 8px;font-size:13px;line-height:1;flex-shrink:0;width:30px;display:inline-flex;align-items:center;justify-content:center">🚫</button>
+        <button class="dh-btn" data-unfollow="1" title="${t("f.unfTitle")}" style="padding:4px 8px;font-size:13px;line-height:1;flex-shrink:0;width:30px;display:inline-flex;align-items:center;justify-content:center">×</button>`;
       row.addEventListener("click", (e) => {
         if (e.target && e.target.closest && e.target.closest("[data-unfollow],[data-exclude],[data-block],[data-tag-edit]")) return;
         const u = r.username || r.name;
@@ -8419,7 +8715,7 @@ function savePage() {
             });
             // после одиночной отписки убираем из исключений
             removeExclude(r.userId);
-            showToast("Отписался от " + (r.name || sub));
+            showToast(t("f.unfDone", { u: r.name || sub }));
             if (friendsCache) {
               friendsCache.rows = friendsCache.rows.filter((x) => String(x.userId) !== String(r.userId));
             }
@@ -8427,7 +8723,7 @@ function savePage() {
           } else {
             unBtn.disabled = false;
             unBtn.textContent = "×";
-            showToast("Не удалось отписаться", true);
+            showToast(t("f.unfFailed"), true);
           }
         });
       }
@@ -8437,8 +8733,8 @@ function savePage() {
           e.preventDefault();
           e.stopPropagation();
           const okGo = await showConfirm(
-            `Заблокировать ${r.name || sub}?`,
-            "Блокировка",
+            t("f.blockConfirm", { u: r.name || sub }),
+            t("m.titleBlock"),
           );
           if (!okGo) return;
           blBtn.disabled = true;
@@ -8453,7 +8749,7 @@ function savePage() {
             });
             addBlock(r);
             removeExclude(r.userId);
-            showToast("Заблокирован " + (r.name || sub));
+            showToast(t("f.blockDone", { u: r.name || sub }));
             if (friendsCache) {
               friendsCache.rows = friendsCache.rows.filter((x) => String(x.userId) !== String(r.userId));
             }
@@ -8461,7 +8757,7 @@ function savePage() {
           } else {
             blBtn.disabled = false;
             blBtn.textContent = "🚫";
-            showToast("Не удалось заблокировать", true);
+            showToast(t("f.blockFailed"), true);
           }
         });
       }
@@ -8472,10 +8768,10 @@ function savePage() {
           e.stopPropagation();
           if (isExcluded(r.userId)) {
             removeExclude(r.userId);
-            showToast("Убран из исключений");
+            showToast(t("excl.removed"));
           } else {
             addExclude(r);
-            showToast("В исключениях");
+            showToast(t("excl.added"));
           }
           renderFriends();
         });
@@ -8488,10 +8784,10 @@ function savePage() {
   async function loadFriends() {
     const btn = els.friendsLoad;
     if (btn) btn.disabled = true;
-    setFriendsStatus("Загрузка друзей…");
+    setFriendsStatus(t("f.loading"));
     try {
       const me = await getMe();
-      if (!me || !me.id) throw new Error("Не выполнен вход");
+      if (!me || !me.id) throw new Error(t("f.notLoggedIn"));
 
       const [following, followers] = await Promise.all([
         fetchUserList(me.id, "following"),
@@ -8546,8 +8842,8 @@ function savePage() {
       updateChangesBadge();
       renderFriends();
     } catch (e) {
-      setFriendsStatus("Ошибка: " + (e && e.message));
-      showToast("Не удалось загрузить друзей", true);
+      setFriendsStatus(t("f.error", { msg: e && e.message }));
+      showToast(t("f.loadFailed"), true);
     } finally {
       if (btn) btn.disabled = false;
     }
@@ -8559,7 +8855,7 @@ function savePage() {
     const scanned = !!(friendsCache && friendsCache.scannedAt);
     const tip = scanned
       ? ""
-      : "Кнопка заработает после полной проверки активности";
+      : t("s.scanBtnOff");
     if (els.unfollowInactive) {
       els.unfollowInactive.disabled = !scanned;
       els.unfollowInactive.title = tip;
@@ -8578,7 +8874,7 @@ function savePage() {
     els.activitySort.dataset.ready = scanned ? "1" : "0";
     els.activitySort.title = scanned
       ? ""
-      : "Сортировка заработает после полной проверки активности";
+      : t("s.sortOff");
   }
 
   /** Опрашивает друзей и помечает неактивных. */
@@ -8586,7 +8882,7 @@ function savePage() {
     const cache = friendsCache;
     const targets = (cache && (cache.scanUsers || cache.rows)) || [];
     if (!targets.length) {
-      showToast("Сначала обнови список друзей");
+      showToast(t("s.needList"));
       return;
     }
     if (scanRunning) return;
@@ -8597,7 +8893,7 @@ function savePage() {
     const daysLimit = DATA.settings.inactiveDays || 7;
     let scanned = 0;
 
-    setFriendsStatus(`Проверка активности 0/${targets.length}…`);
+    setFriendsStatus(t("s.progress", { done: 0, n: targets.length }));
     for (const r of targets) {
       if (!scanRunning) break;
       try {
@@ -8640,7 +8936,7 @@ function savePage() {
       }
       scanned++;
       if (scanned % 5 === 0 || scanned === targets.length) {
-        setFriendsStatus(`Проверка активности ${scanned}/${targets.length}…`);
+        setFriendsStatus(t("s.progress", { done: scanned, n: targets.length }));
       }
       if (delay) {
         await new Promise((res) => setTimeout(res, delay));
@@ -8671,17 +8967,17 @@ function savePage() {
     const dead = targets.filter((r) => r.inactive).length;
     setFriendsStatus(
       scanRunning
-        ? `Проверено: ${targets.length} · неактивных: ${dead} (порог ${daysLimit} дн.)`
-        : `Проверка остановлена на ${scanned}/${targets.length} · неактивных: ${dead}`,
+        ? t("s.done", { n: targets.length, dead, d: daysLimit })
+        : t("s.stopped", { done: scanned, n: targets.length, dead }),
     );
-    showToast(scanRunning ? "✓ Активность проверена: " + dead + " неактивных" : "Проверка остановлена");
+    showToast(scanRunning ? t("s.toastDone", { n: dead }) : t("s.toastStopped"));
     scanRunning = false;
     if (btn) btn.disabled = false;
   }
 
   function stopActivityScan() {
     scanRunning = false;
-    showToast("Проверка активности остановлена");
+    showToast(t("s.toastStop"));
   }
 
   // ========== XP: фейк-буст + накрутка ==========
@@ -9038,7 +9334,7 @@ function savePage() {
   }
 
   // ========== Confirm dialog ==========
-  function showConfirm(message, title = "Подтверждение") {
+  function showConfirm(message, title) {
     return new Promise((resolve) => {
       if (!shadow) {
         resolve(window.confirm(message));
@@ -9049,11 +9345,11 @@ function savePage() {
       overlay.className = "dh-confirm-overlay dh-theme-" + theme;
       overlay.innerHTML = `
         <div class="dh-confirm-box">
-          <div class="dh-confirm-title">${title}</div>
+          <div class="dh-confirm-title">${title || t("ui.confirmTitle")}</div>
           <div class="dh-confirm-body"></div>
           <div class="dh-confirm-actions">
-            <button class="dh-btn" data-cf="no">Отмена</button>
-            <button class="dh-btn dh-btn-primary" data-cf="yes">Да</button>
+            <button class="dh-btn" data-cf="no">${t("ui.cancel")}</button>
+            <button class="dh-btn dh-btn-primary" data-cf="yes">${t("ui.yes")}</button>
           </div>
         </div>
       `;
@@ -9174,17 +9470,17 @@ function savePage() {
     overlay.className = "dh-confirm-overlay dh-theme-" + theme;
     overlay.innerHTML = `
       <div class="dh-confirm-box" style="width:380px">
-        <div class="dh-confirm-title">🏷 Метка</div>
+        <div class="dh-confirm-title">${t("tags.editorTitle")}</div>
         <div class="dh-confirm-body">
           <div class="dh-muted" style="margin-bottom:10px;font-size:11px">
             ${user.name || user.username || id}
           </div>
           <div style="margin-bottom:8px">
-            <div style="font-size:10px;opacity:0.6;margin-bottom:3px">Текст</div>
+            <div style="font-size:10px;opacity:0.6;margin-bottom:3px">${t("tags.text")}</div>
             <input class="dh-input" data-tag="label" maxlength="40" style="width:100%" />
           </div>
           <div style="margin-bottom:8px">
-            <div style="font-size:10px;opacity:0.6;margin-bottom:3px">Цвет</div>
+            <div style="font-size:10px;opacity:0.6;margin-bottom:3px">${t("tags.color")}</div>
             <input type="hidden" data-tag="color" value="#58CC02" />
             <div data-tag="palette" style="display:flex;flex-wrap:wrap;gap:5px">
               <button type="button" data-color="#58CC02" style="width:22px;height:22px;border-radius:50%;background:#58CC02;border:2px solid #fff;box-shadow:0 0 0 1.5px #58CC02;cursor:pointer;padding:0"></button>
@@ -9202,14 +9498,14 @@ function savePage() {
             </div>
           </div>
           <div style="margin-bottom:4px">
-            <div style="font-size:10px;opacity:0.6;margin-bottom:3px">Заметка</div>
+            <div style="font-size:10px;opacity:0.6;margin-bottom:3px">${t("tags.note")}</div>
             <input class="dh-input" data-tag="note" maxlength="120" style="width:100%" />
           </div>
         </div>
         <div class="dh-confirm-actions">
-          <button class="dh-btn" data-tag="clear">Убрать</button>
-          <button class="dh-btn" data-tag="cancel">Отмена</button>
-          <button class="dh-btn dh-btn-primary" data-tag="save">Сохранить</button>
+          <button class="dh-btn" data-tag="clear">${t("tags.remove")}</button>
+          <button class="dh-btn" data-tag="cancel">${t("tags.cancel")}</button>
+          <button class="dh-btn dh-btn-primary" data-tag="save">${t("tags.save")}</button>
         </div>
       </div>
     `;
@@ -9249,7 +9545,7 @@ function savePage() {
       close();
       renderFriends();
       if (els.tagsList && els.tagsList.style.display !== "none") renderTagsList();
-      showToast("Метка убрана");
+      showToast(t("tags.removed"));
     });
     overlay.querySelector('[data-tag="save"]').addEventListener("click", () => {
       upsertTag({ userId: user.userId, username: user.username, name: user.name }, {
@@ -9260,7 +9556,7 @@ function savePage() {
       close();
       renderFriends();
       if (els.tagsList && els.tagsList.style.display !== "none") renderTagsList();
-      showToast("Метка сохранена");
+      showToast(t("tags.saved"));
     });
     shadow.appendChild(overlay);
   }
@@ -9271,7 +9567,7 @@ function savePage() {
     els.tagsList.innerHTML = "";
     updateTagsBadge();
     if (!list.length) {
-      els.tagsList.innerHTML = '<div class="dh-muted">Меток пока нет</div>';
+      els.tagsList.innerHTML = `<div class="dh-muted">${t("tags.empty")}</div>`;
       return;
     }
     for (const u of list) {
@@ -9290,8 +9586,8 @@ function savePage() {
           ${u.note ? `<div style="font-size:10px;opacity:0.6;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">📝 ${u.note}</div>` : ""}
         </div>
         <div style="display:flex;flex-direction:column;gap:3px;flex-shrink:0">
-          <button class="dh-btn" data-tag-edit="1" title="Изменить метку" style="padding:3px 7px;font-size:10px">✏</button>
-          <button class="dh-btn dh-btn-danger" data-tag-del="1" title="Удалить метку" style="padding:3px 7px;font-size:10px">✕</button>
+          <button class="dh-btn" data-tag-edit="1" title="${t("tags.editTitle")}" style="padding:3px 7px;font-size:10px">✏</button>
+          <button class="dh-btn dh-btn-danger" data-tag-del="1" title="${t("tags.delTitle")}" style="padding:3px 7px;font-size:10px">✕</button>
         </div>`;
       row.addEventListener("click", (e) => {
         if (e.target && e.target.closest && e.target.closest("[data-tag-edit],[data-tag-del]")) return;
@@ -9311,14 +9607,14 @@ function savePage() {
         delBtn.addEventListener("click", async (e) => {
           e.stopPropagation();
           const ok = await showConfirm(
-            `Удалить метку с ${u.name || u.username || "?"}?`,
-            "Удаление метки",
+            t("tags.delConfirm", { u: u.name || u.username || "?" }),
+            t("tags.delConfirmTitle"),
           );
           if (!ok) return;
           upsertTag({ userId: u.userId, username: u.username, name: u.name }, { label: "", note: "", color: "#58cc02" });
           renderFriends();
           renderTagsList();
-          showToast("Метка удалена");
+          showToast(t("tags.deleted"));
         });
       }
       els.tagsList.appendChild(row);
@@ -9347,7 +9643,7 @@ function savePage() {
     const uname = getProfileUsername();
     if (!els.tagLabel) return;
     if (!uname) {
-      if (els.tagsUser) els.tagsUser.textContent = "Метка для профиля";
+      if (els.tagsUser) els.tagsUser.textContent = t("tags.forProfile");
       els.tagLabel.value = "";
       els.tagNote.value = "";
       els.tagColor.value = "#58CC02";
@@ -9355,7 +9651,7 @@ function savePage() {
       return;
     }
     const tag = findTagByUser(null, uname) || {};
-    if (els.tagsUser) els.tagsUser.textContent = "Метка для @" + uname;
+    if (els.tagsUser) els.tagsUser.textContent = t("tags.forUser", { u: uname });
     els.tagLabel.value = tag.label || "";
     els.tagNote.value = tag.note || "";
     els.tagColor.value = tag.color || "#58CC02";
@@ -9378,7 +9674,7 @@ function savePage() {
   function saveTagFromForm() {
     const uname = getProfileUsername();
     if (!uname) {
-      showToast("Сначала открой профиль пользователя", true);
+      showToast(t("tags.needProfile"), true);
       return;
     }
     // ищем реальное имя из кеша друзей / подписок
@@ -9393,7 +9689,7 @@ function savePage() {
       note: (els.tagNote && els.tagNote.value.trim()) || "",
       color: (els.tagColor && els.tagColor.value) || "#58cc02",
     });
-    showToast("Метка сохранена");
+    showToast(t("tags.saved"));
     renderFriends();
     updateTagsBadge();
     mountInlineTag(uname);
