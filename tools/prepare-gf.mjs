@@ -1,10 +1,10 @@
 #!/usr/bin/env node
-// Генератор копии скрипта для Greasy Fork (и других площадок).
+// Генератор публичной копии скрипта для Greasy Fork и других площадок.
 //
 //   node tools/prepare-gf.mjs
 //
 // Читает duo-helper.user.js (оригинал НЕ изменяется) и пишет
-// gf/duo-helper.greasyfork.user.js с правками под правила Greasy Fork:
+// gf/duo-helper.public.user.js с правками под правила хостингов:
 //   1. без @updateURL / @downloadURL — запрещены альтернативные источники загрузки;
 //   2. без внутреннего апдейтера — его кнопка ведёт на GitHub raw;
 //   3. без @connect GitHub/jsDelivr — они используются только апдейтером;
@@ -18,7 +18,7 @@ import { fileURLToPath } from "node:url";
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const src = join(root, "duo-helper.user.js");
 const outDir = join(root, "gf");
-const out = join(outDir, "duo-helper.greasyfork.user.js");
+const out = join(outDir, "duo-helper.public.user.js");
 
 let text = readFileSync(src, "utf8");
 const originalLength = text.length;
@@ -95,7 +95,7 @@ const settingsRowNew = [
   '                        ${t("set.version")}',
   '                        <small id="dh-current-version">v${CURRENT_VERSION}</small>',
   '                    </div>',
-  '                    <div class="dh-muted" style="font-size:10px;flex:1;min-width:0">${t("set.gfNote")}</div>',
+  '                    <div class="dh-muted" style="font-size:10px;flex:1;min-width:0">${t("set.publicNote")}</div>',
   '                </div>',
   "",
 ].join("\n");
@@ -104,7 +104,7 @@ const settingsRowNew = [
   if (next === text) {
     console.warn("⚠️  не найдено (пропущено): строка настроек «Версия скрипта»");
   } else {
-    log.push("строка настроек «Версия скрипта» → пояснение о сборке GF");
+    log.push("строка настроек «Версия скрипта» → пояснение о публичной сборке");
     text = next;
   }
 }
@@ -112,6 +112,6 @@ const settingsRowNew = [
 mkdirSync(outDir, { recursive: true });
 writeFileSync(out, text, "utf8");
 
-console.log(`✔ gf/duo-helper.greasyfork.user.js (${originalLength} → ${text.length} символов)`);
+console.log(`✔ gf/duo-helper.public.user.js (${originalLength} → ${text.length} символов)`);
 console.log("  вырезано:");
 for (const l of log) console.log("   - " + l);
