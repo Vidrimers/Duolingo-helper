@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Duolingo Helper
 // @namespace    https://github.com/Vidrimers/Duolingo-helper
-// @version      0.11.0
+// @version      0.11.1
 // @description  Проверка взаимной подписки на профилях Duolingo. Панель, бейджи, кеш.
 // @author       Vidrimers
 // @match        *://*.duolingo.com/*
@@ -72,9 +72,87 @@
   const I18N = {
     ru: {
       "lang.changed": "Язык интерфейса изменён",
+      // вкладки
+      "tab.check": "👤 Проверка",
+      "tab.friends": "👥 Друзья",
+      "tab.tools": "🧰 Инструменты",
+      "tab.settings": "⚙️ Настройки",
+      // вкладка «Проверка»
+      "check.title": "Текущий профиль",
+      "check.openProfile": "Открой профиль пользователя",
+      "check.openProfileSub": "Скрипт покажет, подписан ли он на тебя в ответ.",
+      "check.placeholder": "username для проверки",
+      "check.btn": "Проверить",
+      "check.manualTitle": "Ручная проверка",
+      "check.recheck": "🔄 Перепроверить",
+      "check.copy": "📋 Копировать",
+      "check.refresh": "🔄 Обновить",
+      "check.needUsername": "Укажи username",
+      "check.noUsername": "Нет username для проверки",
+      "check.checking": "Проверяем @{u}…",
+      "check.apiCall": "Запрос к API Duolingo",
+      "check.checkingBadge": "Проверка @{u}…",
+      "check.ownProfile": "Это твой профиль",
+      "check.ownProfileSub": "Нельзя быть подписанным на самого себя — проверка не нужна.",
+      "check.noMe": "Не удалось определить твой аккаунт. Выполнен вход?",
+      "check.notFound": "Пользователь @{u} не найден",
+      "check.error": "Ошибка",
+      "check.errorTitle": "Ошибка проверки",
+      "check.yesStatus": "{who} ПОДПИСАН(А) на вас",
+      "check.noStatus": "{who} НЕ подписан(а) на вас",
+      "check.checkedAt": "@{u} · проверено {time}",
+      "check.yesBadge": "Подписан(а) на вас",
+      "check.noBadge": "Не подписан(а) на вас",
+      "check.autoOff": "Автопроверка выключена — нажми «Проверить»",
+      "check.autoOffBadge": "автопроверка выключена",
+      "check.copyYes": "подписан(а) на вас",
+      "check.copyNo": "НЕ подписан(а) на вас",
+      "check.copyText": "@{u}: {status} (проверено {time})",
+      "check.noData": "Нет данных проверки",
+      "check.copied": "Скопировано",
+      "check.copyFailed": "Не удалось скопировать",
     },
     en: {
       "lang.changed": "Interface language changed",
+      // tabs
+      "tab.check": "👤 Check",
+      "tab.friends": "👥 Friends",
+      "tab.tools": "🧰 Tools",
+      "tab.settings": "⚙️ Settings",
+      // Check tab
+      "check.title": "Current profile",
+      "check.openProfile": "Open a user's profile",
+      "check.openProfileSub": "The script will show whether they follow you back.",
+      "check.placeholder": "username to check",
+      "check.btn": "Check",
+      "check.manualTitle": "Manual check",
+      "check.recheck": "🔄 Re-check",
+      "check.copy": "📋 Copy",
+      "check.refresh": "🔄 Refresh",
+      "check.needUsername": "Enter a username",
+      "check.noUsername": "No username to check",
+      "check.checking": "Checking @{u}…",
+      "check.apiCall": "Requesting the Duolingo API",
+      "check.checkingBadge": "Checking @{u}…",
+      "check.ownProfile": "This is your profile",
+      "check.ownProfileSub": "You can't follow yourself — no check needed.",
+      "check.noMe": "Couldn't detect your account. Are you logged in?",
+      "check.notFound": "User @{u} not found",
+      "check.error": "Error",
+      "check.errorTitle": "Check failed",
+      "check.yesStatus": "{who} FOLLOWS you",
+      "check.noStatus": "{who} does NOT follow you",
+      "check.checkedAt": "@{u} · checked {time}",
+      "check.yesBadge": "Follows you",
+      "check.noBadge": "Doesn't follow you",
+      "check.autoOff": "Auto-check is off — press \"Check\"",
+      "check.autoOffBadge": "auto-check is off",
+      "check.copyYes": "follows you",
+      "check.copyNo": "does NOT follow you",
+      "check.copyText": "@{u}: {status} (checked {time})",
+      "check.noData": "No check data",
+      "check.copied": "Copied",
+      "check.copyFailed": "Couldn't copy",
     },
   };
 
@@ -3299,31 +3377,31 @@
             </div>
 
             <div class="dh-tabs">
-                <button class="dh-tab active" data-tab="check">👤 Проверка</button>
-                <button class="dh-tab" data-tab="friends">👥 Друзья</button>
-                <button class="dh-tab" data-tab="tools">🧰 Инструменты</button>
-                <button class="dh-tab" data-tab="settings">⚙️ Настройки</button>
+                <button class="dh-tab active" data-tab="check">${t("tab.check")}</button>
+                <button class="dh-tab" data-tab="friends">${t("tab.friends")}</button>
+                <button class="dh-tab" data-tab="tools">${t("tab.tools")}</button>
+                <button class="dh-tab" data-tab="settings">${t("tab.settings")}</button>
             </div>
 
             <div class="dh-tab-content active" data-tab="check">
                 <div class="dh-card">
-                    <div class="dh-card-title">Текущий профиль</div>
+                    <div class="dh-card-title">${t("check.title")}</div>
                     <div class="dh-status-line" id="dh-status">
                         <span class="icon">…</span>
-                        <span class="text">Открой профиль пользователя</span>
+                        <span class="text">${t("check.openProfile")}</span>
                     </div>
                     <div class="dh-muted" id="dh-status-sub" style="margin-top:6px">
-                        Скрипт покажет, подписан ли он на тебя в ответ.
+                        ${t("check.openProfileSub")}
                     </div>
                 </div>
 
                 <div class="dh-row">
-                    <input class="dh-input" id="dh-user-input" placeholder="username для проверки" />
-                    <button class="dh-btn dh-btn-primary" id="dh-check-btn">Проверить</button>
+                    <input class="dh-input" id="dh-user-input" placeholder="${t("check.placeholder")}" />
+                    <button class="dh-btn dh-btn-primary" id="dh-check-btn">${t("check.btn")}</button>
                 </div>
 
                 <div class="dh-card" id="dh-manual-card" style="display:none">
-                    <div class="dh-card-title">Ручная проверка</div>
+                    <div class="dh-card-title">${t("check.manualTitle")}</div>
                     <div class="dh-status-line" id="dh-manual-status">
                         <span class="icon">…</span>
                         <span class="text">—</span>
@@ -3332,9 +3410,9 @@
                 </div>
 
                 <div class="dh-row">
-                    <button class="dh-btn dh-btn-ghost" id="dh-recheck-btn">🔄 Перепроверить</button>
-                    <button class="dh-btn dh-btn-ghost" id="dh-copy-btn">📋 Копировать</button>
-                    <button class="dh-btn dh-btn-ghost" id="dh-refresh-page">🔄 Обновить</button>
+                    <button class="dh-btn dh-btn-ghost" id="dh-recheck-btn">${t("check.recheck")}</button>
+                    <button class="dh-btn dh-btn-ghost" id="dh-copy-btn">${t("check.copy")}</button>
+                    <button class="dh-btn dh-btn-ghost" id="dh-refresh-page">${t("check.refresh")}</button>
                 </div>
 
                 <div class="dh-acc" data-acc>
@@ -9779,7 +9857,7 @@ function savePage() {
 
   async function runCheck(username, { manual = false } = {}) {
     if (!username) {
-      showToast("Укажи username", true);
+      showToast(t("check.needUsername"), true);
       return;
     }
     if (checking) return;
@@ -9790,8 +9868,8 @@ function savePage() {
       if (!manual) setBadge(state, title, sub);
     };
 
-    setStatusFn("checking", `Проверяем @${username}…`, "Запрос к API Duolingo");
-    setBadgeState("checking", `Проверка @${username}…`);
+    setStatusFn("checking", t("check.checking", { u: username }), t("check.apiCall"));
+    setBadgeState("checking", t("check.checkingBadge", { u: username }));
 
     try {
       // свой профиль — не проверяем (isOwnProfile работает и без свежего getMe: DATA.me + JWT)
@@ -9800,10 +9878,10 @@ function savePage() {
         hideBadge();
         setStatus(
           "idle",
-          "Это твой профиль",
-          "Нельзя быть подписанным на самого себя — проверка не нужна.",
+          t("check.ownProfile"),
+          t("check.ownProfileSub"),
         );
-        showToast("Это твой профиль");
+        showToast(t("check.ownProfile"));
         return;
       }
 
@@ -9816,12 +9894,12 @@ function savePage() {
 
       const me = await getMe();
       if (!me || !me.id) {
-        throw new Error("Не удалось определить твой аккаунт. Выполнен вход?");
+        throw new Error(t("check.noMe"));
       }
 
       const target = await resolveUser(username);
       if (!target) {
-        throw new Error(`Пользователь @${username} не найден`);
+        throw new Error(t("check.notFound", { u: username }));
       }
 
       const followsMe = await checkFollowsMe(target.username, target.id);
@@ -9836,9 +9914,9 @@ function savePage() {
       applyResult(username, entry, { manual });
     } catch (e) {
       console.warn("[DuoHelper] check failed", e);
-      const msg = e && e.message ? e.message : "Ошибка проверки";
-      setStatusFn("error", "Ошибка", msg);
-      setBadgeState("error", "Ошибка проверки", msg);
+      const msg = e && e.message ? e.message : t("check.errorTitle");
+      setStatusFn("error", t("check.error"), msg);
+      setBadgeState("error", t("check.errorTitle"), msg);
       showToast(msg, true);
     } finally {
       checking = false;
@@ -9852,21 +9930,21 @@ function savePage() {
     if (entry.followsMe) {
       setStatusFn(
         "yes",
-        `${who} ПОДПИСАН(А) на вас`,
-        `@${username} · проверено ${fmtTime(entry.checkedAt)}`,
+        t("check.yesStatus", { who }),
+        t("check.checkedAt", { u: username, time: fmtTime(entry.checkedAt) }),
       );
       if (!manual) {
         // без эмодзи в тексте — иконка ставится отдельно в .dh-inline-icon
-        setBadge("yes", "Подписан(а) на вас", `@${username}`);
+        setBadge("yes", t("check.yesBadge"), `@${username}`);
       }
     } else {
       setStatusFn(
         "no",
-        `${who} НЕ подписан(а) на вас`,
-        `@${username} · проверено ${fmtTime(entry.checkedAt)}`,
+        t("check.noStatus", { who }),
+        t("check.checkedAt", { u: username, time: fmtTime(entry.checkedAt) }),
       );
       if (!manual) {
-        setBadge("no", "Не подписан(а) на вас", `@${username}`);
+        setBadge("no", t("check.noBadge"), `@${username}`);
       }
     }
   }
@@ -9930,8 +10008,8 @@ function savePage() {
         mountInlineTag(u);
         setStatus(
           "idle",
-          "Это твой профиль",
-          "Нельзя быть подписанным на самого себя — проверка не нужна.",
+          t("check.ownProfile"),
+          t("check.ownProfileSub"),
         );
         return;
       }
@@ -9941,8 +10019,8 @@ function savePage() {
         const cached = getCached(u);
         if (cached) applyResult(u, cached);
         else {
-          setStatus("idle", `@${u}`, "Автопроверка выключена — нажми «Проверить»");
-          setBadge("checking", `@${u}`, "автопроверка выключена");
+          setStatus("idle", `@${u}`, t("check.autoOff"));
+          setBadge("checking", `@${u}`, t("check.autoOffBadge"));
         }
       }
       mountInlineTag(u);
@@ -9950,8 +10028,8 @@ function savePage() {
       hideBadge();
       setStatus(
         "idle",
-        "Открой профиль пользователя",
-        "Скрипт покажет, подписан ли он на тебя в ответ.",
+        t("check.openProfile"),
+        t("check.openProfileSub"),
       );
     }
   }
@@ -10709,7 +10787,7 @@ function savePage() {
     els.checkBtn.addEventListener("click", () => {
       const u = (els.userInput.value || "").trim().replace(/^@/, "");
       if (!u) {
-        showToast("Укажи username", true);
+        showToast(t("check.needUsername"), true);
         return;
       }
       els.manualCard.style.display = "block";
@@ -10729,7 +10807,7 @@ function savePage() {
         .trim()
         .replace(/^@/, "");
       if (!u) {
-        showToast("Нет username для проверки", true);
+        showToast(t("check.noUsername"), true);
         return;
       }
       // сброс кеша по этому юзеру
@@ -10748,17 +10826,21 @@ function savePage() {
         .trim()
         .replace(/^@/, "");
       if (u && isOwnProfile(u)) {
-        showToast("Это твой профиль");
+        showToast(t("check.ownProfile"));
         return;
       }
       const entry = u ? DATA.followCache[u.toLowerCase()] : null;
       const text = entry
-        ? `@${u}: ${entry.followsMe ? "подписан(а) на вас" : "НЕ подписан(а) на вас"} (проверено ${fmtTime(entry.checkedAt)})`
-        : "Нет данных проверки";
+        ? t("check.copyText", {
+            u,
+            status: entry.followsMe ? t("check.copyYes") : t("check.copyNo"),
+            time: fmtTime(entry.checkedAt),
+          })
+        : t("check.noData");
       navigator.clipboard
         .writeText(text)
-        .then(() => showToast("Скопировано"))
-        .catch(() => showToast("Не удалось скопировать", true));
+        .then(() => showToast(t("check.copied")))
+        .catch(() => showToast(t("check.copyFailed"), true));
     });
 
     // settings
@@ -10838,10 +10920,21 @@ function savePage() {
             e.stopPropagation();
             DATA.settings.lang = opt.dataset.lang || "ru";
             saveData();
-            syncSwitches();
-            els.setLang.classList.remove("open");
+            // строки вшиты в шаблон на момент createUI — пересобираем панель целиком,
+            // сохраняя состояние окна (открыто/свёрнуто), иначе оно создаётся закрытым
+            try {
+              const wasState = currentWindowState();
+              const host = document.getElementById(HOST_ID);
+              if (host) host.remove();
+              createUI();
+              if (wasState !== "closed" && els.modal) {
+                els.modal.classList.add("open");
+                if (wasState === "min") toggleMinimize();
+              }
+              lastPath = ""; // форс повторной отрисовки статуса
+              onNavigate();
+            } catch {}
             showToast(t("lang.changed"));
-            try { if (typeof renderStats === "function") renderStats(); } catch {}
           });
         });
       }
@@ -11665,8 +11758,8 @@ function savePage() {
         hideBadge();
         setStatus(
           "idle",
-          "Это твой профиль",
-          "Нельзя быть подписанным на самого себя — проверка не нужна.",
+          t("check.ownProfile"),
+          t("check.ownProfileSub"),
         );
       } else if (DATA.settings.autoCheck) {
         // небольшая задержка — дать странице прогрузиться
@@ -11675,8 +11768,8 @@ function savePage() {
     } else {
       setStatus(
         "idle",
-        "Открой профиль пользователя",
-        "Скрипт покажет, подписан ли он на тебя в ответ.",
+        t("check.openProfile"),
+        t("check.openProfileSub"),
       );
     }
 
