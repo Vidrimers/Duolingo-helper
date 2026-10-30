@@ -193,7 +193,7 @@ function adminMenuKeyboard() {
 function mainMenuText(tgId) {
   const user = db.prepare("SELECT duolingo_user_id, duolingo_username FROM users WHERE tg_user_id = ?").get(tgId);
   let text = "";
-  const L = langOf(ctx.from.id);
+  const L = langOf(tgId);
   if (user) {
     const uname = user.duolingo_username || user.duolingo_user_id;
     text += t(L, "menu.brand") + `👤 <b>${uname}</b> · <code>${user.duolingo_user_id}</code>\n\n`;
