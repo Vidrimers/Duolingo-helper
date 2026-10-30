@@ -202,6 +202,10 @@ const dicts = {
     "n.digestAct": "📊 <i>Активность (по проверке от {d}):</i>\n✅ Активны: <b>{a}</b> · 💤 Неактивны (7+ дн.): <b>{b}</b>",
     "n.update": "🚀 <b>Доступно обновление Duolingo Helper v{v}</b>",
     "n.updateBtn": "📦 Установить",
+    // плюрализация (базовый ключ = форма many/other)
+    "stats.streakDays.one": "🔥 <b>Streak:</b> {n} день",
+    "stats.streakDays.few": "🔥 <b>Streak:</b> {n} дня",
+    "unf.confirm.one": "Отписаться от {n} пользователя, который не подписан на вас?",
   },
   en: {
     // common
@@ -400,6 +404,9 @@ const dicts = {
     "n.digestAct": "📊 <i>Activity (as of {d}):</i>\n✅ Active: <b>{a}</b> · 💤 Inactive (7+ d.): <b>{b}</b>",
     "n.update": "🚀 <b>Duolingo Helper v{v} is available</b>",
     "n.updateBtn": "📦 Install",
+    // pluralization (base key = other form)
+    "stats.streakDays.one": "🔥 <b>Streak:</b> {n} day",
+    "unf.confirm.one": "Unfollow {n} user who doesn't follow you back?",
   },
 };
 
@@ -407,10 +414,44 @@ export function userLang(user) {
   return user && user.lang === EN ? EN : RU;
 }
 
-/** Перевод: t("ru"|"en", "key", { n: 5 }) — {n} в строке подставляется из params. */
+/**
+ * Категория множественного числа (CLDR-подобная).
+ * ru/uk: one/few/many; en: one/other; для будущих языков — отдельные ветки
+ * (pl и cs уже готовы, новые добавляются по образцу).
+ */
+function pluralCat(lang, n) {
+  const v = Math.abs(Math.round(Number(n) || 0));
+  const mod10 = v % 10;
+  const mod100 = v % 100;
+  if (lang === EN) return v === 1 ? "one" : "other";
+  if (lang === "pl") {
+    if (v === 1) return "one";
+    if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return "few";
+    return "many";
+  }
+  if (lang === "cs") {
+    if (v === 1) return "one";
+    if (v >= 2 && v <= 4) return "few";
+    return "other";
+  }
+  // ru, uk и другие славянские
+  if (mod10 === 1 && mod100 !== 11) return "one";
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return "few";
+  return "many";
+}
+
+/** Перевод: t("ru"|"en", "key", { n: 5 }) — {n} в строке подставляется из params.
+ *  Плюрализация: при params.count (или params.n) выбирается форма
+ *  key.one / key.few / key.many / key.other; при её отсутствии — базовый ключ. */
 export function t(lang, key, params) {
   const dict = dicts[lang] || dicts.ru;
-  let s = dict[key] != null ? dict[key] : dicts.ru[key] != null ? dicts.ru[key] : key;
+  let s = null;
+  const count = params && (params.count != null ? params.count : params.n);
+  if (count != null) {
+    const plural = dict[key + "." + pluralCat(lang, count)];
+    if (plural != null) s = plural;
+  }
+  if (s == null) s = dict[key] != null ? dict[key] : dicts.ru[key] != null ? dicts.ru[key] : key;
   if (params) {
     for (const k of Object.keys(params)) {
       s = s.split("{" + k + "}").join(String(params[k]));

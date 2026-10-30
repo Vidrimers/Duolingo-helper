@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Duolingo Helper
 // @namespace    https://github.com/Vidrimers/Duolingo-helper
-// @version      0.11.6
+// @version      0.11.7
 // @description  Follow-back check for Duolingo profiles. Panel, badges, cache. / Проверка взаимной подписки на профилях Duolingo.
 // @author       Vidrimers
 // @match        *://*.duolingo.com/*
@@ -658,6 +658,19 @@
       "tg.xpBoost60": "Фейк x2 · 60 мин",
       "tg.heartsOn": "включена — сердца не списываются",
       "tg.heartsOff": "выключена — списание как обычно",
+      // плюрализация (формы key.one/few/many; базовый ключ = форма few/many)
+      "ap.start.one": "Автопрактика: старт ({n} урок)",
+      "ap.start.few": "Автопрактика: старт ({n} урока)",
+      "ap.done.one": "Готово: {n} урок",
+      "ap.done.few": "Готово: {n} урока",
+      "m.confirmNonf.one": "Отписаться от {n} пользователя, который не подписан на вас?",
+      "m.confirmAll.one": "Отписаться от {n} пользователя? Исключения (🛡) не тронем.",
+      "m.confirmAll2.one": "Точно отписаться от {n} человека? Это действие нельзя отменить одной кнопкой (undo есть в «Истории»).",
+      "m.logAll.one": "отписка от {n} пользователя",
+      "m.confirmInactive.one": "Отписаться от {n} неактивной подписки (порог {d} дн.)?",
+      "m.confirmBlock.one": "Заблокировать {n} неактивной подписки (порог {d} дн.)?",
+      "quest.metrics.one": "✓ {label}: {n} метрика",
+      "quest.metrics.few": "✓ {label}: {n} метрики",
     },
     en: {
       "lang.changed": "Interface language changed",
@@ -1247,6 +1260,16 @@
       "tg.xpBoost60": "Fake x2 · 60 min",
       "tg.heartsOn": "on — hearts are not spent",
       "tg.heartsOff": "off — spending as usual",
+      // pluralization (key.one / base = other)
+      "ap.start.one": "Auto-practice: start ({n} lesson)",
+      "ap.done.one": "Done: {n} lesson",
+      "m.confirmNonf.one": "Unfollow {n} user who doesn't follow you back?",
+      "m.confirmAll.one": "Unfollow {n} user? Exceptions (🛡) untouched.",
+      "m.confirmAll2.one": "Really unfollow {n} person? This can't be undone with one button (undo is in \"History\").",
+      "m.logAll.one": "unfollow {n} user",
+      "m.confirmInactive.one": "Unfollow {n} inactive subscription (threshold {d} d.)?",
+      "m.confirmBlock.one": "Block {n} inactive subscription (threshold {d} d.)?",
+      "quest.metrics.one": "✓ {label}: {n} metric",
     },
   };
 
@@ -1254,10 +1277,45 @@
     return (DATA.settings && DATA.settings.lang) || "ru";
   }
 
-  /** Перевод: t("key") или t("key", { n: 5 }) для плейсхолдеров {n}. */
+  /**
+   * Категория множественного числа (CLDR-подобная).
+   * ru/uk: one/few/many; en: one/other; для будущих языков — отдельные ветки
+   * (pl и cs уже готовы, новые добавляются по образцу).
+   */
+  function pluralCat(lang, n) {
+    const v = Math.abs(Math.round(Number(n) || 0));
+    const mod10 = v % 10;
+    const mod100 = v % 100;
+    if (lang === "en") return v === 1 ? "one" : "other";
+    if (lang === "pl") {
+      if (v === 1) return "one";
+      if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return "few";
+      return "many";
+    }
+    if (lang === "cs") {
+      if (v === 1) return "one";
+      if (v >= 2 && v <= 4) return "few";
+      return "other";
+    }
+    // ru, uk и другие славянские
+    if (mod10 === 1 && mod100 !== 11) return "one";
+    if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return "few";
+    return "many";
+  }
+
+  /** Перевод: t("key") или t("key", { n: 5 }) для плейсхолдеров {n}.
+   *  Плюрализация: при params.count (или params.n) выбирается форма
+   *  key.one / key.few / key.many / key.other; при её отсутствии — базовый ключ. */
   function t(key, params) {
-    const dict = I18N[uiLang()] || I18N.ru;
-    let s = dict[key] != null ? dict[key] : (I18N.ru[key] != null ? I18N.ru[key] : key);
+    const lang = uiLang();
+    const dict = I18N[lang] || I18N.ru;
+    let s = null;
+    const count = params && (params.count != null ? params.count : params.n);
+    if (count != null) {
+      const plural = dict[key + "." + pluralCat(lang, count)];
+      if (plural != null) s = plural;
+    }
+    if (s == null) s = dict[key] != null ? dict[key] : (I18N.ru[key] != null ? I18N.ru[key] : key);
     if (params) {
       for (const k of Object.keys(params)) {
         s = s.split("{" + k + "}").join(String(params[k]));
