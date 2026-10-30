@@ -2,7 +2,7 @@
 
 **English** | [Русский](README.ru.md)
 
-A userscript for Tampermonkey — an extension for Duolingo with follow-back checking, user tagging and tools for managing friends. A Windows XP-style window, badges on profiles, custom tags.
+A userscript for Tampermonkey — an extension for Duolingo with follow-back checking, user tagging and tools for managing friends. A themed window (10 themes), badges on profiles, custom tags.
 
 > Version: 0.11.6 | Works on `*.duolingo.com`
 
@@ -12,7 +12,7 @@ A userscript for Tampermonkey — an extension for Duolingo with follow-back che
 
 - [Installation](#installation)
 - [Features](#features)
-  - [Windows XP-style window](#windows-xp-style-window)
+  - [Window and themes](#window-and-themes)
   - [Follow-back check on profiles](#follow-back-check-on-profiles)
   - [User tags](#user-tags)
   - [Friends list](#friends-list)
@@ -54,9 +54,9 @@ A userscript for Tampermonkey — an extension for Duolingo with follow-back che
 
 ## Features
 
-### Windows XP-style window
+### Window and themes
 
-The script panel looks like a classic Windows XP (Luna) window: a blue gradient titlebar, grey frame, minimize/close buttons.
+The script panel is a draggable window with ten themes (Win95 by default): titlebar, frame, minimize/close buttons.
 
 - The window **can be dragged by the titlebar** anywhere on the page
 - The position is remembered after dragging and restored on reload
