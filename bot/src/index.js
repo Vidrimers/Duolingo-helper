@@ -2611,7 +2611,7 @@ const httpServer = createServer((req, res) => {
     req.on("data", (chunk) => { body += chunk; });
     req.on("end", () => {
       try {
-        const { duolingoUserId, duolingoUsername, xpLog, totalXp, streak, excludeList, scriptVersion } = JSON.parse(body || "{}");
+        const { duolingoUserId, duolingoUsername, xpLog, totalXp, streak, excludeList, scriptVersion, lang } = JSON.parse(body || "{}");
         if (!duolingoUserId) {
           res.writeHead(400, { "Content-Type": "application/json" });
           res.end(JSON.stringify({ error: "duolingoUserId required" }));
@@ -2673,6 +2673,10 @@ const httpServer = createServer((req, res) => {
             }
             db.prepare("UPDATE users SET duolingo_username = ? WHERE duolingo_user_id = ?").run(duolingoUsername, String(duolingoUserId));
           }
+        } catch {}
+        // язык интерфейса из скрипта — для рендера сообщений бота
+        try {
+          if (lang) db.prepare("UPDATE users SET lang = ? WHERE duolingo_user_id = ?").run(String(lang), String(duolingoUserId));
         } catch {}
 
         // сохраняем записи xpLog в user_stats.

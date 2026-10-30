@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Duolingo Helper
 // @namespace    https://github.com/Vidrimers/Duolingo-helper
-// @version      0.10.5
+// @version      0.11.0
 // @description  Проверка взаимной подписки на профилях Duolingo. Панель, бейджи, кеш.
 // @author       Vidrimers
 // @match        *://*.duolingo.com/*
@@ -64,6 +64,45 @@
     "privacySnapshot",
   ];
 
+  // ========== i18n ==========
+  // Язык интерфейса: "ru" | "en". Миграция: у аккаунтов, созданных до появления
+  // настройки, lang не сохранён → "ru"; новые аккаунты получают "en" в emptyAccount.
+  // defaultSettings() lang НЕ содержит намеренно — иначе спред при загрузке слота
+  // затрёт «не выбрано» и старые аккаунты молча переключатся на en.
+  const I18N = {
+    ru: {
+      "lang.changed": "Язык интерфейса изменён",
+    },
+    en: {
+      "lang.changed": "Interface language changed",
+    },
+  };
+
+  function uiLang() {
+    return (DATA.settings && DATA.settings.lang) || "ru";
+  }
+
+  /** Перевод: t("key") или t("key", { n: 5 }) для плейсхолдеров {n}. */
+  function t(key, params) {
+    const dict = I18N[uiLang()] || I18N.ru;
+    let s = dict[key] != null ? dict[key] : (I18N.ru[key] != null ? I18N.ru[key] : key);
+    if (params) {
+      for (const k of Object.keys(params)) {
+        s = s.split("{" + k + "}").join(String(params[k]));
+      }
+    }
+    return s;
+  }
+
+  /** Локаль для чисел/дат. */
+  function uiLocale() {
+    return uiLang() === "en" ? "en-US" : "ru-RU";
+  }
+
+  function fmtNum(n) {
+    return (Number(n) || 0).toLocaleString(uiLocale());
+  }
+
   function defaultSettings() {
     return {
       autoCheck: true,
@@ -94,7 +133,8 @@
 
   function emptyAccount() {
     return {
-      settings: defaultSettings(),
+      // lang здесь, а не в defaultSettings(): только новые аккаунты стартуют с en
+      settings: { ...defaultSettings(), lang: "en" },
       followCache: {},
       me: null,
       actionLog: [],
@@ -3714,6 +3754,19 @@
                 </div>
                 <div class="dh-setting-row">
                     <div class="dh-setting-label">
+                        Язык / Language
+                        <small>Interface language</small>
+                    </div>
+                    <div class="dh-select" id="dh-set-lang" style="width:160px;flex:0 0 160px">
+                        <span class="dh-select-text">Русский</span><span class="dh-select-arrow">▾</span>
+                        <div class="dh-select-options">
+                            <div class="dh-select-option" data-lang="ru">Русский</div>
+                            <div class="dh-select-option" data-lang="en">English</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="dh-setting-row">
+                    <div class="dh-setting-label">
                         Кеш (минут)
                         <small>Не перезапрашивать API, пока результат свежий</small>
                     </div>
@@ -3834,6 +3887,9 @@
       setTheme: modal.querySelector("#dh-set-theme"),
       setThemeText: modal.querySelector("#dh-set-theme .dh-select-text"),
       setThemeOpts: [...modal.querySelectorAll("#dh-set-theme .dh-select-option")],
+      setLang: modal.querySelector("#dh-set-lang"),
+      setLangText: modal.querySelector("#dh-set-lang .dh-select-text"),
+      setLangOpts: [...modal.querySelectorAll("#dh-set-lang .dh-select-option")],
       setHearts: modal.querySelector("#dh-set-hearts"),
       heartsStatus: modal.querySelector("#dh-hearts-status"),
       setShort: modal.querySelector("#dh-set-short"),
@@ -6236,6 +6292,9 @@
       els.setStartText.textContent =
         startLabels[DATA.settings.startState] || startLabels.remember;
     }
+    if (els.setLangText) {
+      els.setLangText.textContent = uiLang() === "en" ? "English" : "Русский";
+    }
     if (els.setCache) els.setCache.value = DATA.settings.cacheMinutes;
     if (els.setDelay) els.setDelay.value = DATA.settings.requestDelay;
     if (els.setNotify) els.setNotify.value = DATA.settings.notifyHideSec || 5;
@@ -6456,6 +6515,7 @@
             streak,
             excludeList: DATA.excludeList || [],
             scriptVersion: (typeof GM_info !== "undefined" && GM_info.script && GM_info.script.version) || "",
+            lang: uiLang(),
           }),
           timeout: 5000,
           onload(r) {
@@ -6483,8 +6543,8 @@
     const weekXp = stats.xpLog.filter((e) => e.date >= weekAgo).reduce((s, e) => s + (e.xp || 0), 0);
     const streak = (stats.lastSnapshot && stats.lastSnapshot.streak) ?? "—";
 
-    if (els.statToday) els.statToday.textContent = "+" + (todayXp ? todayXp.xp : 0).toLocaleString("ru");
-    if (els.statWeek) els.statWeek.textContent = "+" + weekXp.toLocaleString("ru");
+    if (els.statToday) els.statToday.textContent = "+" + fmtNum(todayXp ? todayXp.xp : 0);
+    if (els.statWeek) els.statWeek.textContent = "+" + fmtNum(weekXp);
     if (els.statStreak) els.statStreak.textContent = streak;
 
     // график 7 дней
@@ -6801,7 +6861,7 @@
       const streak = res.streak ?? (res.body && res.body.streak) ?? "—";
       const xp = res.totalXp ?? (res.body && res.body.totalXp) ?? "—";
       if (streakEl) streakEl.textContent = streak;
-      if (xpEl) xpEl.textContent = typeof xp === "number" ? xp.toLocaleString("ru") : xp;
+      if (xpEl) xpEl.textContent = typeof xp === "number" ? fmtNum(xp) : xp;
     } catch {
       if (streakEl) streakEl.textContent = "—";
       if (xpEl) xpEl.textContent = "—";
@@ -6866,7 +6926,7 @@
     <h2>📊 Общая статистика</h2>
     <div class="stats-grid">
       <div class="stat-box">
-        <div class="value">${Number(totalXp).toLocaleString("ru")}</div>
+        <div class="value">${fmtNum(totalXp)}</div>
         <div class="label">⚡ Всего XP</div>
       </div>
       <div class="stat-box">
@@ -8624,7 +8684,7 @@ function savePage() {
         if (gap === 0) continue;
         var badge = document.createElement("span");
         badge.className = "dh-lb-gap";
-        badge.textContent = (gap > 0 ? "+" : "") + gap.toLocaleString("ru");
+        badge.textContent = (gap > 0 ? "+" : "") + fmtNum(gap);
         badge.style.cssText = "margin-left:8px;padding:1px 6px;border-radius:8px;font-size:11px;font-weight:700;white-space:nowrap;vertical-align:middle;pointer-events:none;" +
           (gap > 0
             ? "background:rgba(88,204,2,0.15);color:#1F7A1F;"
@@ -9814,7 +9874,7 @@ function savePage() {
   function fmtTime(ts) {
     if (!ts) return "—";
     try {
-      return new Date(ts).toLocaleString("ru-RU", {
+      return new Date(ts).toLocaleString(uiLocale(), {
         day: "2-digit",
         month: "2-digit",
         hour: "2-digit",
@@ -10764,6 +10824,29 @@ function savePage() {
       }
       document.addEventListener("click", () => {
         if (els.setTheme) els.setTheme.classList.remove("open");
+      });
+    }
+
+    if (els.setLang) {
+      els.setLang.addEventListener("click", (e) => {
+        e.stopPropagation();
+        els.setLang.classList.toggle("open");
+      });
+      if (els.setLangOpts && els.setLangOpts.length) {
+        els.setLangOpts.forEach((opt) => {
+          opt.addEventListener("click", (e) => {
+            e.stopPropagation();
+            DATA.settings.lang = opt.dataset.lang || "ru";
+            saveData();
+            syncSwitches();
+            els.setLang.classList.remove("open");
+            showToast(t("lang.changed"));
+            try { if (typeof renderStats === "function") renderStats(); } catch {}
+          });
+        });
+      }
+      document.addEventListener("click", () => {
+        if (els.setLang) els.setLang.classList.remove("open");
       });
     }
 

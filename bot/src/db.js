@@ -180,5 +180,9 @@ try {
 try {
   db.exec(`ALTER TABLE script_installs ADD COLUMN version TEXT`);
 } catch {}
+// миграция: язык интерфейса пользователя (для рендера сообщений бота)
+try {
+  db.exec(`ALTER TABLE users ADD COLUMN lang TEXT`);
+} catch {}
 
 export default db;
