@@ -2,7 +2,7 @@
 // @name         Duolingo Helper
 // @namespace    https://github.com/Vidrimers/Duolingo-helper
 // @version      0.11.6
-// @description  Проверка взаимной подписки на профилях Duolingo. Панель, бейджи, кеш.
+// @description  Follow-back check for Duolingo profiles. Panel, badges, cache. / Проверка взаимной подписки на профилях Duolingo.
 // @author       Vidrimers
 // @match        *://*.duolingo.com/*
 // @grant        GM_setValue
