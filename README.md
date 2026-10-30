@@ -6,7 +6,7 @@
 
 A userscript for Tampermonkey — an extension for Duolingo with follow-back checking, user tagging and tools for managing friends. A themed window (10 themes), badges on profiles, custom tags.
 
-> Version: 0.11.8 | Works on `*.duolingo.com`
+> Version: 0.11.9 | Works on `*.duolingo.com`
 
 ---
 
@@ -246,9 +246,6 @@ The **"Tools"** tab:
 | Button       | Action                                             |
 | ------------ | -------------------------------------------------- |
 | Daily        | Closes all unfinished daily quests with one button |
-| Weekly       | Closes weekly quests with one button               |
-| Friends      | Closes friends quests with one button              |
-| Family       | Closes family quests with one button               |
 | Monthly      | Loads the list of monthly quests with progress     |
 | Claim all    | Completes all unfinished monthlies in a row        |
 | GET on a quest | Completes one specific monthly quest             |

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Duolingo Helper
 // @namespace    https://github.com/Vidrimers/Duolingo-helper
-// @version      0.11.8
+// @version      0.11.9
 // @description  Follow-back check for Duolingo profiles. Panel, badges, cache. / Проверка взаимной подписки на профилях Duolingo.
 // @author       Vidrimers
 // @license      CC BY-NC-ND 4.0
@@ -289,7 +289,7 @@
       "tool.xpNote2": "Stories — истории Duolingo; за «пройденную» историю реально дают XP.",
       "tool.xpNote3": "Sessions — имитация учебной сессии/урока без прохождения.",
       "tool.quests": "⚠️ Квесты {risk}",
-      "tool.questsDesc": "Инъекция прогресса в daily / weekly / friends / family / monthly. Нарушает правила Duolingo.",
+      "tool.questsDesc": "Инъекция прогресса в daily / monthly квесты. Нарушает правила Duolingo.",
       "tool.questClaimAll": "Забрать все",
       "tool.gems": "⚠️ Гемы (алмазы) {risk}",
       "tool.gemsDesc": "Сбор rewardBundles (SKILL_COMPLETION).",
@@ -892,7 +892,7 @@
       "tool.xpNote2": "Stories — Duolingo stories; a \"completed\" story really gives XP.",
       "tool.xpNote3": "Sessions — an imitation of a study session/lesson without solving it.",
       "tool.quests": "⚠️ Quests {risk}",
-      "tool.questsDesc": "Progress injection into daily / weekly / friends / family / monthly. Violates Duolingo rules.",
+      "tool.questsDesc": "Progress injection into daily / monthly quests. Violates Duolingo rules.",
       "tool.questClaimAll": "Claim all",
       "tool.gems": "⚠️ Gems {risk}",
       "tool.gemsDesc": "Collecting rewardBundles (SKILL_COMPLETION).",
@@ -4842,11 +4842,6 @@
                         </div>
                         <div class="dh-row" style="margin-bottom:6px">
                             <button class="dh-btn dh-btn-primary" id="dh-quest-daily">Daily</button>
-                            <button class="dh-btn" id="dh-quest-weekly">Weekly</button>
-                            <button class="dh-btn" id="dh-quest-friends">Friends</button>
-                        </div>
-                        <div class="dh-row" style="margin-bottom:6px">
-                            <button class="dh-btn" id="dh-quest-family">Family</button>
                             <button class="dh-btn" id="dh-quest-load">Monthly</button>
                             <button class="dh-btn" id="dh-quest-claim-all">${t("tool.questClaimAll")}</button>
                         </div>
@@ -5151,9 +5146,6 @@
       xpStatus: modal.querySelector("#dh-xp-status"),
       accs: [...modal.querySelectorAll("[data-acc]")],
       questDaily: modal.querySelector("#dh-quest-daily"),
-      questWeekly: modal.querySelector("#dh-quest-weekly"),
-      questFriends: modal.querySelector("#dh-quest-friends"),
-      questFamily: modal.querySelector("#dh-quest-family"),
       questLoad: modal.querySelector("#dh-quest-load"),
       questClaimAll: modal.querySelector("#dh-quest-claim-all"),
       questStatus: modal.querySelector("#dh-quest-status"),
@@ -12244,21 +12236,6 @@ function savePage() {
 
     if (els.questDaily) {
       els.questDaily.addEventListener("click", () => runDailyQuests());
-    if (els.questWeekly) {
-      els.questWeekly.addEventListener("click", () =>
-        runQuestsByKind("weekly", "Weekly", els.questWeekly),
-      );
-    }
-    if (els.questFriends) {
-      els.questFriends.addEventListener("click", () =>
-        runQuestsByKind("friends", "Friends", els.questFriends),
-      );
-    }
-    if (els.questFamily) {
-      els.questFamily.addEventListener("click", () =>
-        runQuestsByKind("family", "Family", els.questFamily),
-      );
-    }
     }
     if (els.questLoad) {
       els.questLoad.addEventListener("click", () => loadMonthlyQuests());
