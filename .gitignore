@@ -2,6 +2,9 @@ temp/
 scripts/
 bot/node_modules/
 bckp/
+gf/
+prepare-gf.bat
+gf/
 
 tasks.txt
 tasks.md

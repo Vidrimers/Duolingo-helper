@@ -4,6 +4,10 @@
 // @version      0.11.7
 // @description  Follow-back check for Duolingo profiles. Panel, badges, cache. / Проверка взаимной подписки на профилях Duolingo.
 // @author       Vidrimers
+// @license      CC BY-NC-ND 4.0
+// @homepageURL  https://github.com/Vidrimers/Duolingo-helper
+// @supportURL   https://github.com/Vidrimers/Duolingo-helper/issues
+// @antifeature  trackUser
 // @match        *://*.duolingo.com/*
 // @grant        GM_setValue
 // @grant        GM_getValue
@@ -526,6 +530,7 @@
       "set.lbgap": "Обновление рейтинга, сек",
       "set.lbgapDesc": "Как часто обновляются разрывы XP на странице рейтингов (leaderboard) (1–60)",
       "set.version": "Версия скрипта",
+      "set.gfNote": "Это версия для greasyfork.org — обновления с GitHub недоступны, скрипт обновляется через менеджер скриптов",
       "set.checkUpdate": "🔍 Проверить обновления",
       "set.checkUpdateFail": "Не удалось проверить обновления",
       "set.resetPos": "Сбросить позицию окна",
@@ -1128,6 +1133,7 @@
       "set.lbgap": "Leaderboard refresh, sec",
       "set.lbgapDesc": "How often XP gaps refresh on leaderboard pages (1–60)",
       "set.version": "Script version",
+      "set.gfNote": "This is the greasyfork.org build — GitHub updates are not available; the script updates via the script manager",
       "set.checkUpdate": "🔍 Check for updates",
       "set.checkUpdateFail": "Couldn't check for updates",
       "set.resetPos": "Reset window position",
