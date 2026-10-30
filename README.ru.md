@@ -1,3 +1,5 @@
+<p align="center"><img src="img/avatar.png" alt="Duolingo Helper" width="128" /></p>
+
 # 🦉 Duolingo Helper
 
 [English](README.md) | **Русский**
@@ -54,6 +56,8 @@ Userscript для Tampermonkey — расширение для Duolingo с пр�
 
 ### Окно и темы
 
+<p align="center"><img src="img/Window%20and%20themes.jpg" alt="Окно и темы" /></p>
+
 Панель скрипта — перетаскиваемое окно с десятью темами оформления (по умолчанию Win95): шапка, рамка, кнопки «свернуть/закрыть».
 
 - Окно **перетаскивается за шапку** в любое место страницы
@@ -79,6 +83,8 @@ Userscript для Tampermonkey — расширение для Duolingo с пр�
 
 ### Проверка подписки на профиле
 
+<p align="center"><img src="img/Follow-back%20check%20on%20profiles.jpg" alt="Проверка подписки" width="32%" /> <img src="img/Follow-back%20check%20on%20profiles%20(2).jpg" alt="Проверка подписки" width="32%" /> <img src="img/Follow-back%20check%20on%20profiles%20(3).jpg" alt="Проверка подписки" width="32%" /></p>
+
 При открытии страницы пользователя (`/profile/имя`) скрипт автоматически проверяет, подписан ли этот человек на тебя в ответ.
 
 Плашка вставляется **прямо в вёрстку рядом с именем** пользователя (как в URL профиля) и является частью шапки профиля — прокручивается вместе с именем.
@@ -90,6 +96,8 @@ Userscript для Tampermonkey — расширение для Duolingo с пр�
 Если имя на странице найти не удалось — плашка временно показывается в углу экрана. Клик по плашке открывает панель управления.
 
 ### Метки на людей
+
+<p align="center"><img src="img/User%20tags.jpg" alt="Метки на людей" /></p>
 
 Во вкладке **«Проверка»** блок **«Метки»** — текст, цвет, заметка для текущего профиля. Рядом ссылка **«Люди с метками»** со списком и кнопкой **«← Назад»**.
 
@@ -133,6 +141,8 @@ Userscript для Tampermonkey — расширение для Duolingo с пр�
 - карточка с твоим аккаунтом (username + id)
 
 ### Кеш и настройки
+
+<p align="center"><img src="img/Cache%20and%20settings.jpg" alt="Кеш и настройки" /></p>
 
 Вкладка **«Настройки»**:
 
@@ -183,6 +193,8 @@ Userscript для Tampermonkey — расширение для Duolingo с пр�
 
 ### Защита сердец
 
+<p align="center"><img src="img/Heart%20protection.jpg" alt="Защита сердец" /></p>
+
 Вкладка **«Инструменты»** — блокирует запросы списания сердец при ошибках в уроках (`remove-heart`). Сердца остаются на месте.
 
 - Тумблер **«Блокировать списание сердец»** (по умолчанию включено)
@@ -193,6 +205,8 @@ Userscript для Tampermonkey — расширение для Duolingo с пр�
 > Это защита механики игры в твоём аккаунте, а не накрутка. Но вмешательство в работу сайта формально может нарушать правила Duolingo — на свой страх и риск.
 
 ### Уроки
+
+<p align="center"><img src="img/Lessons.jpg" alt="Уроки" /></p>
 
 > ⚠️ **Читы. На свой страх и риск.** Укорочение уроков и автосолвер нарушают правила Duolingo. **По умолчанию выключены.**
 
@@ -210,6 +224,8 @@ Userscript для Tampermonkey — расширение для Duolingo с пр�
 
 ### XP / буст
 
+<p align="center"><img src="img/XP%20boost.jpg" alt="XP / буст" /></p>
+
 > ⚠️ **Читы. На свой страх и риск.** Поле — цель в XP (сколько набрать).
 
 | Что      | Описание                                                                             |
@@ -218,6 +234,8 @@ Userscript для Tampermonkey — расширение для Duolingo с пр�
 | Sessions | Накрутка XP через `POST/PUT /sessions` (`UNIT_TEST` + бонусы), проверка по `totalXp` |
 
 ### Квесты
+
+<p align="center"><img src="img/Quests.jpg" alt="Квесты" /></p>
 
 > ⚠️ **Чит. На свой страх и риск.** Инъекция прогресса в квесты через `goals-api.duolingo.com`. Нарушает правила Duolingo, возможна блокировка аккаунта.
 
@@ -256,6 +274,8 @@ Userscript для Tampermonkey — расширение для Duolingo с пр�
 
 ### Streak
 
+<p align="center"><img src="img/Streak.jpg" alt="Streak" /></p>
+
 > ⚠️ **Чит. На свой страх и риск.** Накрутка/восстановление дней серии через `POST/PUT /2017-06-30/sessions` с подменой дат. Нарушает правила Duolingo.
 
 | Кнопка        | Действие                                                             |
@@ -266,6 +286,8 @@ Userscript для Tampermonkey — расширение для Duolingo с пр�
 Ввод — количество дней (1–365).
 
 ### Лига
+
+<p align="center"><img src="img/League.jpg" alt="Лига" /></p>
 
 | Кнопка        | Действие                                                    |
 | ------------- | ----------------------------------------------------------- |
@@ -280,6 +302,8 @@ Userscript для Tampermonkey — расширение для Duolingo с пр�
 
 ### Аккаунты
 
+<p align="center"><img src="img/Accounts.jpg" alt="Аккаунты" /></p>
+
 | Функция | Описание |
 |---|---|
 | Мультиаккаунт-переключатель | Список аккаунтов, переключение без повторного входа |
@@ -288,6 +312,8 @@ Userscript для Tampermonkey — расширение для Duolingo с пр�
 | Линковка Telegram | Кнопка «Привязать Telegram» (у активного профиля) → deep link в бота |
 
 ### Telegram-бот
+
+<p align="center"><img src="img/Telegram%20bot.jpg" alt="Telegram-бот" width="32%" /> <img src="img/Telegram%20bot%20(2).jpg" alt="Telegram-бот" width="32%" /> <img src="img/Telegram%20bot%20(3).jpg" alt="Telegram-бот" width="32%" /></p>
 
 [@Duolingo_Helperbot](https://t.me/Duolingo_Helperbot) — управление аккаунтом Duolingo через Telegram.
 

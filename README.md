@@ -1,3 +1,5 @@
+<p align="center"><img src="img/avatar.png" alt="Duolingo Helper" width="128" /></p>
+
 # 🦉 Duolingo Helper
 
 **English** | [Русский](README.ru.md)
@@ -56,6 +58,8 @@ A userscript for Tampermonkey — an extension for Duolingo with follow-back che
 
 ### Window and themes
 
+<p align="center"><img src="img/Window%20and%20themes.jpg" alt="Window and themes" /></p>
+
 The script panel is a draggable window with ten themes (Win95 by default): titlebar, frame, minimize/close buttons.
 
 - The window **can be dragged by the titlebar** anywhere on the page
@@ -81,6 +85,8 @@ In the window titlebar: **`?`** — about the script and its features, **`🐞`*
 
 ### Follow-back check on profiles
 
+<p align="center"><img src="img/Follow-back%20check%20on%20profiles.jpg" alt="Follow-back check" width="32%" /> <img src="img/Follow-back%20check%20on%20profiles%20(2).jpg" alt="Follow-back check" width="32%" /> <img src="img/Follow-back%20check%20on%20profiles%20(3).jpg" alt="Follow-back check" width="32%" /></p>
+
 When you open a user's page (`/profile/name`), the script automatically checks whether that person follows you back.
 
 The badge is inserted **directly into the layout next to the user's name** (matching the profile URL) and is part of the profile header — it scrolls together with the name.
@@ -92,6 +98,8 @@ The badge is inserted **directly into the layout next to the user's name** (matc
 If the name can't be found on the page, the badge is shown temporarily in the corner of the screen. Clicking the badge opens the control panel.
 
 ### User tags
+
+<p align="center"><img src="img/User%20tags.jpg" alt="User tags" /></p>
 
 In the **"Check"** tab, the **"Tags"** block — text, color and a note for the current profile. Next to it is a **"Tagged people"** link with a list and a **"← Back"** button.
 
@@ -135,6 +143,8 @@ In the panel (🦉 button → **"Check"** tab) you can enter any username and ch
 - a card with your account (username + id)
 
 ### Cache and settings
+
+<p align="center"><img src="img/Cache%20and%20settings.jpg" alt="Cache and settings" /></p>
 
 The **"Settings"** tab:
 
@@ -185,6 +195,8 @@ The **"Cloud saves"** block at the bottom of the "Settings" tab — a backup of 
 
 ### Heart protection
 
+<p align="center"><img src="img/Heart%20protection.jpg" alt="Heart protection" /></p>
+
 The **"Tools"** tab — blocks heart-spending requests on mistakes in lessons (`remove-heart`). Hearts stay where they are.
 
 - The **"Block heart spending"** toggle (enabled by default)
@@ -195,6 +207,8 @@ The **"Tools"** tab — blocks heart-spending requests on mistakes in lessons (`
 > This protects the game's mechanics in your own account, not farming. Still, interfering with the site can formally break Duolingo's rules — at your own risk.
 
 ### Lessons
+
+<p align="center"><img src="img/Lessons.jpg" alt="Lessons" /></p>
 
 > ⚠️ **Cheats. At your own risk.** Shortening lessons and the auto solver break Duolingo's rules. **Disabled by default.**
 
@@ -212,6 +226,8 @@ The blocks in "Tools" are an **accordion**: one opens at a time, the rest collap
 
 ### XP / boost
 
+<p align="center"><img src="img/XP%20boost.jpg" alt="XP / boost" /></p>
+
 > ⚠️ **Cheats. At your own risk.** The field is the XP target (how much to earn).
 
 | What     | Description                                                                           |
@@ -220,6 +236,8 @@ The blocks in "Tools" are an **accordion**: one opens at a time, the rest collap
 | Sessions | XP farming via `POST/PUT /sessions` (`UNIT_TEST` + bonuses), verified against `totalXp` |
 
 ### Quests
+
+<p align="center"><img src="img/Quests.jpg" alt="Quests" /></p>
 
 > ⚠️ **Cheat. At your own risk.** Progress injection into quests via `goals-api.duolingo.com`. Breaks Duolingo's rules, the account may be banned.
 
@@ -258,6 +276,8 @@ The **"Tools"** tab:
 
 ### Streak
 
+<p align="center"><img src="img/Streak.jpg" alt="Streak" /></p>
+
 > ⚠️ **Cheat. At your own risk.** Farming/restoring streak days via `POST/PUT /2017-06-30/sessions` with faked dates. Breaks Duolingo's rules.
 
 | Button          | Action                                                              |
@@ -268,6 +288,8 @@ The **"Tools"** tab:
 The input is the number of days (1–365).
 
 ### League
+
+<p align="center"><img src="img/League.jpg" alt="League" /></p>
 
 | Button          | Action                                                     |
 | --------------- | ---------------------------------------------------------- |
@@ -282,6 +304,8 @@ The input is the number of days (1–365).
 
 ### Accounts
 
+<p align="center"><img src="img/Accounts.jpg" alt="Accounts" /></p>
+
 | Feature | Description |
 |---|---|
 | Multi-account switcher | A list of accounts, switching without logging in again |
@@ -290,6 +314,8 @@ The input is the number of days (1–365).
 | Telegram linking | The "Link Telegram" button (on the active profile) → deep link into the bot |
 
 ### Telegram bot
+
+<p align="center"><img src="img/Telegram%20bot.jpg" alt="Telegram bot" width="32%" /> <img src="img/Telegram%20bot%20(2).jpg" alt="Telegram bot" width="32%" /> <img src="img/Telegram%20bot%20(3).jpg" alt="Telegram bot" width="32%" /></p>
 
 [@Duolingo_Helperbot](https://t.me/Duolingo_Helperbot) — manage your Duolingo account through Telegram.
 
