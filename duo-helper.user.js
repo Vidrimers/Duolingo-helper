@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Duolingo Helper
 // @namespace    https://github.com/Vidrimers/Duolingo-helper
-// @version      0.10.4
+// @version      0.10.5
 // @description  Проверка взаимной подписки на профилях Duolingo. Панель, бейджи, кеш.
 // @author       Vidrimers
 // @match        *://*.duolingo.com/*
@@ -3581,31 +3581,12 @@
 
                 <div class="dh-acc" data-acc>
                     <button type="button" class="dh-acc-head">
-                        <span class="dh-acc-title">⚠️ Магазин — на свой страх и риск</span>
-                        <span class="dh-acc-arrow">▾</span>
-                    </button>
-                    <div class="dh-acc-body"><div class="dh-acc-inner">
-                        <div class="dh-muted" style="margin-bottom:8px">
-                            Выдача предметов магазина без оплаты/гемов. Нарушает правила Duolingo.
-                        </div>
-                        <div class="dh-row" style="margin-bottom:6px">
-                            <button class="dh-btn dh-btn-primary" id="dh-shop-load">Загрузить</button>
-                            <button class="dh-btn dh-btn-danger" id="dh-shop-super">Super 3 дня</button>
-                        </div>
-                        <input class="dh-num-input" id="dh-shop-search" type="text" placeholder="Сначала загрузите список" style="width:100%;margin-bottom:4px;font-size:11px;opacity:0.5" disabled />
-                        <div class="dh-muted dh-op-status" id="dh-shop-status"></div>
-                        <div id="dh-shop-list" style="margin-top:8px;display:flex;flex-direction:column;gap:6px"></div>
-                    </div></div>
-                </div>
-
-                <div class="dh-acc" data-acc>
-                    <button type="button" class="dh-acc-head">
                         <span class="dh-acc-title">⚠️ Гемы (алмазы) — на свой страх и риск</span>
                         <span class="dh-acc-arrow">▾</span>
                     </button>
                     <div class="dh-acc-body"><div class="dh-acc-inner">
                         <div class="dh-muted" style="margin-bottom:8px">
-                            Сбор rewardBundles (SKILL_COMPLETION). Кнопки GET в магазине баланс гемов НЕ пополняют.
+                            Сбор rewardBundles (SKILL_COMPLETION).
                         </div>
                         <div class="dh-row" style="margin-bottom:6px">
                             <button class="dh-btn dh-btn-primary" id="dh-gems-once">Собрать</button>
@@ -3885,11 +3866,6 @@
       questClaimAll: modal.querySelector("#dh-quest-claim-all"),
       questStatus: modal.querySelector("#dh-quest-status"),
       questList: modal.querySelector("#dh-quest-list"),
-      shopLoad: modal.querySelector("#dh-shop-load"),
-      shopSuper: modal.querySelector("#dh-shop-super"),
-      shopSearch: modal.querySelector("#dh-shop-search"),
-      shopStatus: modal.querySelector("#dh-shop-status"),
-      shopList: modal.querySelector("#dh-shop-list"),
       gemsOnce: modal.querySelector("#dh-gems-once"),
       gemsFarm: modal.querySelector("#dh-gems-farm"),
       gemsFarmFast: modal.querySelector("#dh-gems-farm-fast"),
@@ -5522,96 +5498,7 @@
     }
   }
 
-  // ========== Shop ==========
-  // ⚠️ Выдача предметов isFree — чит, на свой страх и риск.
-
-  /** Человекочитаемые названия предметов магазина + количество/цена. */
-  /** Эмодзи-иконка для предмета магазина. */
-  function shopEmoji(id) {
-    const s = String(id).toLowerCase();
-    if (s.includes("streak_freeze") || s.includes("streak_shield")) return "🧊";
-    if (s.includes("streak_repair")) return "🔧";
-    if (s.includes("xp_boost") || s.includes("double_xp")) return "⚡";
-    if (s.includes("health") || s.includes("heart")) return "❤️";
-    if (s.includes("gem") || s.includes("crystal")) return "💎";
-    if (s.includes("outfit") || s.includes("skin")) return "👕";
-    if (s.includes("immersive") || s.includes("super")) return "⭐";
-    if (s.includes("legendary")) return "🏆";
-    if (s.includes("quest")) return "📜";
-    return "📦";
-  }
-
-  function describeShopItem(item) {
-    const id = String(item.id || "");
-    const idLow = id.toLowerCase();
-    const rawName = (item.name ? String(item.name) : "").trim();
-
-    // число из id/имени: gems_500 → 500, xp_boost_15 → 15
-    const num =
-      (id.match(/(\d+)\s*$/) || id.match(/(\d+)/) || [])[1] ||
-      (rawName.match(/(\d+)/) || [])[1] ||
-      "";
-    const qty =
-      item.quantity != null && item.quantity !== "" ? String(item.quantity) : "";
-    const amount = qty || num;
-
-    // короткий смысл — для подписи
-    const hints = [
-      [/immersive_subscription|super_?3|super_?trial|free_taste/, "Триал Super"],
-      [/streak_repair|repair_streak/, "Починка streak"],
-      [/streak_freeze|streak_shield|streak_protect/, "Заморозка серии"],
-      [/xp_boost|double_xp|xp_2x|xp_15|xp_60/, "Двойной XP"],
-      [/health_refill|heart_refill|refill_heart|health_pack|buy_heart|hearts?$/, "Сердца"],
-      [/heart_segment|unlimited_hearts|health_shield/, "Сердца"],
-      [/gem|crystal/, "Гемы"],
-      [/outfit|skin|costume|wearable/, "Аутфит"],
-      [/legendary/, "Legendary"],
-      [/pronunciation/, "Произношение"],
-      [/row_blaster/, "Row Blaster"],
-      [/quest_reroll|daily_quest/, "Квесты"],
-      [/mastery_test|skill_test/, "Тест"],
-      [/bookshelf|chapter/, "Книга"],
-      [/ramp_up|final_level|side_quest|practice/, "Доступ"],
-    ];
-    let hint = id;
-    for (const [re, h] of hints) {
-      if (re.test(idLow)) {
-        hint = h;
-        break;
-      }
-    }
-
-    // имя: API name в приоритете, иначе притираем id
-    let name = rawName;
-    if (!name || name.toLowerCase() === idLow) {
-      name = id
-        .replace(/[_-]+/g, " ")
-        .replace(/\s+/g, " ")
-        .trim()
-        .replace(/\b\w/g, (c) => c.toUpperCase());
-    }
-    // подставляем количество, если его нет в названии
-    if (amount && !/\d/.test(name)) {
-      name += " ×" + amount;
-    }
-
-    const bits = [hint];
-    if (item.price != null && item.price !== "") {
-      bits.push(item.price + " " + (item.currencyType || ""));
-    }
-    bits.push(id);
-
-    return {
-      name: name || id,
-      desc: bits.filter(Boolean).join(" · "),
-      amount,
-    };
-  }
-
-  function setShopStatus(text) {
-    if (els.shopStatus) els.shopStatus.textContent = text;
-  }
-
+  // языки аккаунта (fromLanguage/learningLanguage) — общий хелпер для фармов
   async function getMeLanguages() {
     const myId = getMyId();
     if (!myId) return { fromLanguage: "en", learningLanguage: "en" };
@@ -5625,235 +5512,6 @@
       };
     } catch {
       return { fromLanguage: "en", learningLanguage: "en" };
-    }
-  }
-
-  function shopPost(url, payload) {
-    return new Promise((resolve) => {
-      GM_xmlhttpRequest({
-        method: "POST",
-        url,
-        headers: {
-          "Content-Type": "application/json",
-          accept: "application/json",
-          authorization: "Bearer " + (getToken() || ""),
-        },
-        data: JSON.stringify(payload),
-        timeout: 15000,
-        onload(resp) {
-          resolve(resp.status);
-        },
-        onerror() {
-          resolve(0);
-        },
-        ontimeout() {
-          resolve(0);
-        },
-      });
-    });
-  }
-
-  async function buyShopItem(itemName, extra = {}) {
-    const myId = getMyId();
-    if (!myId) return false;
-    const langs = await getMeLanguages();
-    const status = await shopPost(
-      `${API.users}/${myId}/shop-items`,
-      {
-        itemName,
-        isFree: true,
-        consumed: true,
-        fromLanguage: langs.fromLanguage,
-        learningLanguage: langs.learningLanguage,
-        ...extra,
-      },
-    );
-    return status === 200 || status === 201;
-  }
-
-  var shopCache = [];
-
-  /** Проверяет, появился ли предмет в shopItems пользователя. */
-  async function verifyShopItem(itemName) {
-    try {
-      const myId = getMyId();
-      if (!myId) return null;
-      const res = await new Promise((resolve) => {
-        GM_xmlhttpRequest({
-          method: "GET",
-          url: `https://www.duolingo.com/2023-05-23/users/${myId}?fields=shopItems`,
-          headers: { accept: "application/json" },
-          timeout: 10000,
-          onload(resp) {
-            try {
-              resolve(JSON.parse(resp.responseText || "{}"));
-            } catch {
-              resolve(null);
-            }
-          },
-          onerror() { resolve(null); },
-          ontimeout() { resolve(null); },
-        });
-      });
-      if (!res) return null;
-      const list = res.shopItems || (res.body && res.body.shopItems) || [];
-      return list.some((s) => {
-        const id = String(s.itemName || s.id || s.name || "").toLowerCase();
-        return id === String(itemName).toLowerCase() || id.includes(String(itemName).toLowerCase());
-      });
-    } catch {
-      return null;
-    }
-  }
-
-  function renderShopItems(items) {
-    shopCache = items || [];
-    renderShopFiltered();
-  }
-  function renderShopFiltered() {
-    if (!els.shopList) return;
-    const q = (els.shopSearch && els.shopSearch.value || "").trim().toLowerCase();
-    const items = shopCache;
-    els.shopList.innerHTML = "";
-    const valid = items.filter(
-      (i) => (i.currencyType === "XGM" || !i.currencyType) && !(i.id || "").includes("gift"),
-    );
-    const filtered = q
-      ? valid.filter((i) =>
-          (i.id || "").toLowerCase().includes(q) ||
-          (i.name || "").toLowerCase().includes(q)
-        )
-      : valid;
-    if (!filtered.length) {
-      els.shopList.innerHTML = '<div class="dh-muted">' + (q ? "Ничего не найдено" : "Нет предметов") + "</div>";
-      return;
-    }
-    const order = [
-      ["Streak", (id) => id.includes("streak_freeze")],
-      ["XP", (id) => id.includes("xp_boost")],
-      ["Hearts", (id) => id.includes("health") || id.includes("heart")],
-      ["Gems", (id) => id.includes("gem")],
-      ["Outfits", (id, i) => i.type === "outfit"],
-      ["Прочее", () => true],
-    ];
-    const used = new Set();
-    for (const [label, pred] of order) {
-      const group = filtered.filter((i) => {
-        if (used.has(i.id)) return false;
-        if (!pred((i.id || "").toLowerCase(), i)) return false;
-        used.add(i.id);
-        return true;
-      });
-      if (!group.length) continue;
-      const head = document.createElement("div");
-      head.className = "dh-card-title";
-      head.style.marginTop = "6px";
-      head.textContent = label;
-      els.shopList.appendChild(head);
-      const grid = document.createElement("div");
-      grid.className = "dh-shop-grid";
-      for (const item of group) {
-        const info = describeShopItem(item);
-        const card = document.createElement("div");
-        card.className = "dh-shop-card";
-        const emoji = shopEmoji(item.id || "");
-        card.innerHTML = `
-            <div class="icon">${emoji}</div>
-            <div class="name">${info.name}</div>
-            <div class="desc">${info.desc}</div>
-            <button class="dh-btn">Получить</button>`;
-        const b = card.querySelector("button");
-        b.addEventListener("click", async () => {
-          b.disabled = true;
-          b.textContent = "…";
-          const ok = await buyShopItem(item.id);
-          if (!ok) {
-            b.textContent = "Ошибка";
-            showToast("Не удалось: " + info.name, true);
-            setTimeout(() => {
-              b.disabled = false;
-              b.textContent = "Получить";
-            }, 2500);
-            return;
-          }
-          const verified = await verifyShopItem(item.id);
-          if (verified === true) {
-            b.textContent = "✓ Получено";
-            showToast("✓ " + info.name);
-          } else {
-            b.textContent = "?";
-            showToast("? " + info.name + " — проверь в аккаунте");
-          }
-          setTimeout(() => {
-            b.disabled = false;
-            b.textContent = "Получить";
-          }, 2500);
-        });
-        grid.appendChild(card);
-      }
-      els.shopList.appendChild(grid);
-    }
-  }
-
-  async function loadShop() {
-    const btn = els.shopLoad;
-    if (btn) btn.disabled = true;
-    setShopStatus("Загрузка магазина…");
-    try {
-      const res = await new Promise((resolve) => {
-        GM_xmlhttpRequest({
-          method: "GET",
-          url: "https://www.duolingo.com/2023-05-23/shop-items",
-          headers: { accept: "application/json" },
-          timeout: 15000,
-          onload(resp) {
-            resolve({ status: resp.status, text: resp.responseText });
-          },
-          onerror() {
-            resolve({ status: 0, text: "" });
-          },
-          ontimeout() {
-            resolve({ status: 0, text: "" });
-          },
-        });
-      });
-      if (res.status !== 200) throw new Error("HTTP " + res.status);
-      const items = (JSON.parse(res.text || "{}").shopItems) || [];
-      renderShopItems(items);
-      setShopStatus("Предметов: " + items.length);
-      if (els.shopSearch) {
-        els.shopSearch.disabled = false;
-        els.shopSearch.style.opacity = "1";
-        els.shopSearch.placeholder = "Поиск предметов…";
-      }
-    } catch (e) {
-      setShopStatus("Ошибка: " + (e && e.message));
-      showToast(e && e.message ? e.message : "Ошибка магазина", true);
-    } finally {
-      if (btn) btn.disabled = false;
-    }
-  }
-
-  async function buySuper3Days() {
-    const btn = els.shopSuper;
-    if (btn) btn.disabled = true;
-    setShopStatus("Выдача Super 3 дня…");
-    try {
-      const ok = await buyShopItem("immersive_subscription", {
-        productId: "com.duolingo.immersive_free_trial_subscription",
-      });
-      if (ok) {
-        setShopStatus("Super 3 дня: выдано");
-        showToast("✓ Super 3 дня выдан");
-      } else {
-        setShopStatus("Super: не удалось");
-        showToast("Не удалось выдать Super", true);
-      }
-    } catch (e) {
-      setShopStatus("Ошибка: " + (e && e.message));
-      showToast("Ошибка Super", true);
-    } finally {
-      if (btn) btn.disabled = false;
     }
   }
 
@@ -11261,16 +10919,6 @@ function savePage() {
     }
     if (els.questClaimAll) {
       els.questClaimAll.addEventListener("click", () => claimAllMonthly());
-    }
-
-    if (els.shopLoad) {
-      els.shopLoad.addEventListener("click", () => loadShop());
-    }
-    if (els.shopSearch) {
-      els.shopSearch.addEventListener("input", () => renderShopFiltered());
-    }
-    if (els.shopSuper) {
-      els.shopSuper.addEventListener("click", () => buySuper3Days());
     }
 
     if (els.gemsOnce) {

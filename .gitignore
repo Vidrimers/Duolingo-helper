@@ -1,6 +1,7 @@
 temp/
 scripts/
 bot/node_modules/
+bckp/
 
 tasks.txt
 tasks.md
