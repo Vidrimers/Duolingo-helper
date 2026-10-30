@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Duolingo Helper
 // @namespace    https://github.com/Vidrimers/Duolingo-helper
-// @version      0.11.7
+// @version      0.11.8
 // @description  Follow-back check for Duolingo profiles. Panel, badges, cache. / Проверка взаимной подписки на профилях Duolingo.
 // @author       Vidrimers
 // @license      CC BY-NC-ND 4.0
@@ -10854,10 +10854,22 @@ function savePage() {
   function mountInlineTag(username) {
     const old = document.getElementById("dh-inline-tag");
     const tag = findTagByUser(null, username);
+    if (!tag || !tag.label) {
+      if (old) old.remove();
+      return;
+    }
+    const title = tag.note || t("f.tagTitle");
+    const followBadge = document.getElementById(INLINE_BADGE_ID);
+    const nameEl0 = findNameEl(username);
+    const anchor = (followBadge && followBadge.parentNode) ? followBadge : nameEl0;
+    // тег уже на месте и актуален — не пересоздаём, иначе слетает выделение текста
+    if (old && old.isConnected && anchor && old.previousElementSibling === anchor &&
+        old.textContent === tag.label && old.title === title) {
+      return;
+    }
     if (old) old.remove();
-    if (!tag || !tag.label) return;
 
-    const nameEl = findNameEl(username);
+    const nameEl = nameEl0;
     if (!nameEl) {
       // имя ещё не отрисовано — пробуем снова
       if (tagRetryTimer) clearInterval(tagRetryTimer);
@@ -10877,10 +10889,10 @@ function savePage() {
     const el = document.createElement("span");
     el.id = "dh-inline-tag";
     el.textContent = tag.label;
-    el.title = tag.note || t("f.tagTitle");
+    el.title = title;
     el.style.cssText =
-      "display:inline-flex;align-items:center;margin-left:8px;padding:2px 10px;" +
-      "border-radius:999px;font:700 11px/1.3 Tahoma,sans-serif;white-space:nowrap;" +
+      "display:inline-flex;align-items:center;vertical-align:middle;margin-left:8px;padding:2px 10px;" +
+      "border-radius:999px;font:700 11px/1.3 Tahoma,\"Segoe UI\",sans-serif;white-space:nowrap;" +
       "background:" +
       (tag.color || "#58cc02") +
       ";color:#fff;border:1px solid rgba(0,0,0,0.12);box-shadow:0 1px 3px rgba(0,0,0,0.12);cursor:pointer;";
@@ -10894,7 +10906,6 @@ function savePage() {
     });
 
     // после плашки подписки, если она есть; иначе после имени
-    const followBadge = document.getElementById(INLINE_BADGE_ID);
     if (followBadge && followBadge.parentNode) {
       followBadge.insertAdjacentElement("afterend", el);
     } else {
