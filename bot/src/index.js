@@ -4,8 +4,18 @@ import { randomBytes } from "crypto";
 import { config } from "./config.js";
 import db from "./db.js";
 import { encryptJWT, decryptJWT } from "./crypto.js";
+import { t, userLang, fmtNum, fmtSigned } from "./i18n.js";
 
 const bot = new Bot(config.tgBotToken);
+
+// язык ответа: "en" только если скрипт прислал "en", иначе "ru" (старые пользователи не переключаются)
+function langOf(tgId) {
+  try {
+    return userLang(db.prepare("SELECT lang FROM users WHERE tg_user_id = ?").get(tgId));
+  } catch {
+    return "ru";
+  }
+}
 
 // локальная дата (YYYY-MM-DD) — не UTC, чтобы «сегодня» считалось по времени сервера
 function localDateStr(d = new Date()) {
@@ -27,11 +37,12 @@ bot.use((ctx, next) => {
     try {
       const banned = db.prepare("SELECT id FROM banned_users WHERE tg_user_id = ?").get(ctx.from.id);
       if (banned) {
+        const L = langOf(ctx.from.id);
         // для callback — отвечаем тихо, для команд — сообщение
         if (ctx.callbackQuery) {
-          ctx.answerCallbackQuery("⛔ Вы заблокированы.").catch(() => {});
+          ctx.answerCallbackQuery(t(L, "common.banned")).catch(() => {});
         } else {
-          ctx.reply("⛔ Вы заблокированы.").catch(() => {});
+          ctx.reply(t(L, "common.banned")).catch(() => {});
         }
         return;
       }
@@ -63,19 +74,16 @@ bot.command("start", (ctx) => {
       // проверяем: привязан ли этот TG к этому Duolingo ID
       const linked = db.prepare("SELECT * FROM users WHERE tg_user_id = ? AND duolingo_user_id = ?").get(ctx.from.id, duoId);
       if (!linked) {
-        ctx.reply("❌ Этот Telegram не привязан к данному аккаунту Duolingo. Сначала привяжите аккаунт через скрипт.");
+        ctx.reply(t(langOf(ctx.from.id), "code.duoNotLinked"));
         return;
       }
     }
     bugReportState.set(ctx.from.id, "waiting");
-    ctx.reply(
-      "🐛 <b>Багрепорт</b>\n\n" +
-      "Опишите проблему одним сообщением:",
-      {
-        parse_mode: "HTML",
-        reply_markup: { inline_keyboard: [[{ text: "✖ Отмена", callback_data: "bug_cancel" }]] },
-      }
-    );
+    const L = langOf(ctx.from.id);
+    ctx.reply(t(L, "bug.prompt"), {
+      parse_mode: "HTML",
+      reply_markup: { inline_keyboard: [[{ text: t(L, "common.cancel"), callback_data: "bug_cancel" }]] },
+    });
     return;
   }
   if (startPayload) {
@@ -87,20 +95,20 @@ bot.command("start", (ctx) => {
 });
 
 // === Меню ===
-function mainMenuKeyboard(isAdmin) {
+function mainMenuKeyboard(isAdmin, L) {
   const rows = [
     [
-      { text: "📊 Статистика", callback_data: "action_stats" },
-      { text: "👥 Друзья", callback_data: "action_friends" },
+      { text: t(L, "menu.stats"), callback_data: "action_stats" },
+      { text: t(L, "menu.friends"), callback_data: "action_friends" },
     ],
     [
-      { text: "🏆 Лига", callback_data: "action_league" },
+      { text: t(L, "menu.league"), callback_data: "action_league" },
     ],
     [
-      { text: "⚙️ Настройки", callback_data: "menu_settings" },
-      { text: "🐛 Багрепорт", callback_data: "bug_report_start" },
+      { text: t(L, "menu.settings"), callback_data: "menu_settings" },
+      { text: t(L, "menu.bugreport"), callback_data: "bug_report_start" },
     ],
-    [{ text: "🌐 Открыть сайт", url: "https://www.duolingo.com" }],
+    [{ text: t(L, "menu.openSite"), url: "https://www.duolingo.com" }],
   ];
   if (isAdmin) {
     rows.push([{ text: "🔧 Админ-панель", callback_data: "menu_admin" }]);
@@ -108,12 +116,12 @@ function mainMenuKeyboard(isAdmin) {
   return { inline_keyboard: rows };
 }
 
-function settingsMenuKeyboard() {
+function settingsMenuKeyboard(L) {
   return {
     inline_keyboard: [
-      [{ text: "🔔 Уведомления", callback_data: "settings_notify" }],
-      [{ text: "🔗 Линковка", callback_data: "settings_link" }],
-      [{ text: "← Назад", callback_data: "menu_main" }],
+      [{ text: t(L, "settings.notify"), callback_data: "settings_notify" }],
+      [{ text: t(L, "settings.link"), callback_data: "settings_link" }],
+      [{ text: t(L, "common.back"), callback_data: "menu_main" }],
     ],
   };
 }
@@ -184,14 +192,15 @@ function adminMenuKeyboard() {
 // формирование текста главного меню
 function mainMenuText(tgId) {
   const user = db.prepare("SELECT duolingo_user_id, duolingo_username FROM users WHERE tg_user_id = ?").get(tgId);
-  let text = "🦉 <b>Duolingo Helper</b>\n\n";
+  let text = "";
+  const L = langOf(ctx.from.id);
   if (user) {
     const uname = user.duolingo_username || user.duolingo_user_id;
-    text += `👤 <b>${uname}</b> · <code>${user.duolingo_user_id}</code>\n\n`;
+    text += t(L, "menu.brand") + `👤 <b>${uname}</b> · <code>${user.duolingo_user_id}</code>\n\n`;
   } else {
-    text += "❌ Аккаунт не привязан\n\n";
+    text += t(L, "menu.brand") + t(L, "menu.notLinked");
   }
-  text += "Выберите действие:";
+  text += t(L, "menu.choose");
   return text;
 }
 
@@ -199,12 +208,13 @@ function showMainMenu(ctx) {
   const isAdmin = ctx.from.id === config.adminTgId;
   ctx.reply(mainMenuText(ctx.from.id), {
     parse_mode: "HTML",
-    reply_markup: mainMenuKeyboard(isAdmin),
+    reply_markup: mainMenuKeyboard(isAdmin, langOf(ctx.from.id)),
   });
 }
 
 // сборка текста статистики (используется в экране статистики и после накрутки XP)
 async function buildStatsText(user) {
+  const L = userLang(user);
   const jwt = decryptJWT(user.jwt_encrypted);
   const res = await fetch(
     `https://www.duolingo.com/2017-06-30/users/${user.duolingo_user_id}?fields=totalXp,streak,name,username,streakData`,
@@ -230,12 +240,12 @@ async function buildStatsText(user) {
   } catch {}
 
   // определяем, занимался ли сегодня
-  let todayStatus = "⚠️ <i>Ещё нет</i>";
+  let todayStatus = t(L, "stats.todayNone");
   try {
     const lastExtended = d.streakData?.currentStreak?.lastExtendedDate;
     if (lastExtended) {
       const today = localDateStr();
-      if (lastExtended >= today) todayStatus = "✅ <i>Занимался</i>";
+      if (lastExtended >= today) todayStatus = t(L, "stats.todayDone");
     }
   } catch {}
 
@@ -271,7 +281,7 @@ async function buildStatsText(user) {
   }
 
   // график за 7 дней (значения — разницы total_xp; +1 строка вниз как база)
-  const days = ["Вс", "Пн", "Вт", "Ср", "Чт", "Пт", "Сб"];
+  const days = [0, 1, 2, 3, 4, 5, 6].map((i) => t(L, "days." + i));
   const statsRows = db.prepare("SELECT date, xp, total_xp FROM user_stats WHERE duolingo_user_id = ? ORDER BY date DESC LIMIT 8").all(user.duolingo_user_id);
   let chart = "";
   if (statsRows.length > 0) {
@@ -284,36 +294,36 @@ async function buildStatsText(user) {
       .map((r, i) => ({ date: r.date, xp: valOf(r, statsRows[i + 1]) }))
       .reverse();
     const maxXp = Math.max(1, ...revRows.map((r) => r.xp));
-    chart = "\n\n📈 <b>XP за 7 дней:</b>\n<pre>";
+    chart = t(L, "stats.chart");
     for (const r of revRows) {
       const d = new Date(r.date + "T12:00:00");
       const dayLabel = days[d.getDay()];
       const barLen = Math.max(0, Math.min(12, Math.round((r.xp / maxXp) * 12)));
       const bar = "█".repeat(barLen) + "░".repeat(12 - barLen);
-      chart += `${dayLabel} ${bar} ${Number(r.xp).toLocaleString("ru")}\n`;
+      chart += `${dayLabel} ${bar} ${fmtNum(r.xp, L)}\n`;
     }
     chart += "</pre>";
   }
 
   return (
-    `📊 <b>Статистика</b>\n\n` +
+    t(L, "stats.head") +
     `👤 <b>${name}</b> · <code>${user.duolingo_user_id}</code>\n\n` +
-    `⚡ <b>XP:</b> ${Number(totalXp).toLocaleString("ru")}\n` +
-    `🏆 <b>XP в лиге:</b> ${leagueXp == null ? "—" : Number(leagueXp).toLocaleString("ru")}\n` +
-    `🔥 <b>Streak:</b> ${streak} дней\n` +
-    `📅 <b>Сегодня:</b> ${todayStatus}\n` +
-    `⚡ <b>Сегодня:</b> ${fmtSigned(todayXp)}\n` +
-    `📅 <b>Неделя:</b> ${fmtSigned(weekXp)}` + chart
+    t(L, "stats.xp", { n: fmtNum(totalXp, L) }) + "\n" +
+    t(L, "stats.leagueXp", { n: leagueXp == null ? "—" : fmtNum(leagueXp, L) }) + "\n" +
+    t(L, "stats.streakDays", { n: streak }) + "\n" +
+    t(L, "stats.todayStatus", { s: todayStatus }) + "\n" +
+    t(L, "stats.todayXp", { n: fmtSigned(todayXp, L) }) + "\n" +
+    t(L, "stats.weekXp", { n: fmtSigned(weekXp, L) }) + chart
   );
 }
 
-function statsKeyboard() {
+function statsKeyboard(L) {
   return {
     inline_keyboard: [
-      [{ text: "🎁 Получить XP", callback_data: "xp_get" }],
-      [{ text: "🔥 Серия дней", callback_data: "streak_get" }],
-      [{ text: "💝 Донат", callback_data: "donate_menu" }],
-      [{ text: "← Назад", callback_data: "menu_main" }],
+      [{ text: t(L, "stats.getXp"), callback_data: "xp_get" }],
+      [{ text: t(L, "stats.streakBtn"), callback_data: "streak_get" }],
+      [{ text: t(L, "menu.donate"), callback_data: "donate_menu" }],
+      [{ text: t(L, "common.back"), callback_data: "menu_main" }],
     ],
   };
 }
@@ -432,8 +442,10 @@ function mondayStrOf(dateStr) {
 }
 
 // «22–28 окт» / «28 сен – 4 окт»
-function fmtRange(startStr, endStr) {
-  const months = ["янв", "фев", "мар", "апр", "мая", "июн", "июл", "авг", "сен", "окт", "ноя", "дек"];
+function fmtRange(startStr, endStr, L) {
+  const months = L === "en"
+    ? ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+    : ["янв", "фев", "мар", "апр", "мая", "июн", "июл", "авг", "сен", "окт", "ноя", "дек"];
   const a = new Date(startStr + "T12:00:00");
   const b = new Date(endStr + "T12:00:00");
   const am = months[a.getMonth()];
@@ -651,6 +663,7 @@ async function runFriendsScan(user, targets, daysLimit, onProgress, shouldStop) 
 
 // запуск скана: правит сообщение (chatId, messageId), порог — параметр (только этот скан)
 async function startFriendsScan(user, daysLimit, chatId, messageId, tgId) {
+  const L = userLang(user);
   const edit = (text, replyMarkup) =>
     bot.api.editMessageText(chatId, messageId, text, { parse_mode: "HTML", reply_markup: replyMarkup }).catch(() => {});
   const cache = friendsCache.get(tgId);
@@ -663,28 +676,28 @@ async function startFriendsScan(user, daysLimit, chatId, messageId, tgId) {
   }
   const targets = [...byId.values()];
   if (!targets.length) {
-    await edit("🔍 <b>Активность</b>\n\nСначала откройте список друзей.", {
-      inline_keyboard: [[{ text: "← Назад", callback_data: "action_friends" }]],
+    await edit(t(L, "scan.needFriends"), {
+      inline_keyboard: [[{ text: t(L, "common.back"), callback_data: "action_friends" }]],
     });
     return;
   }
   if (friendsRunning.has(tgId)) {
-    await edit("🔍 <b>Активность</b>\n\n⏳ Уже выполняется.", {
-      inline_keyboard: [[{ text: "← Назад", callback_data: "action_friends" }]],
+    await edit(t(L, "scan.busy"), {
+      inline_keyboard: [[{ text: t(L, "common.back"), callback_data: "action_friends" }]],
     });
     return;
   }
   friendsRunning.add(tgId);
   friendsScanStop.delete(tgId);
-  const stopKb = { inline_keyboard: [[{ text: "⏹ Стоп", callback_data: "friends_scan_stop" }]] };
-  await edit(`🔍 <b>Активность</b>\n\nПроверка 0/${targets.length}…`, stopKb);
+  const stopKb = { inline_keyboard: [[{ text: t(L, "scan.stop"), callback_data: "friends_scan_stop" }]] };
+  await edit(t(L, "scan.progress", { done: 0, total: targets.length }), stopKb);
   let lastEdit = 0;
   try {
     const items = await runFriendsScan(user, targets, daysLimit, (done, total) => {
       const now = Date.now();
       if (now - lastEdit < 2000) return;
       lastEdit = now;
-      edit(`🔍 <b>Активность</b>\n\nПроверка ${done}/${total}…`, stopKb);
+      edit(t(L, "scan.progress", { done, total }), stopKb);
     }, () => friendsScanStop.has(tgId));
     const stopped = friendsScanStop.has(tgId);
     try {
@@ -695,23 +708,22 @@ async function startFriendsScan(user, daysLimit, chatId, messageId, tgId) {
       `).run(String(user.duolingo_user_id), JSON.stringify({ items, daysLimit }), Date.now());
     } catch {}
     const inactive = items.filter((r) => r.inactive);
+    const tail = t(L, "scan.tail", { n: inactive.length, d: daysLimit });
     await edit(
-      `🔍 <b>Активность</b>\n\n` +
-      (stopped
-        ? `⏹ Остановлено: проверено <b>${items.length}</b> из ${targets.length}\n`
-        : `Проверено: <b>${items.length}</b>\n`) +
-      `Неактивны: <b>${inactive.length}</b> (порог ${daysLimit} дн.)`,
+      stopped
+        ? t(L, "scan.stopped", { done: items.length, total: targets.length, tail })
+        : t(L, "scan.checked", { n: items.length, tail }),
       {
         inline_keyboard: [
-          [{ text: "🚫 Отписаться от неактивных", callback_data: "friends_unf_inactive" }],
-          [{ text: "🚫 Заблокировать неактивных", callback_data: "friends_block_inactive" }],
-          [{ text: "← Назад", callback_data: "action_friends" }],
+          [{ text: t(L, "scan.unfInactive"), callback_data: "friends_unf_inactive" }],
+          [{ text: t(L, "scan.blockInactive"), callback_data: "friends_block_inactive" }],
+          [{ text: t(L, "common.back"), callback_data: "action_friends" }],
         ],
       }
     );
   } catch {
-    await edit("🔍 <b>Активность</b>\n\n❌ Ошибка скана.", {
-      inline_keyboard: [[{ text: "← Назад", callback_data: "action_friends" }]],
+    await edit(t(L, "scan.error"), {
+      inline_keyboard: [[{ text: t(L, "common.back"), callback_data: "action_friends" }]],
     });
   } finally {
     friendsRunning.delete(tgId);
@@ -764,23 +776,18 @@ function markReminder(tgId, date) {
   upsertNotifyPrefs(tgId, p);
 }
 
-function notifyKeyboard(prefs) {
+function notifyKeyboard(prefs, L) {
   const flag = (v) => (v ? "✅" : "🔕");
   return {
     inline_keyboard: [
-      [{ text: `🔥 Пора позаниматься: ${flag(prefs.remind_practice)}`, callback_data: "notify_toggle_practice" }],
-      [{ text: `🏆 Обход в лиге: ${flag(prefs.league_overtake)}`, callback_data: "notify_toggle_league" }],
-      [{ text: `👥 Кто подписался / отписался: ${flag(prefs.follow_changes)}`, callback_data: "notify_toggle_follows" }],
-      [{ text: `📬 Дайджест: ${flag(prefs.digest)}`, callback_data: "notify_toggle_digest" }],
-      [{ text: `🚀 Обновления скрипта: ${flag(prefs.script_updates)}`, callback_data: "notify_toggle_updates" }],
-      [{ text: "← Назад", callback_data: "menu_settings" }],
+      [{ text: t(L, "notify.practice", { flag: flag(prefs.remind_practice) }), callback_data: "notify_toggle_practice" }],
+      [{ text: t(L, "notify.league", { flag: flag(prefs.league_overtake) }), callback_data: "notify_toggle_league" }],
+      [{ text: t(L, "notify.follows", { flag: flag(prefs.follow_changes) }), callback_data: "notify_toggle_follows" }],
+      [{ text: t(L, "notify.digest", { flag: flag(prefs.digest) }), callback_data: "notify_toggle_digest" }],
+      [{ text: t(L, "notify.updates", { flag: flag(prefs.script_updates) }), callback_data: "notify_toggle_updates" }],
+      [{ text: t(L, "common.back"), callback_data: "menu_settings" }],
     ],
   };
-}
-
-function fmtSigned(n) {
-  const v = Math.round(Number(n) || 0);
-  return (v < 0 ? "−" : "+") + Math.abs(v).toLocaleString("ru");
 }
 
 function cmpVersion(a, b) {
@@ -911,66 +918,54 @@ function buildBalanceMessage(balances) {
   return msg;
 }
 
-function donateMenuText() {
-  return (
-    "💝 <b>Поддержать проект</b>\n\n" +
-    "Если вам нравится Duolingo Helper и вы хотите поддержать его развитие — вы можете сделать донат.\n\n" +
-    "Ваша поддержка помогает:\n" +
-    "• Развивать новые функции\n" +
-    "• Поддерживать стабильную работу\n" +
-    "• Оплачивать серверы бота\n\n" +
-    "Выберите удобный способ доната:"
-  );
+function donateMenuText(L) {
+  return t(L, "donate.text");
 }
 
-function donateMenuKeyboard() {
+function donateMenuKeyboard(L) {
   const rows = [];
   if (config.donationAlertsUrl) rows.push([{ text: "🎁 DonationAlerts", url: config.donationAlertsUrl }]);
-  rows.push([{ text: "🌐 Все способы", url: "https://vidrimers.site/donate" }]);
+  rows.push([{ text: t(L, "donate.allWays"), url: "https://vidrimers.site/donate" }]);
   const crypto = [];
   if (config.kaspaAddress) crypto.push({ text: "💎 Kaspa", callback_data: "donate_kaspa" });
   if (config.tonAddress) crypto.push({ text: "💠 TON", callback_data: "donate_ton" });
   if (config.usdtAddress) crypto.push({ text: "💵 USDT (TRC-20)", callback_data: "donate_usdt" });
   for (let i = 0; i < crypto.length; i += 2) rows.push(crypto.slice(i, i + 2));
-  rows.push([{ text: "← Назад", callback_data: "menu_main" }]);
+  rows.push([{ text: t(L, "common.back"), callback_data: "menu_main" }]);
   return { inline_keyboard: rows };
 }
 
-function donateAddressView(kind) {
+function donateAddressView(kind, L) {
   const map = {
     kaspa: {
       icon: "💎", label: "Kaspa",
       title: "💎 <b>Kaspa (KAS)</b>",
       addr: config.kaspaAddress,
-      info: "ℹ️ Kaspa — быстрая и масштабируемая криптовалюта с мгновенными транзакциями",
+      info: t(L, "donate.kaspaInfo"),
     },
     ton: {
       icon: "💠", label: "TON",
       title: "💠 <b>TON (Toncoin)</b>",
       addr: config.tonAddress,
-      info: "ℹ️ TON — блокчейн от создателей Telegram с низкими комиссиями",
+      info: t(L, "donate.tonInfo"),
     },
     usdt: {
       icon: "💵", label: "USDT",
       title: "💵 <b>USDT (TRC-20)</b>",
       addr: config.usdtAddress,
-      info: "⚠️ <b>Важно:</b> используйте только сеть TRON (TRC-20)!\nОтправка через другие сети приведёт к потере средств.",
+      info: t(L, "donate.usdtInfo"),
     },
   };
   const m = map[kind];
   if (!m || !m.addr) {
     return {
-      text: `❌ ${m ? m.label : "Кошелёк"} адрес не настроен`,
-      kb: { inline_keyboard: [[{ text: "← Назад", callback_data: "donate_menu" }]] },
+      text: t(L, "donate.walletMissing", { label: m ? m.label : "?" }),
+      kb: { inline_keyboard: [[{ text: t(L, "common.back"), callback_data: "donate_menu" }]] },
     };
   }
   return {
-    text:
-      `${m.title}\n\n` +
-      `Адрес кошелька:\n<code>${m.addr}</code>\n\n` +
-      `📋 Нажмите на адрес, чтобы скопировать\n\n` +
-      m.info,
-    kb: { inline_keyboard: [[{ text: "← Назад к донатам", callback_data: "donate_menu" }]] },
+    text: m.title + "\n\n" + t(L, "donate.addr", { addr: m.addr, info: m.info }),
+    kb: { inline_keyboard: [[{ text: t(L, "common.backToDoante"), callback_data: "donate_menu" }]] },
   };
 }
 
@@ -978,18 +973,20 @@ function donateAddressView(kind) {
 bot.on("callback_query", async (ctx) => {
   const data = ctx.callbackQuery.data;
   const isAdmin = ctx.from.id === config.adminTgId;
+  const L = langOf(ctx.from.id);
 
   // навигация по меню
   if (data === "menu_main") {
     await ctx.editMessageText(mainMenuText(ctx.from.id), {
       parse_mode: "HTML",
-      reply_markup: mainMenuKeyboard(isAdmin),
+      reply_markup: mainMenuKeyboard(isAdmin, langOf(ctx.from.id)),
     });
     return;
   }
   if (data === "menu_settings") {
-    await ctx.editMessageText("⚙️ Настройки\n\nВыберите раздел:", {
-      reply_markup: settingsMenuKeyboard(),
+    const L = langOf(ctx.from.id);
+    await ctx.editMessageText(t(L, "settings.title"), {
+      reply_markup: settingsMenuKeyboard(L),
     });
     return;
   }
@@ -1009,25 +1006,25 @@ bot.on("callback_query", async (ctx) => {
     await ctx.answerCallbackQuery();
     const user = db.prepare("SELECT * FROM users WHERE tg_user_id = ?").get(ctx.from.id);
     if (!user || !user.jwt_encrypted) {
-      await ctx.editMessageText("📊 Статистика\n\n❌ Аккаунт не привязан или JWT отсутствует.", {
-        reply_markup: { inline_keyboard: [[{ text: "← Назад", callback_data: "menu_main" }]] },
+      await ctx.editMessageText(t(L, "stats.notLinked"), {
+        reply_markup: { inline_keyboard: [[{ text: t(L, "common.back"), callback_data: "menu_main" }]] },
       });
       return;
     }
-    await ctx.editMessageText("📊 <b>Статистика</b>\n\n⏳ Загрузка…", {
+    await ctx.editMessageText(t(langOf(ctx.from.id), "stats.loading"), {
       parse_mode: "HTML",
-      reply_markup: { inline_keyboard: [[{ text: "← Назад", callback_data: "menu_main" }]] },
+      reply_markup: { inline_keyboard: [[{ text: t(langOf(ctx.from.id), "common.back"), callback_data: "menu_main" }]] },
     });
     try {
       const msg = await buildStatsText(user);
       await ctx.editMessageText(msg, {
         parse_mode: "HTML",
-        reply_markup: statsKeyboard(),
+        reply_markup: statsKeyboard(userLang(user)),
       });
     } catch (e) {
-      await ctx.editMessageText("📊 <b>Статистика</b>\n\n❌ Ошибка загрузки данных.", {
+      await ctx.editMessageText(t(langOf(ctx.from.id), "stats.error"), {
         parse_mode: "HTML",
-        reply_markup: { inline_keyboard: [[{ text: "← Назад", callback_data: "menu_main" }]] },
+        reply_markup: { inline_keyboard: [[{ text: t(langOf(ctx.from.id), "common.back"), callback_data: "menu_main" }]] },
       });
     }
     return;
@@ -1038,14 +1035,14 @@ bot.on("callback_query", async (ctx) => {
     await ctx.answerCallbackQuery();
     const user = db.prepare("SELECT * FROM users WHERE tg_user_id = ?").get(ctx.from.id);
     if (!user || !user.jwt_encrypted) {
-      await ctx.editMessageText("🏆 Лига\n\n❌ Аккаунт не привязан.", {
-        reply_markup: { inline_keyboard: [[{ text: "← Назад", callback_data: "menu_main" }]] },
+      await ctx.editMessageText(t(L, "league.notLinked"), {
+        reply_markup: { inline_keyboard: [[{ text: t(L, "common.back"), callback_data: "menu_main" }]] },
       });
       return;
     }
-    await ctx.editMessageText("🏆 <b>Лига</b>\n\n⏳ Загрузка…", {
+    await ctx.editMessageText(t(L, "league.loading"), {
       parse_mode: "HTML",
-      reply_markup: { inline_keyboard: [[{ text: "← Назад", callback_data: "menu_main" }]] },
+      reply_markup: { inline_keyboard: [[{ text: t(L, "common.back"), callback_data: "menu_main" }]] },
     });
     try {
       const jwt = decryptJWT(user.jwt_encrypted);
@@ -1061,7 +1058,7 @@ bot.on("callback_query", async (ctx) => {
       const myScore = myIdx >= 0 ? rankings[myIdx].score : 0;
 
       const medals = ["🥇", "🥈", "🥉"];
-      let table = "🏆 <b>Лига</b>\n\n";
+      let table = t(L, "league.title");
       for (let i = 0; i < Math.min(rankings.length, 15); i++) {
         const r = rankings[i];
         const isMe = String(r.user_id) === myId;
@@ -1069,30 +1066,30 @@ bot.on("callback_query", async (ctx) => {
         const medal = medals[i] || (i + 1) + ".";
         const dot = isMe ? "●" : gap > 0 ? "🟢" : gap < 0 ? "🔴" : "●";
         const gapStr = isMe
-          ? "← ты"
+          ? t(L, "league.you")
           : gap > 0
-            ? "+" + Number(gap).toLocaleString("ru")
+            ? "+" + fmtNum(gap, L)
             : gap < 0
-              ? "−" + Number(Math.abs(gap)).toLocaleString("ru")
+              ? "−" + fmtNum(Math.abs(gap), L)
               : "0";
         table += `${medal} <b>${r.display_name || r.user_id}</b>\n`;
-        table += `${dot} <code>${Number(r.score).toLocaleString("ru")}</code>  ${gapStr}\n\n`;
+        table += `${dot} <code>${fmtNum(r.score, L)}</code>  ${gapStr}\n\n`;
       }
-      table += `Твоё место: <b>${myIdx >= 0 ? myIdx + 1 : "—"}</b>`;
+      table += t(L, "league.myPlace", { n: myIdx >= 0 ? myIdx + 1 : "—" });
 
       await ctx.editMessageText(table, {
         parse_mode: "HTML",
         reply_markup: {
           inline_keyboard: [
-            [{ text: "🎯 Фарм до места", callback_data: "farm_menu" }],
-            [{ text: "🔄 Обновить", callback_data: "league_refresh" }, { text: "← Назад", callback_data: "menu_main" }],
+            [{ text: t(L, "league.farmTo"), callback_data: "farm_menu" }],
+            [{ text: t(L, "league.refresh"), callback_data: "league_refresh" }, { text: t(L, "common.back"), callback_data: "menu_main" }],
           ],
         },
       });
     } catch (e) {
-      await ctx.editMessageText("🏆 <b>Лига</b>\n\n❌ Ошибка загрузки.", {
+      await ctx.editMessageText(t(L, "league.error"), {
         parse_mode: "HTML",
-        reply_markup: { inline_keyboard: [[{ text: "← Назад", callback_data: "menu_main" }]] },
+        reply_markup: { inline_keyboard: [[{ text: t(L, "common.back"), callback_data: "menu_main" }]] },
       });
     }
     return;
@@ -1125,16 +1122,14 @@ bot.on("callback_query", async (ctx) => {
         if (btns.length === 5) { rows.push(btns.splice(0)); }
       }
       if (btns.length) rows.push(btns);
-      rows.push([{ text: "← Назад", callback_data: "action_league" }]);
+      rows.push([{ text: t(L, "common.back"), callback_data: "action_league" }]);
 
-      await ctx.editMessageText(
-        `🎯 <b>Фарм до места</b>\n\n` +
-        `Эта функция поможет тебе подняться в лиге — бот будет накручивать XP, пока не достигнешь выбранного места.\n\n` +
-        `Твоё место: <b>${myRank}</b>\nВыберите целевое место:`,
-        { parse_mode: "HTML", reply_markup: { inline_keyboard: rows } }
-      );
+      await ctx.editMessageText(t(L, "leagueFarm.intro", { rank: myRank }), {
+        parse_mode: "HTML",
+        reply_markup: { inline_keyboard: rows },
+      });
     } catch {
-      await ctx.answerCallbackQuery("❌ Ошибка");
+      await ctx.answerCallbackQuery(t(L, "common.error"));
     }
     return;
   }
@@ -1148,7 +1143,7 @@ bot.on("callback_query", async (ctx) => {
     const jwt = decryptJWT(user.jwt_encrypted);
     const myId = String(user.duolingo_user_id);
 
-    await ctx.editMessageText(`🎯 <b>Фарм до места ${targetRank}</b>\n\n⏳ Начинаю…`, {
+    await ctx.editMessageText(t(L, "leagueFarm.start", { n: targetRank }), {
       parse_mode: "HTML",
       reply_markup: { inline_keyboard: [] },
     });
@@ -1198,7 +1193,7 @@ bot.on("callback_query", async (ctx) => {
       if (myRank > 0 && myRank <= targetRank) {
         // цель достигнута
         const medals = ["🥇", "🥈", "🥉"];
-        let table = `✅ <b>Цель достигнута!</b> Место: <b>${myRank}</b>\n\n🏆 <b>Лига</b>\n\n`;
+        let table = t(L, "leagueFarm.done", { n: myRank });
         for (let i = 0; i < Math.min(rankings.length, 15); i++) {
           const r = rankings[i];
           const isMe = String(r.user_id) === myId;
@@ -1206,18 +1201,18 @@ bot.on("callback_query", async (ctx) => {
           const medal = medals[i] || (i + 1) + ".";
           const dot = isMe ? "●" : gap > 0 ? "🟢" : gap < 0 ? "🔴" : "●";
           const gapStr = isMe
-            ? "← ты"
+            ? t(L, "league.you")
             : gap > 0
-              ? "+" + Number(gap).toLocaleString("ru")
+              ? "+" + fmtNum(gap, L)
               : gap < 0
-                ? "−" + Number(Math.abs(gap)).toLocaleString("ru")
+                ? "−" + fmtNum(Math.abs(gap), L)
                 : "0";
           table += `${medal} <b>${r.display_name || r.user_id}</b>\n`;
-          table += `${dot} <code>${Number(r.score).toLocaleString("ru")}</code>  ${gapStr}\n\n`;
+          table += `${dot} <code>${fmtNum(r.score, L)}</code>  ${gapStr}\n\n`;
         }
         await ctx.editMessageText(table, {
           parse_mode: "HTML",
-          reply_markup: { inline_keyboard: [[{ text: "← Назад", callback_data: "action_league" }]] },
+          reply_markup: { inline_keyboard: [[{ text: t(L, "common.back"), callback_data: "action_league" }]] },
         });
         return;
       }
@@ -1233,17 +1228,14 @@ bot.on("callback_query", async (ctx) => {
       const myNewScore = newIdx >= 0 ? newRankings[newIdx].score : 0;
 
       await ctx.editMessageText(
-        `🎯 <b>Фарм до места ${targetRank}</b>\n\n` +
-        `⚡ +50 XP · место: <b>${newRank}</b>\n` +
-        `📊 Текущий XP: <b>${Number(myNewScore).toLocaleString("ru")}</b>\n` +
-        `⏱ Цикл: ${iterations}`,
+        t(L, "leagueFarm.progress", { n: targetRank, r: newRank, x: fmtNum(myNewScore, L), i: iterations }),
         { parse_mode: "HTML", reply_markup: { inline_keyboard: [] } }
       ).catch(() => {});
     }
 
-    await ctx.editMessageText("🎯 <b>Фарм</b>\n\n⚠️ Достигнут лимит итераций.", {
+    await ctx.editMessageText(t(L, "leagueFarm.limit"), {
       parse_mode: "HTML",
-      reply_markup: { inline_keyboard: [[{ text: "← Назад", callback_data: "action_league" }]] },
+      reply_markup: { inline_keyboard: [[{ text: t(L, "common.back"), callback_data: "action_league" }]] },
     });
     return;
   }
@@ -1405,12 +1397,12 @@ bot.on("callback_query", async (ctx) => {
     await ctx.answerCallbackQuery();
     const user = db.prepare("SELECT * FROM users WHERE tg_user_id = ?").get(ctx.from.id);
     if (!user || !user.jwt_encrypted) {
-      await ctx.editMessageText("👥 Друзья\n\n❌ Аккаунт не привязан.", {
-        reply_markup: { inline_keyboard: [[{ text: "← Назад", callback_data: "menu_main" }]] },
+      await ctx.editMessageText(t(L, "friends.notLinked"), {
+        reply_markup: { inline_keyboard: [[{ text: t(L, "common.back"), callback_data: "menu_main" }]] },
       }).catch(() => {});
       return;
     }
-    await ctx.editMessageText("👥 <b>Друзья</b>\n\n⏳ Загрузка…", { parse_mode: "HTML" }).catch(() => {});
+    await ctx.editMessageText(t(L, "friends.loading"), { parse_mode: "HTML" }).catch(() => {});
     try {
       const jwt = decryptJWT(user.jwt_encrypted);
       const myId = user.duolingo_user_id;
@@ -1422,25 +1414,22 @@ bot.on("callback_query", async (ctx) => {
       const nonFollowers = following.filter((u) => !followersSet.has(String(u.userId)));
       friendsCache.set(ctx.from.id, { myId, following, followers, nonFollowers });
       await ctx.editMessageText(
-        `👥 <b>Друзья</b>\n\n` +
-        `Подписок: <b>${following.length}</b>\n` +
-        `Подписчиков: <b>${followers.length}</b>\n` +
-        `Не подписаны: <b>${nonFollowers.length}</b>`,
+        t(L, "friends.summary", { a: following.length, b: followers.length, c: nonFollowers.length }),
         {
           parse_mode: "HTML",
           reply_markup: {
             inline_keyboard: [
-              [{ text: "🚫 Отписаться от неподписанных", callback_data: "friends_unfollow_nonf" }],
-              [{ text: "🔍 Активность", callback_data: "friends_scan" }],
-              [{ text: "← Назад", callback_data: "menu_main" }],
+              [{ text: t(L, "friends.unfNonf"), callback_data: "friends_unfollow_nonf" }],
+              [{ text: t(L, "friends.activity"), callback_data: "friends_scan" }],
+              [{ text: t(L, "common.back"), callback_data: "menu_main" }],
             ],
           },
         }
       ).catch(() => {});
     } catch {
-      await ctx.editMessageText("👥 <b>Друзья</b>\n\n❌ Ошибка загрузки.", {
+      await ctx.editMessageText(t(L, "friends.error"), {
         parse_mode: "HTML",
-        reply_markup: { inline_keyboard: [[{ text: "← Назад", callback_data: "menu_main" }]] },
+        reply_markup: { inline_keyboard: [[{ text: t(L, "common.back"), callback_data: "menu_main" }]] },
       }).catch(() => {});
     }
     return;
@@ -1453,24 +1442,21 @@ bot.on("callback_query", async (ctx) => {
     const excl = getExclusions(user || {});
     const targets = cache ? cache.nonFollowers.filter((u) => !excl.has(String(u.userId))) : [];
     if (!targets.length) {
-      await safeEdit(ctx, "🚫 <b>Отписка от неподписанных</b>\n\nНет целей (обновите список друзей).", {
+      await safeEdit(ctx, t(L, "unf.noTargets"), {
         parse_mode: "HTML",
-        reply_markup: { inline_keyboard: [[{ text: "← Назад", callback_data: "action_friends" }]] },
+        reply_markup: { inline_keyboard: [[{ text: t(L, "common.back"), callback_data: "action_friends" }]] },
       });
       return;
     }
-    await safeEdit(ctx,
-      `🚫 <b>Отписка от неподписанных</b>\n\nОтписаться от ${targets.length} пользователей, которые не подписаны на вас?\nИсключения 🛡 не тронем.`,
-      {
-        parse_mode: "HTML",
-        reply_markup: {
-          inline_keyboard: [
-            [{ text: `✅ Да, отписать ${targets.length}`, callback_data: "friends_unfollow_nonf_go" }],
-            [{ text: "← Назад", callback_data: "action_friends" }],
-          ],
-        },
-      }
-    );
+    await safeEdit(ctx, t(L, "unf.confirm", { n: targets.length }), {
+      parse_mode: "HTML",
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: t(L, "unf.yes", { n: targets.length }), callback_data: "friends_unfollow_nonf_go" }],
+          [{ text: t(L, "common.back"), callback_data: "action_friends" }],
+        ],
+      },
+    });
     return;
   }
 
@@ -1480,8 +1466,8 @@ bot.on("callback_query", async (ctx) => {
     const isNonf = data === "friends_unfollow_nonf_go";
     const user = db.prepare("SELECT * FROM users WHERE tg_user_id = ?").get(ctx.from.id);
     if (!user || !user.jwt_encrypted) {
-      await safeEdit(ctx, "❌ Аккаунт не привязан.", {
-        reply_markup: { inline_keyboard: [[{ text: "← Назад", callback_data: "action_friends" }]] },
+      await safeEdit(ctx, t(L, "unf.notLinked"), {
+        reply_markup: { inline_keyboard: [[{ text: t(L, "common.back"), callback_data: "action_friends" }]] },
       });
       return;
     }
@@ -1491,24 +1477,25 @@ bot.on("callback_query", async (ctx) => {
     if (isNonf) {
       const cache = friendsCache.get(ctx.from.id);
       targets = cache ? cache.nonFollowers.filter((u) => !excl.has(String(u.userId))) : [];
-      title = "🚫 <b>Отписка от неподписанных</b>";
+      title = t(L, "unf.title");
     } else {
       const scan = loadFriendScan(user.duolingo_user_id);
       const items = scan ? (scan.items || []) : [];
       targets = items.filter((r) => r.inactive && !excl.has(String(r.userId)) && (isBlock || r.iFollow));
-      title = isBlock ? "🚫 <b>Блокировка неактивных</b>" : "🚫 <b>Отписка от неактивных</b>";
+      title = isBlock ? t(L, "act.titleBlock") : t(L, "act.titleUnf");
     }
+    const opLabel = isBlock ? t(L, "act.progressBlock") : t(L, "act.progressUnf");
     if (!targets.length) {
-      await safeEdit(ctx, title + "\n\nНет целей.", {
+      await safeEdit(ctx, title + t(L, "act.noTargets"), {
         parse_mode: "HTML",
-        reply_markup: { inline_keyboard: [[{ text: "← Назад", callback_data: "action_friends" }]] },
+        reply_markup: { inline_keyboard: [[{ text: t(L, "common.back"), callback_data: "action_friends" }]] },
       });
       return;
     }
     if (friendsRunning.has(ctx.from.id)) {
-      await safeEdit(ctx, title + "\n\n⏳ Действие уже выполняется.", {
+      await safeEdit(ctx, title + t(L, "act.busy"), {
         parse_mode: "HTML",
-        reply_markup: { inline_keyboard: [[{ text: "← Назад", callback_data: "action_friends" }]] },
+        reply_markup: { inline_keyboard: [[{ text: t(L, "common.back"), callback_data: "action_friends" }]] },
       });
       return;
     }
@@ -1526,29 +1513,29 @@ bot.on("callback_query", async (ctx) => {
         const now = Date.now();
         if (now - lastEdit >= 2000 || i === targets.length - 1) {
           lastEdit = now;
-          await ctx.editMessageText(`${title}\n\n${isBlock ? "Блокировка" : "Отписка"} ${i + 1}/${targets.length}… (+${ok})`, {
+          await ctx.editMessageText(`${title}\n\n${opLabel} ${i + 1}/${targets.length}… (+${ok})`, {
             parse_mode: "HTML",
           }).catch(() => {});
         }
         await new Promise((r) => setTimeout(r, 300 + Math.floor(Math.random() * 250)));
       }
       const name = isNonf
-        ? `отписка от ${ok} неподписанных`
+        ? t(L, "act.logNonf", { n: ok })
         : isBlock
-          ? `блокировка ${ok} неактивных`
-          : `отписка от ${ok} неактивных`;
+          ? t(L, "act.logBlock", { n: ok })
+          : t(L, "act.logUnf", { n: ok });
       logBotAction(user.duolingo_user_id, isBlock ? "block_mass" : "unfollow_mass", ids, name);
       await ctx.editMessageText(
-        `${title}\n\n✅ Готово: ${ok} / ${targets.length}`,
+        title + t(L, "act.done", { ok, n: targets.length }),
         {
           parse_mode: "HTML",
-          reply_markup: { inline_keyboard: [[{ text: "← Назад", callback_data: "action_friends" }]] },
+          reply_markup: { inline_keyboard: [[{ text: t(L, "common.back"), callback_data: "action_friends" }]] },
         }
       ).catch(() => {});
     } catch {
-      await ctx.editMessageText(`${title}\n\n❌ Ошибка (${ok} / ${targets.length}).`, {
+      await ctx.editMessageText(title + t(L, "act.error", { ok, n: targets.length }), {
         parse_mode: "HTML",
-        reply_markup: { inline_keyboard: [[{ text: "← Назад", callback_data: "action_friends" }]] },
+        reply_markup: { inline_keyboard: [[{ text: t(L, "common.back"), callback_data: "action_friends" }]] },
       }).catch(() => {});
     } finally {
       friendsRunning.delete(ctx.from.id);
@@ -1558,7 +1545,7 @@ bot.on("callback_query", async (ctx) => {
 
   if (data === "friends_scan_stop") {
     friendsScanStop.add(ctx.from.id);
-    await ctx.answerCallbackQuery("⏹ Останавливаю…").catch(() => {});
+    await ctx.answerCallbackQuery(t(L, "scan.stopping")).catch(() => {});
     return;
   }
 
@@ -1566,26 +1553,23 @@ bot.on("callback_query", async (ctx) => {
     await ctx.answerCallbackQuery();
     const user = db.prepare("SELECT * FROM users WHERE tg_user_id = ?").get(ctx.from.id);
     if (!user || !user.jwt_encrypted) {
-      await safeEdit(ctx, "🔍 <b>Активность</b>\n\n❌ Аккаунт не привязан.", {
+      await safeEdit(ctx, t(L, "scan.title") + "\n\n" + t(L, "unf.notLinked"), {
         parse_mode: "HTML",
-        reply_markup: { inline_keyboard: [[{ text: "← Назад", callback_data: "action_friends" }]] },
+        reply_markup: { inline_keyboard: [[{ text: t(L, "common.back"), callback_data: "action_friends" }]] },
       });
       return;
     }
     // выбор порога — применяется только к этому скану
-    await safeEdit(ctx,
-      "🔍 <b>Активность</b>\n\nПорог неактивности, дней:",
-      {
-        parse_mode: "HTML",
-        reply_markup: {
-          inline_keyboard: [
-            [{ text: "7 дн", callback_data: "friends_scan_d_7" }, { text: "14 дн", callback_data: "friends_scan_d_14" }, { text: "30 дн", callback_data: "friends_scan_d_30" }],
-            [{ text: "✏ Ввести число", callback_data: "friends_scan_custom" }],
-            [{ text: "← Назад", callback_data: "action_friends" }],
-          ],
-        },
-      }
-    );
+    await safeEdit(ctx, t(L, "scan.thresholdAsk"), {
+      parse_mode: "HTML",
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: t(L, "scan.d7"), callback_data: "friends_scan_d_7" }, { text: t(L, "scan.d14"), callback_data: "friends_scan_d_14" }, { text: t(L, "scan.d30"), callback_data: "friends_scan_d_30" }],
+          [{ text: t(L, "scan.custom"), callback_data: "friends_scan_custom" }],
+          [{ text: t(L, "common.back"), callback_data: "action_friends" }],
+        ],
+      },
+    });
     return;
   }
 
@@ -1594,9 +1578,9 @@ bot.on("callback_query", async (ctx) => {
     const daysLimit = parseInt(data.replace("friends_scan_d_", ""), 10);
     const user = db.prepare("SELECT * FROM users WHERE tg_user_id = ?").get(ctx.from.id);
     if (!user || !user.jwt_encrypted) {
-      await safeEdit(ctx, "🔍 <b>Активность</b>\n\n❌ Аккаунт не привязан.", {
+      await safeEdit(ctx, t(L, "scan.title") + "\n\n" + t(L, "unf.notLinked"), {
         parse_mode: "HTML",
-        reply_markup: { inline_keyboard: [[{ text: "← Назад", callback_data: "action_friends" }]] },
+        reply_markup: { inline_keyboard: [[{ text: t(L, "common.back"), callback_data: "action_friends" }]] },
       });
       return;
     }
@@ -1608,13 +1592,10 @@ bot.on("callback_query", async (ctx) => {
   if (data === "friends_scan_custom") {
     const msg = ctx.callbackQuery.message;
     scanDaysState.set(ctx.from.id, { chatId: msg.chat.id, messageId: msg.message_id });
-    await safeEdit(ctx,
-      "✏ <b>Порог неактивности</b>\n\nВведите число дней (1–365):",
-      {
-        parse_mode: "HTML",
-        reply_markup: { inline_keyboard: [[{ text: "✖ Отмена", callback_data: "friends_scan" }]] },
-      }
-    );
+    await safeEdit(ctx, t(L, "scan.customAsk"), {
+      parse_mode: "HTML",
+      reply_markup: { inline_keyboard: [[{ text: t(L, "common.cancel"), callback_data: "friends_scan" }]] },
+    });
     return;
   }
 
@@ -1626,26 +1607,25 @@ bot.on("callback_query", async (ctx) => {
     const scan = user ? loadFriendScan(user.duolingo_user_id) : null;
     const items = scan ? (scan.items || []) : [];
     const targets = items.filter((r) => r.inactive && !excl.has(String(r.userId)) && (isBlock || r.iFollow));
-    const title = isBlock ? "🚫 <b>Блокировка неактивных</b>" : "🚫 <b>Отписка от неактивных</b>";
+    const title = isBlock ? t(L, "act.titleBlock") : t(L, "act.titleUnf");
+    const verb = isBlock ? t(L, "act.verbBlock") : t(L, "act.verbUnf");
+    const verbShort = isBlock ? t(L, "act.verbBlock") : t(L, "act.progressUnf");
     if (!targets.length) {
-      await safeEdit(ctx, title + "\n\nНет целей (сначала проверьте активность).", {
+      await safeEdit(ctx, title + t(L, "act.noTargetsScan"), {
         parse_mode: "HTML",
-        reply_markup: { inline_keyboard: [[{ text: "← Назад", callback_data: "action_friends" }]] },
+        reply_markup: { inline_keyboard: [[{ text: t(L, "common.back"), callback_data: "action_friends" }]] },
       });
       return;
     }
-    await safeEdit(ctx,
-      `${title}\n\n${isBlock ? "Заблокировать" : "Отписаться от"} ${targets.length} неактивных?\nИсключения 🛡 не тронем.`,
-      {
-        parse_mode: "HTML",
-        reply_markup: {
-          inline_keyboard: [
-            [{ text: `✅ Да, ${isBlock ? "заблокировать" : "отписать"} ${targets.length}`, callback_data: isBlock ? "friends_block_inactive_go" : "friends_unf_inactive_go" }],
-            [{ text: "← Назад", callback_data: "action_friends" }],
-          ],
-        },
-      }
-    );
+    await safeEdit(ctx, title + "\n\n" + t(L, "act.confirm", { verb, n: targets.length }), {
+      parse_mode: "HTML",
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: t(L, "act.yes", { verb: verbShort, n: targets.length }), callback_data: isBlock ? "friends_block_inactive_go" : "friends_unf_inactive_go" }],
+          [{ text: t(L, "common.back"), callback_data: "action_friends" }],
+        ],
+      },
+    });
     return;
   }
 
@@ -1653,22 +1633,17 @@ bot.on("callback_query", async (ctx) => {
   if (data === "xp_get") {
     streakAmountState.delete(ctx.from.id);
     xpAmountState.set(ctx.from.id, "waiting");
-    await safeEdit(ctx,
-      "🎁 <b>Получить XP</b>\n\n" +
-      "Введите количество XP (минимум 50):\n\n" +
-      "⚠️ <i>Накрутка XP — на свой страх и риск, возможна блокировка.</i>",
-      {
-        parse_mode: "HTML",
-        reply_markup: { inline_keyboard: [[{ text: "✖ Отмена", callback_data: "xp_cancel" }]] },
-      }
-    );
+    await safeEdit(ctx, t(L, "xp.ask"), {
+      parse_mode: "HTML",
+      reply_markup: { inline_keyboard: [[{ text: t(L, "common.cancel"), callback_data: "xp_cancel" }]] },
+    });
     return;
   }
 
   if (data === "xp_cancel") {
     xpAmountState.delete(ctx.from.id);
-    await safeEdit(ctx, "❌ Накрутка отменена.", {
-      reply_markup: { inline_keyboard: [[{ text: "← В статистику", callback_data: "action_stats" }]] },
+    await safeEdit(ctx, t(L, "xp.cancelled"), {
+      reply_markup: { inline_keyboard: [[{ text: t(L, "common.backToStats"), callback_data: "action_stats" }]] },
     });
     return;
   }
@@ -1677,23 +1652,17 @@ bot.on("callback_query", async (ctx) => {
   if (data === "streak_get") {
     xpAmountState.delete(ctx.from.id);
     streakAmountState.set(ctx.from.id, "waiting");
-    await safeEdit(ctx,
-      "🔥 <b>Накрутка серии</b>\n\n" +
-      "Сколько дней накрутить? (минимум 1, максимум 365)\n\n" +
-      "⚠️ <i>Накрутка серии — на свой страх и риск, возможна блокировка.</i>\n" +
-      "⏱ <i>Процесс может занять 5–6 минут.</i>",
-      {
-        parse_mode: "HTML",
-        reply_markup: { inline_keyboard: [[{ text: "✖ Отмена", callback_data: "streak_cancel" }]] },
-      }
-    );
+    await safeEdit(ctx, t(L, "streak.ask"), {
+      parse_mode: "HTML",
+      reply_markup: { inline_keyboard: [[{ text: t(L, "common.cancel"), callback_data: "streak_cancel" }]] },
+    });
     return;
   }
 
   if (data === "streak_cancel") {
     streakAmountState.delete(ctx.from.id);
-    await safeEdit(ctx, "❌ Накрутка отменена.", {
-      reply_markup: { inline_keyboard: [[{ text: "← В статистику", callback_data: "action_stats" }]] },
+    await safeEdit(ctx, t(L, "xp.cancelled"), {
+      reply_markup: { inline_keyboard: [[{ text: t(L, "common.backToStats"), callback_data: "action_stats" }]] },
     });
     return;
   }
@@ -1701,22 +1670,18 @@ bot.on("callback_query", async (ctx) => {
   // === БАГРЕПОРТЫ ===
   if (data === "bug_report_start") {
     bugReportState.set(ctx.from.id, "waiting");
-    await safeEdit(ctx,
-      "🐛 <b>Багрепорт</b>\n\n" +
-      "Опишите проблему одним сообщением:",
-      {
-        parse_mode: "HTML",
-        reply_markup: { inline_keyboard: [[{ text: "✖ Отмена", callback_data: "bug_cancel" }]] },
-      }
-    );
+    await safeEdit(ctx, t(L, "bug.prompt"), {
+      parse_mode: "HTML",
+      reply_markup: { inline_keyboard: [[{ text: t(L, "common.cancel"), callback_data: "bug_cancel" }]] },
+    });
     return;
   }
 
   if (data === "bug_cancel") {
     bugReportState.delete(ctx.from.id);
     bugReplyState.delete(ctx.from.id);
-    await safeEdit(ctx, "❌ Багрепорт отменён.", {
-      reply_markup: { inline_keyboard: [[{ text: "← В меню", callback_data: "menu_main" }]] },
+    await safeEdit(ctx, t(L, "bug.cancelled"), {
+      reply_markup: { inline_keyboard: [[{ text: t(L, "common.backToMenu"), callback_data: "menu_main" }]] },
     });
     return;
   }
@@ -1737,7 +1702,7 @@ bot.on("callback_query", async (ctx) => {
     }).catch(() => {});
     // уведомление пользователю
     bot.api.sendMessage(Number(bug.tg_user_id),
-      "🔄 Ваш багрепорт принят в работу!",
+      t(langOf(Number(bug.tg_user_id)), "bug.accepted"),
     ).catch(() => {});
     return;
   }
@@ -1766,7 +1731,7 @@ bot.on("callback_query", async (ctx) => {
     db.prepare("UPDATE bug_reports SET status = 'completed', updated_at = datetime('now') WHERE id = ?").run(bugId);
     await ctx.answerCallbackQuery("✅ Выполнено");
     if (bug) {
-      bot.api.sendMessage(Number(bug.tg_user_id), "✅ Ваш багрепорт выполнен!").catch(() => {});
+      bot.api.sendMessage(Number(bug.tg_user_id), t(langOf(Number(bug.tg_user_id)), "bug.doneMsg")).catch(() => {});
     }
     return;
   }
@@ -1860,9 +1825,9 @@ bot.on("callback_query", async (ctx) => {
     if (data.startsWith("notify_toggle_")) {
       toggleNotify(ctx.from.id, data.replace("notify_toggle_", ""));
     }
-    await safeEdit(ctx, "🔔 <b>Уведомления</b>\n\nВыберите, что уведомлять:", {
+    await safeEdit(ctx, t(L, "notify.title"), {
       parse_mode: "HTML",
-      reply_markup: notifyKeyboard(getNotifyPrefs(ctx.from.id)),
+      reply_markup: notifyKeyboard(getNotifyPrefs(ctx.from.id), L),
     });
     return;
   }
@@ -1871,83 +1836,69 @@ bot.on("callback_query", async (ctx) => {
   if (data === "settings_link") {
     const user = db.prepare("SELECT * FROM users WHERE tg_user_id = ?").get(ctx.from.id);
     if (!user) {
-      await safeEdit(ctx,
-        "🔗 <b>Линковка</b>\n\n" +
-        "❌ Аккаунт не привязан.\nИспользуйте кнопку «Привязать Telegram» в скрипте Duolingo Helper.",
-        {
-          parse_mode: "HTML",
-          reply_markup: { inline_keyboard: [[{ text: "← Назад", callback_data: "menu_settings" }]] },
-        }
-      );
+      await safeEdit(ctx, t(L, "link.notLinked"), {
+        parse_mode: "HTML",
+        reply_markup: { inline_keyboard: [[{ text: t(L, "common.back"), callback_data: "menu_settings" }]] },
+      });
       return;
     }
     const tgName = user.tg_username || ctx.from.username || String(user.tg_user_id);
-    await safeEdit(ctx,
-      `🔗 <b>Линковка</b>\n\n` +
-      `✅ Аккаунт привязан\n\n` +
-      `👤 <b>${user.duolingo_username || user.duolingo_user_id}</b> · <code>${user.duolingo_user_id}</code>\n` +
-      `📱 @${tgName} · <code>${user.tg_user_id}</code>\n` +
-      `📅 Привязан: ${user.linked_at}`,
-      {
-        parse_mode: "HTML",
-        reply_markup: {
-          inline_keyboard: [
-            [{ text: "🔓 Отвязать аккаунт", callback_data: "settings_unlink" }],
-            [{ text: "← Назад", callback_data: "menu_settings" }],
-          ],
-        },
-      }
-    );
+    await safeEdit(ctx, t(L, "link.linked", {
+      duo: user.duolingo_username || user.duolingo_user_id,
+      duoId: user.duolingo_user_id,
+      tg: tgName,
+      tgId: user.tg_user_id,
+      date: user.linked_at,
+    }), {
+      parse_mode: "HTML",
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: t(L, "link.unlinkBtn"), callback_data: "settings_unlink" }],
+          [{ text: t(L, "common.back"), callback_data: "menu_settings" }],
+        ],
+      },
+    });
     return;
   }
 
   if (data === "settings_unlink") {
     const user = db.prepare("SELECT * FROM users WHERE tg_user_id = ?").get(ctx.from.id);
     if (!user) {
-      await safeEdit(ctx, "🔗 <b>Линковка</b>\n\n❌ Аккаунт не привязан.", {
+      await safeEdit(ctx, t(L, "link.notLinkedShort"), {
         parse_mode: "HTML",
-        reply_markup: { inline_keyboard: [[{ text: "← Назад", callback_data: "menu_settings" }]] },
+        reply_markup: { inline_keyboard: [[{ text: t(L, "common.back"), callback_data: "menu_settings" }]] },
       });
       return;
     }
-    await safeEdit(ctx,
-      "🔓 <b>Отвязка аккаунта</b>\n\n" +
-      "⚠️ Отвязать аккаунт?\n" +
-      "Все данные и настройки будут удалены с сервера:\n" +
-      "статистика, уведомления, друзья, история действий.",
-      {
-        parse_mode: "HTML",
-        reply_markup: {
-          inline_keyboard: [
-            [{ text: "✅ Да, отвязать", callback_data: "settings_unlink_go" }],
-            [{ text: "← Назад", callback_data: "settings_link" }],
-          ],
-        },
-      }
-    );
+    await safeEdit(ctx, t(L, "link.unlinkConfirm"), {
+      parse_mode: "HTML",
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: t(L, "link.unlinkYes"), callback_data: "settings_unlink_go" }],
+          [{ text: t(L, "common.back"), callback_data: "settings_link" }],
+        ],
+      },
+    });
     return;
   }
 
   if (data === "settings_unlink_go") {
     const user = db.prepare("SELECT * FROM users WHERE tg_user_id = ?").get(ctx.from.id);
     if (user) wipeUserData(user.tg_user_id, user.duolingo_user_id);
-    await safeEdit(ctx,
-      "✅ Аккаунт отвязан.\n\nВсе данные удалены с сервера.",
-      {
-        parse_mode: "HTML",
-        reply_markup: { inline_keyboard: [[{ text: "← В меню", callback_data: "menu_main" }]] },
-      }
-    );
+    await safeEdit(ctx, t(L, "link.unlinked"), {
+      parse_mode: "HTML",
+      reply_markup: { inline_keyboard: [[{ text: t(L, "common.backToMenu"), callback_data: "menu_main" }]] },
+    });
     return;
   }
 
   // === ДОНАТЫ ===
   if (data === "donate_menu") {
-    await ctx.answerCallbackQuery("Открываю меню донатов").catch(() => {});
+    await ctx.answerCallbackQuery(t(L, "donate.answer")).catch(() => {});
     // отдельным сообщением, чтобы не затирать исходное (дайджест/статистика)
-    await ctx.reply(donateMenuText(), {
+    await ctx.reply(donateMenuText(L), {
       parse_mode: "HTML",
-      reply_markup: donateMenuKeyboard(),
+      reply_markup: donateMenuKeyboard(L),
     }).catch(() => {});
     bot.api.sendMessage(config.adminTgId,
       `💝 <b>Донат меню</b>\n👤 @${ctx.from.username || ctx.from.id} (ID: <code>${ctx.from.id}</code>) открыл меню донатов`,
@@ -1958,7 +1909,7 @@ bot.on("callback_query", async (ctx) => {
 
   if (data === "donate_kaspa" || data === "donate_ton" || data === "donate_usdt") {
     const kind = data.replace("donate_", "");
-    const view = donateAddressView(kind);
+    const view = donateAddressView(kind, L);
     await safeEdit(ctx, view.text, {
       parse_mode: "HTML",
       reply_markup: view.kb,
@@ -2012,40 +1963,40 @@ bot.on("callback_query", async (ctx) => {
 
 // /help
 bot.command("help", (ctx) => {
+  const L = langOf(ctx.from.id);
   ctx.reply(
-    "📋 Duolingo Helper Bot\n\n" +
-    "Привяжи аккаунт через скрипт Duolingo Helper,\n" +
-    "затем используй кнопки меню.",
-    { reply_markup: mainMenuKeyboard(ctx.from.id === config.adminTgId) }
+    "📋 Duolingo Helper Bot\n\n" + t(L, "start.noLink"),
+    { reply_markup: mainMenuKeyboard(ctx.from.id === config.adminTgId, L) }
   );
 });
 
 // /status
 bot.command("status", (ctx) => {
   const tgId = ctx.from.id;
+  const L = langOf(tgId);
   const user = db.prepare("SELECT * FROM users WHERE tg_user_id = ?").get(tgId);
   if (!user) {
-    ctx.reply("❌ Аккаунт не привязан. Используй кнопку в скрипте Duolingo Helper.");
+    ctx.reply(t(L, "status.notLinked"));
     return;
   }
-  ctx.reply(
-    `✅ Аккаунт привязан:\n\n` +
-    `Duolingo: ${user.duolingo_username || user.duolingo_user_id}\n` +
-    `ID: ${user.duolingo_user_id}\n` +
-    `Привязан: ${user.linked_at}`
-  );
+  ctx.reply(t(L, "status.linked", {
+    name: user.duolingo_username || user.duolingo_user_id,
+    id: user.duolingo_user_id,
+    date: user.linked_at,
+  }));
 });
 
 // /unlink
 bot.command("unlink", async (ctx) => {
   const tgId = ctx.from.id;
+  const L = langOf(tgId);
   const user = db.prepare("SELECT * FROM users WHERE tg_user_id = ?").get(tgId);
   if (!user) {
-    ctx.reply("❌ Аккаунт не привязан.");
+    ctx.reply(t(L, "unlink.notLinked"));
     return;
   }
   wipeUserData(tgId, user.duolingo_user_id);
-  ctx.reply("✅ Аккаунт отвязан. Все данные удалены с сервера.");
+  ctx.reply(t(L, "unlink.done"));
 });
 
 // /bugreport — отправка бага
@@ -2061,18 +2012,16 @@ const friendsScanStop = new Set(); // tg_id — флаг остановки ск
 const scanDaysState = new Map(); // tg_id -> { chatId, messageId } — ждём порог неактивности
 bot.command("bugreport", (ctx) => {
   bugReportState.set(ctx.from.id, "waiting");
-  ctx.reply(
-    "🐛 <b>Багрепорт</b>\n\n" +
-    "Опишите проблему одним сообщением:",
-    {
-      parse_mode: "HTML",
-      reply_markup: { inline_keyboard: [[{ text: "✖ Отмена", callback_data: "bug_cancel" }]] },
-    }
-  );
+  const L = langOf(ctx.from.id);
+  ctx.reply(t(L, "bug.prompt"), {
+    parse_mode: "HTML",
+    reply_markup: { inline_keyboard: [[{ text: t(L, "common.cancel"), callback_data: "bug_cancel" }]] },
+  });
 });
 
 // приём текста бага и количества XP
 bot.on("message:text", async (ctx) => {
+  const L = langOf(ctx.from.id);
   // если ждём количество XP — запускаем накрутку
   if (xpAmountState.get(ctx.from.id) === "waiting") {
     const raw = ctx.message.text.trim();
@@ -2082,21 +2031,21 @@ bot.on("message:text", async (ctx) => {
     xpAmountState.delete(ctx.from.id);
     const amount = parseInt(raw, 10);
     if (!Number.isFinite(amount) || amount < 50) {
-      await ctx.reply("❌ Минимум 50 XP. Попробуйте ещё раз:");
+      await ctx.reply(t(L, "xp.min50"));
       xpAmountState.set(ctx.from.id, "waiting");
       return;
     }
     const target = Math.min(99999, amount);
     if (xpRunning.has(ctx.from.id)) {
-      await ctx.reply("⏳ Накрутка уже идёт, дождитесь завершения.");
+      await ctx.reply(t(L, "xp.running"));
       return;
     }
     const user = db.prepare("SELECT * FROM users WHERE tg_user_id = ?").get(ctx.from.id);
     if (!user || !user.jwt_encrypted) {
-      await ctx.reply("❌ Аккаунт не привязан или JWT отсутствует.");
+      await ctx.reply(t(L, "xp.noJwt"));
       return;
     }
-    const statusMsg = await ctx.reply("⏳ <b>Идёт накрутка XP…</b>", { parse_mode: "HTML" });
+    const statusMsg = await ctx.reply(t(L, "xp.progress"), { parse_mode: "HTML" });
     xpRunning.add(ctx.from.id);
     try {
       const earned = await runXpFarm(user, target);
@@ -2111,18 +2060,18 @@ bot.on("message:text", async (ctx) => {
       await ctx.api.editMessageText(
         statusMsg.chat.id,
         statusMsg.message_id,
-        (earned ? `✅ <b>Готово: +${Number(earned).toLocaleString("ru")} XP</b>\n\n` : "⚠️ <b>XP не начислены</b>\n\n") + statsText,
+        (earned ? t(L, "xp.done", { n: fmtNum(earned, L) }) : t(L, "xp.none")) + statsText,
         {
           parse_mode: "HTML",
-          reply_markup: statsKeyboard(),
+          reply_markup: statsKeyboard(L),
         }
       ).catch(() => {});
     } catch (e) {
       await ctx.api.editMessageText(
         statusMsg.chat.id,
         statusMsg.message_id,
-        "❌ Ошибка накрутки XP.",
-        { reply_markup: statsKeyboard() }
+        t(L, "xp.error"),
+        { reply_markup: statsKeyboard(L) }
       ).catch(() => {});
     } finally {
       xpRunning.delete(ctx.from.id);
@@ -2139,22 +2088,22 @@ bot.on("message:text", async (ctx) => {
     streakAmountState.delete(ctx.from.id);
     const amount = parseInt(raw, 10);
     if (!Number.isFinite(amount) || amount < 1) {
-      await ctx.reply("❌ Минимум 1 день. Попробуйте ещё раз:");
+      await ctx.reply(t(L, "streak.min1"));
       streakAmountState.set(ctx.from.id, "waiting");
       return;
     }
     const target = Math.min(365, amount);
     if (streakRunning.has(ctx.from.id)) {
-      await ctx.reply("⏳ Накрутка серии уже идёт, дождитесь завершения.");
+      await ctx.reply(t(L, "streak.running"));
       return;
     }
     const user = db.prepare("SELECT * FROM users WHERE tg_user_id = ?").get(ctx.from.id);
     if (!user || !user.jwt_encrypted) {
-      await ctx.reply("❌ Аккаунт не привязан или JWT отсутствует.");
+      await ctx.reply(t(L, "xp.noJwt"));
       return;
     }
     const statusMsg = await ctx.reply(
-      `🔥 <b>Накрутка серии…</b>\n\nДень 0/${target}… (+0)\n\n⏱ <i>Может занять 5–6 минут.</i>`,
+      t(L, "streak.progress", { d: 0, t: target, ok: 0, warn: "" }) + t(L, "streak.tail"),
       { parse_mode: "HTML" }
     );
     streakRunning.add(ctx.from.id);
@@ -2169,7 +2118,7 @@ bot.on("message:text", async (ctx) => {
         ctx.api.editMessageText(
           statusMsg.chat.id,
           statusMsg.message_id,
-          `🔥 <b>Накрутка серии…</b>\n\nДень ${day}/${target}… (+${ok})` + (isFail ? " ⚠️" : "") + `\n\n⏱ <i>Может занять 5–6 минут.</i>`,
+          t(L, "streak.progress", { d: day, t: target, ok, warn: isFail ? " ⚠️" : "" }) + t(L, "streak.tail"),
           { parse_mode: "HTML" }
         ).catch(() => {});
       });
@@ -2177,18 +2126,18 @@ bot.on("message:text", async (ctx) => {
       await ctx.api.editMessageText(
         statusMsg.chat.id,
         statusMsg.message_id,
-        (saved ? `✅ <b>Готово: +${saved} дн.</b>\n\n` : "⚠️ <b>Серия не увеличена</b>\n\n") + statsText,
+        (saved ? t(L, "streak.done", { n: saved }) : t(L, "streak.none")) + statsText,
         {
           parse_mode: "HTML",
-          reply_markup: statsKeyboard(),
+          reply_markup: statsKeyboard(L),
         }
       ).catch(() => {});
     } catch (e) {
       await ctx.api.editMessageText(
         statusMsg.chat.id,
         statusMsg.message_id,
-        "❌ Ошибка накрутки серии.",
-        { reply_markup: statsKeyboard() }
+        t(L, "streak.error"),
+        { reply_markup: statsKeyboard(L) }
       ).catch(() => {});
     } finally {
       streakRunning.delete(ctx.from.id);
@@ -2206,13 +2155,13 @@ bot.on("message:text", async (ctx) => {
     scanDaysState.delete(ctx.from.id);
     const days = parseInt(raw, 10);
     if (!Number.isFinite(days) || days < 1 || days > 365) {
-      await ctx.reply("❌ Введите число от 1 до 365:");
+      await ctx.reply(t(L, "scan.customAsk"));
       scanDaysState.set(ctx.from.id, st);
       return;
     }
     const user = db.prepare("SELECT * FROM users WHERE tg_user_id = ?").get(ctx.from.id);
     if (!user || !user.jwt_encrypted) {
-      await ctx.reply("❌ Аккаунт не привязан.");
+      await ctx.reply(t(L, "unf.notLinked"));
       return;
     }
     await startFriendsScan(user, days, st.chatId, st.messageId, ctx.from.id);
@@ -2229,14 +2178,14 @@ bot.on("message:text", async (ctx) => {
       return;
     }
     if (!text || text.length < 5) {
-      ctx.reply("❌ Сообщение слишком короткое. Попробуйте ещё раз: /bugreport");
+      ctx.reply(t(L, "bug.tooShort"));
       return;
     }
     // проверка привязки TG
     const user = db.prepare("SELECT * FROM users WHERE tg_user_id = ?").get(ctx.from.id);
     if (!user) {
       bugReportState.delete(ctx.from.id);
-      ctx.reply("❌ Для отправки багрепорта привяжите аккаунт. Кнопка «Привязать Telegram» в скрипте Duolingo Helper.");
+      ctx.reply(t(L, "bug.needLink"));
       return;
     }
     // rate limit: 1 баг в 5 минут
@@ -2246,7 +2195,7 @@ bot.on("message:text", async (ctx) => {
       if (elapsed < 5 * 60 * 1000) {
         bugReportState.delete(ctx.from.id);
         const mins = Math.ceil((5 * 60 * 1000 - elapsed) / 60000);
-        ctx.reply("⏱ Слишком часто. Попробуйте через " + mins + " мин.");
+        ctx.reply(t(L, "bug.tooOften", { n: mins }));
         return;
       }
     }
@@ -2256,7 +2205,7 @@ bot.on("message:text", async (ctx) => {
     const todayCount = db.prepare("SELECT COUNT(*) as n FROM bug_reports WHERE tg_user_id = ? AND created_at >= ?").get(ctx.from.id, todayStart.toISOString()).n;
     if (todayCount >= 10) {
       bugReportState.delete(ctx.from.id);
-      ctx.reply("❌ Достигнут дневной лимит багрепортов (10). Попробуйте завтра.");
+      ctx.reply(t(L, "bug.limit"));
       return;
     }
     const bugId = db.prepare(`
@@ -2265,7 +2214,7 @@ bot.on("message:text", async (ctx) => {
     `).run(ctx.from.id, ctx.from.username || "", user ? user.duolingo_user_id || "" : "", user ? user.duolingo_username || "" : "", text).lastInsertRowid;
 
     // подтверждение пользователю
-    ctx.reply("✅ <b>Багрепорт отправлен!</b>\n\nМы рассмотрим его в ближайшее время.", { parse_mode: "HTML" });
+    ctx.reply(t(L, "bug.sent"), { parse_mode: "HTML" });
 
     // уведомление админу
     const duoName = (user && user.duolingo_username) || (user && user.duolingo_user_id) || "—";
@@ -2296,7 +2245,7 @@ bot.on("message:text", async (ctx) => {
     if (bug) {
       db.prepare("UPDATE bug_reports SET admin_reply = ?, status = 'in_progress', updated_at = datetime('now') WHERE id = ?").run(replyText, bugId);
       // отправляем ответ пользователю
-      bot.api.sendMessage(Number(bug.tg_user_id), `💬 Ответ от поддержки:\n\n${replyText}`).catch(() => {});
+      bot.api.sendMessage(Number(bug.tg_user_id), t(langOf(Number(bug.tg_user_id)), "bug.reply", { text: replyText })).catch(() => {});
       ctx.reply("✅ Ответ отправлен пользователю.");
     }
     return;
@@ -2317,21 +2266,22 @@ bot.command("admin", (ctx) => {
 
 // обработка кода линковки из deep link
 function handleLinkCode(ctx, code) {
+  const L = langOf(ctx.from.id);
   const row = db.prepare("SELECT * FROM link_codes WHERE code = ?").get(code);
   if (!row) {
-    ctx.reply("❌ Код не найден.");
+    ctx.reply(t(L, "code.notFound"));
     return;
   }
   if (row.used) {
-    ctx.reply("❌ Код уже использован.");
+    ctx.reply(t(L, "code.used"));
     return;
   }
   if (Date.now() > row.expires_at) {
-    ctx.reply("❌ Код истёк. Получи новый в скрипте.");
+    ctx.reply(t(L, "code.expired"));
     return;
   }
   if (row.attempts >= 5) {
-    ctx.reply("❌ Слишком много попыток.");
+    ctx.reply(t(L, "code.tooMany"));
     return;
   }
 
@@ -2339,10 +2289,7 @@ function handleLinkCode(ctx, code) {
 
   const existing = db.prepare("SELECT * FROM users WHERE tg_user_id = ?").get(ctx.from.id);
   if (existing && existing.duolingo_user_id !== row.duolingo_user_id) {
-    ctx.reply(
-      "⚠️ Уже привязан другой Duolingo-аккаунт.\n" +
-      "Сначала отвяжи: /unlink"
-    );
+    ctx.reply(t(L, "code.otherAccount"));
     return;
   }
 
@@ -2357,11 +2304,7 @@ function handleLinkCode(ctx, code) {
       linked_at = datetime('now')
   `).run(row.duolingo_user_id, row.duolingo_username || null, ctx.from.id, ctx.from.username || "", row.jwt_encrypted || null);
 
-  ctx.reply(
-    "✅ Аккаунт привязан!\n\n" +
-    `Duolingo ID: ${row.duolingo_user_id}\n` +
-    "Теперь ты получишь доступ к командам бота."
-  );
+  ctx.reply(t(L, "code.success", { id: row.duolingo_user_id }));
 
   // уведомление админу о линковке
   try {
@@ -2792,13 +2735,13 @@ async function checkPracticeReminders() {
         continue;
       }
       await bot.api.sendMessage(u.tg_user_id,
-        "🔥 <b>Пора позаниматься!</b>\n\nСегодня вы ещё не занимались. Позанимайся либо получи XP, чтобы не потерять серию.",
+        t(userLang(u), "n.practice"),
         {
           parse_mode: "HTML",
           reply_markup: {
             inline_keyboard: [[
-              { text: "🎁 Получить XP", callback_data: "xp_get" },
-              { text: "🌐 Открыть сайт", url: "https://www.duolingo.com" },
+              { text: t(userLang(u), "stats.getXp"), callback_data: "xp_get" },
+              { text: t(userLang(u), "menu.openSite"), url: "https://www.duolingo.com" },
             ]],
           },
         }
@@ -2851,13 +2794,14 @@ async function checkLeagueOvertakes() {
         }
         if (overtakers.length) {
           const place = myIdx + 1;
+          const NL = userLang(u);
           const text = (overtakers.length === 1
-            ? `🏆 <b>Тебя обогнал ${escapeHtml(overtakers[0].name)}</b>\nНа ${Number(overtakers[0].gap).toLocaleString("ru")} очков.`
-            : `🏆 <b>Тебя обогнали</b>\n\n` + overtakers.map((t) => `${escapeHtml(t.name)} — на ${Number(t.gap).toLocaleString("ru")} очков`).join("\n")) +
-            `\n\n📍 Сейчас твоё место в лиге: <b>${place}</b>`;
+            ? t(NL, "n.overtakeOne", { name: escapeHtml(overtakers[0].name), n: fmtNum(overtakers[0].gap, NL) })
+            : t(NL, "n.overtakeMany") + overtakers.map((ot) => t(NL, "n.overtakeRow", { name: escapeHtml(ot.name), n: fmtNum(ot.gap, NL) })).join("\n")) +
+            t(NL, "n.overtakePlace", { p: place });
           await bot.api.sendMessage(u.tg_user_id, text, {
             parse_mode: "HTML",
-            reply_markup: { inline_keyboard: [[{ text: "🎯 Фарм до места", callback_data: "farm_menu" }]] },
+            reply_markup: { inline_keyboard: [[{ text: t(NL, "league.farmTo"), callback_data: "farm_menu" }]] },
           }).catch(() => {});
         }
       }
@@ -2935,13 +2879,14 @@ async function checkFollowChanges() {
       }
       if (!followed.length && !unfollowed.length) continue;
       // одним сообщением, со ссылками на профили
+      const CL = userLang(u);
       const all = [
-        ...followed.map((f) => ({ f, line: `✅ ${profileLink(f)} подписался` })),
-        ...unfollowed.map((f) => ({ f, line: `❌ ${profileLink(f)} отписался` })),
+        ...followed.map((f) => ({ f, line: t(CL, "n.followed", { link: profileLink(f) }) })),
+        ...unfollowed.map((f) => ({ f, line: t(CL, "n.unfollowed", { link: profileLink(f) }) })),
       ];
       const shown = all.slice(0, 20);
       const hidden = all.length - shown.length;
-      const text = `👥 <b>Изменения</b>\n\n` + shown.map((s) => s.line).join("\n") + (hidden > 0 ? `\n…и ещё ${hidden}` : "");
+      const text = t(CL, "n.changesTitle") + shown.map((s) => s.line).join("\n") + (hidden > 0 ? t(CL, "n.changesMore", { n: hidden }) : "");
       await bot.api.sendMessage(u.tg_user_id, text, { parse_mode: "HTML" }).catch(() => {});
       // события → в «Изменения» скрипта (с дедупом на его стороне)
       const now = Date.now();
@@ -3031,7 +2976,8 @@ async function checkWeeklyDigest() {
       } catch {}
 
       // активность по последнему скану
-      let actBlock = "📊 <i>Активность: нет данных — запустите «🔍 Активность» в разделе «👥 Друзья».</i>";
+      const DL = userLang(u);
+      let actBlock = t(DL, "n.digestActEmpty");
       try {
         const scan = loadFriendScan(u.duolingo_user_id);
         const items = scan ? (scan.items || []) : [];
@@ -3043,25 +2989,23 @@ async function checkWeeklyDigest() {
           const scanDate = scanned
             ? `${scanned.getDate()}.${String(scanned.getMonth() + 1).padStart(2, "0")}`
             : "?";
-          actBlock =
-            `📊 <i>Активность (по проверке от ${scanDate}):</i>\n` +
-            `✅ Активны: <b>${active}</b> · 💤 Неактивны (7+ дн.): <b>${inactive}</b>`;
+          actBlock = t(DL, "n.digestAct", { d: scanDate, a: active, b: inactive });
         }
       } catch {}
 
       const net = followed - unfollowed;
       const netStr = net > 0 ? ` (+${net})` : net < 0 ? ` (−${Math.abs(net)})` : "";
       const text =
-        `📬 <b>Дайджест за неделю (${fmtRange(start, todayUser)})</b>\n\n` +
-        `👥 Подписчиков: <b>${followers == null ? "—" : followers}</b>${netStr}\n` +
-        `🔄 Подписался: +${followed} · Отписался: −${unfollowed}\n` +
-        `⚡ XP за неделю: <b>${fmtSigned(weekXp)}</b>\n` +
-        `🎁 Из них накручено XP: <b>+${Number(farmedXp).toLocaleString("ru")}</b>\n\n` +
+        t(DL, "n.digestTitle", { range: fmtRange(start, todayUser, DL) }) +
+        t(DL, "n.digestFollowers", { n: followers == null ? "—" : followers, net: netStr }) +
+        t(DL, "n.digestFollow", { a: followed, b: unfollowed }) +
+        t(DL, "n.digestXp", { n: fmtSigned(weekXp, DL) }) +
+        t(DL, "n.digestFarmed", { n: fmtNum(farmedXp, DL) }) +
         actBlock;
 
       await bot.api.sendMessage(u.tg_user_id, text, {
         parse_mode: "HTML",
-        reply_markup: { inline_keyboard: [[{ text: "💝 Донат", callback_data: "donate_menu" }]] },
+        reply_markup: { inline_keyboard: [[{ text: t(DL, "menu.donate"), callback_data: "donate_menu" }]] },
       }).catch(() => {});
       prefs.last_digest_date = todayUser;
       upsertNotifyPrefs(u.tg_user_id, prefs);
@@ -3093,11 +3037,12 @@ async function checkScriptUpdates() {
       for (const u of users) {
         const prefs = getNotifyPrefs(u.tg_user_id);
         if (!prefs.script_updates) continue;
+        const UL = langOf(u.tg_user_id);
         await bot.api.sendMessage(u.tg_user_id,
-          `🚀 <b>Доступно обновление Duolingo Helper v${version}</b>`,
+          t(UL, "n.update", { v: version }),
           {
             parse_mode: "HTML",
-            reply_markup: { inline_keyboard: [[{ text: "📦 Установить", url: "https://raw.githubusercontent.com/Vidrimers/Duolingo-helper/master/duo-helper.user.js" }]] },
+            reply_markup: { inline_keyboard: [[{ text: t(UL, "n.updateBtn"), url: "https://raw.githubusercontent.com/Vidrimers/Duolingo-helper/master/duo-helper.user.js" }]] },
           }
         ).catch(() => {});
       }
@@ -3137,14 +3082,21 @@ bot.start({
   onStart: async (me) => {
     console.log(`[bot] Started as @${me.username}`);
     console.log(`[bot] Admin: ${config.adminTgId}`);
-    // меню команд (кнопка рядом с полем ввода)
+    // меню команд (кнопка рядом с полем ввода) — ru и en
     await bot.api.setMyCommands([
       { command: "start", description: "Главное меню" },
       { command: "help", description: "Справка" },
       { command: "status", description: "Статус привязки" },
       { command: "bugreport", description: "Сообщить об ошибке" },
       { command: "unlink", description: "Отвязать аккаунт" },
-    ]);
+    ], { language_code: "ru" }).catch(() => {});
+    await bot.api.setMyCommands([
+      { command: "start", description: "Main menu" },
+      { command: "help", description: "Help" },
+      { command: "status", description: "Link status" },
+      { command: "bugreport", description: "Report a bug" },
+      { command: "unlink", description: "Unlink account" },
+    ]).catch(() => {});
     // уведомление админу о старте
     try {
       await bot.api.sendMessage(config.adminTgId, "🟢 Бот запущен и готов к работе.");

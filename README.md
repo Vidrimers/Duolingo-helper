@@ -299,6 +299,8 @@ Userscript для Tampermonkey — расширение для Duolingo с пр�
 
 **Команды:** `/start`, `/help`, `/status`, `/bugreport`, `/unlink`
 
+**Язык:** сообщения бота — на языке скрипта («Настройки → Язык / Language»: Русский / English); админ-панель всегда на русском.
+
 **Линковка:** кнопка «Привязать Telegram» в скрипте → deep link → бот.
 **Багрепорт:** кнопка 🐞 в скрипте → выбор GitHub / Telegram → `/bugreport` в боте.
 
