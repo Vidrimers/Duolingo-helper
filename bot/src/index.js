@@ -2700,7 +2700,7 @@ setInterval(cleanupOldLinkCodes, 24 * 60 * 60 * 1000);
 // 1) «Пора позаниматься» — в 23:00 по таймзоне аккаунта, если серия сегодня не продлена
 async function checkPracticeReminders() {
   const rows = db.prepare(`
-    SELECT u.tg_user_id, u.duolingo_user_id, u.jwt_encrypted, u.timezone
+    SELECT u.tg_user_id, u.duolingo_user_id, u.jwt_encrypted, u.timezone, u.lang
     FROM users u
     WHERE u.tg_user_id IS NOT NULL
       AND u.tg_user_id NOT IN (SELECT tg_user_id FROM banned_users)
@@ -2754,7 +2754,7 @@ async function checkPracticeReminders() {
 // 2) «Обход в лиге» — по снапшоту таблицы, уведомляем только на пересечении
 async function checkLeagueOvertakes() {
   const rows = db.prepare(`
-    SELECT u.tg_user_id, u.duolingo_user_id, u.jwt_encrypted
+    SELECT u.tg_user_id, u.duolingo_user_id, u.jwt_encrypted, u.lang
     FROM users u
     WHERE u.tg_user_id IS NOT NULL
       AND u.tg_user_id NOT IN (SELECT tg_user_id FROM banned_users)
@@ -2838,7 +2838,7 @@ function insertPendingChange(duoId, kind, f, ts) {
 
 async function checkFollowChanges() {
   const rows = db.prepare(`
-    SELECT u.tg_user_id, u.duolingo_user_id, u.jwt_encrypted
+    SELECT u.tg_user_id, u.duolingo_user_id, u.jwt_encrypted, u.lang
     FROM users u
     WHERE u.tg_user_id IS NOT NULL
       AND u.tg_user_id NOT IN (SELECT tg_user_id FROM banned_users)
@@ -2899,7 +2899,7 @@ async function checkFollowChanges() {
 // 4) «Дайджест» — воскресенье 20:00 по таймзоне аккаунта
 async function checkWeeklyDigest() {
   const rows = db.prepare(`
-    SELECT u.tg_user_id, u.duolingo_user_id, u.jwt_encrypted, u.timezone, u.linked_at
+    SELECT u.tg_user_id, u.duolingo_user_id, u.jwt_encrypted, u.timezone, u.lang, u.linked_at
     FROM users u
     WHERE u.tg_user_id IS NOT NULL
       AND u.tg_user_id NOT IN (SELECT tg_user_id FROM banned_users)
