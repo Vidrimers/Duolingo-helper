@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Duolingo Helper
 // @namespace    https://github.com/Vidrimers/Duolingo-helper
-// @version      0.11.5
+// @version      0.11.6
 // @description  Проверка взаимной подписки на профилях Duolingo. Панель, бейджи, кеш.
 // @author       Vidrimers
 // @match        *://*.duolingo.com/*
@@ -591,6 +591,73 @@
       "cloud.deleted": "✓ Бэкап удалён",
       "cloud.deleteError": "Ошибка удаления: {e}",
       "cloud.serverDown": "сервер недоступен",
+      // окно, бейдж, футер
+      "ui.badgeDefault": "Проверка…",
+      "ui.badgeHint": "нажми, чтобы открыть панель",
+      "ui.badgeTitle": "Duolingo Helper — нажми, чтобы открыть панель",
+      "ui.about": "О скрипте",
+      "ui.bug": "Сообщить об ошибке",
+      "ui.minimize": "Свернуть",
+      "ui.restore": "Развернуть",
+      "ui.close": "Закрыть",
+      "ui.ok": "Понятно",
+      "ui.install": "⬆️ Установить",
+      "ui.donate": "Поддержать проект",
+      "ui.license": "Лицензия",
+      "ui.statsOpened": "✓ Статистика открыта в новой вкладке",
+      "ui.noAccount": "Не удалось определить аккаунт",
+      "ui.noAccount2": "Не удалось определить ваш аккаунт",
+      // обновления
+      "upd.banner": "🆕 Доступно обновление: v{a} → v{b}",
+      "upd.installing": "Установка обновления… перезагрузка через {n}…",
+      "upd.checking": "⏳ Проверяем...",
+      "upd.found": "Найдено обновление — см. плашку вверху панели",
+      "upd.none": "✓ Обновлений нет, версия актуальна",
+      // справка
+      "help.title": "Справка",
+      "help.intro": "Userscript для Tampermonkey — расширение для Duolingo.\nПомогает следить за подписками, чистить друзей, держать серию\nи ускорять рутину в аккаунте.",
+      "help.whatCan": "Что умеет:",
+      "help.f1": "Проверка взаимной подписки на профиле и в списке друзей",
+      "help.f2": "Кто подписался / отписался, история действий с откатом",
+      "help.f3": "Отписка, блокировка, исключения (🛡), блок-лист",
+      "help.f4": "Неактивные друзья: streak, XP, массовые действия",
+      "help.f5": "Защита сердец, короткие уроки, автосолвер",
+      "help.f6": "Квесты, магазин, гемы, streak, лига, XP-буст",
+      "help.credits1": "Часть механик (уроки, квесты, магазин, гемы, лига, XP)\nнаписана с нуля, вдохновившись проектом пользователя",
+      "help.credits2": "Идея меток на пользователей взята из",
+      "help.warn": "Массовые действия и читы — на свой страх и риск.\nJWT-токен не отправляется третьим сторонам.",
+      "help.warn2": "Помните, что используя читерские функции, вы не выучите язык: они сделаны для развлечения!",
+      // лицензия
+      "lic.title": "Лицензия",
+      "lic.free": "✅ Использовать бесплатно",
+      "lic.share": "✅ Делиться с указанием автора",
+      "lic.commercial": "❌ Коммерческое использование",
+      "lic.derivatives": "❌ Переделки и производные",
+      "lic.commercialNote": "Для коммерческого использования свяжитесь с автором для получения лицензии.",
+      "lic.full": "Полный текст",
+      // багрепорт (модалка и шаблон)
+      "bug.title": "🐛 Багрепорт",
+      "bug.how": "Как хотите отправить багрепорт?",
+      "bug.version": "**Версия скрипта:** ",
+      "bug.browser": "**Браузер:** ",
+      "bug.theme": "**Тема окна:** ",
+      "bug.steps": "**Шаги воспроизведения:**",
+      "bug.expected": "**Ожидаемое поведение:**",
+      "bug.actual": "**Фактическое поведение:**",
+      "bug.extra": "**Дополнительно:**",
+      // тумблеры (доп.)
+      "tg.autoOn": "Автопроверка включена",
+      "tg.autoOff": "Автопроверка выключена",
+      "tg.badgeOn": "Бейдж включён",
+      "tg.badgeOff": "Бейдж выключен",
+      "tg.freeMaxOn": "Free Max / Super включён",
+      "tg.freeMaxOff": "Free Max / Super выключен",
+      "tg.xpBoostOn": "Фейк XP-буст включён",
+      "tg.xpBoostOff": "Фейк XP-буст выключен",
+      "tg.xpBoost15": "Фейк x2 · 15 мин",
+      "tg.xpBoost60": "Фейк x2 · 60 мин",
+      "tg.heartsOn": "включена — сердца не списываются",
+      "tg.heartsOff": "выключена — списание как обычно",
     },
     en: {
       "lang.changed": "Interface language changed",
@@ -1113,6 +1180,73 @@
       "cloud.deleted": "✓ Backup deleted",
       "cloud.deleteError": "Delete failed: {e}",
       "cloud.serverDown": "server unavailable",
+      // window, badge, footer
+      "ui.badgeDefault": "Checking…",
+      "ui.badgeHint": "click to open the panel",
+      "ui.badgeTitle": "Duolingo Helper — click to open the panel",
+      "ui.about": "About",
+      "ui.bug": "Report a bug",
+      "ui.minimize": "Minimize",
+      "ui.restore": "Restore",
+      "ui.close": "Close",
+      "ui.ok": "Got it",
+      "ui.install": "⬆️ Install",
+      "ui.donate": "Support the project",
+      "ui.license": "License",
+      "ui.statsOpened": "✓ Stats opened in a new tab",
+      "ui.noAccount": "Couldn't detect the account",
+      "ui.noAccount2": "Couldn't detect your account",
+      // updates
+      "upd.banner": "🆕 Update available: v{a} → v{b}",
+      "upd.installing": "Installing the update… reloading in {n}…",
+      "upd.checking": "⏳ Checking...",
+      "upd.found": "Update found — see the banner at the top of the panel",
+      "upd.none": "✓ No updates, the version is up to date",
+      // help
+      "help.title": "Help",
+      "help.intro": "A userscript for Tampermonkey — an extension for Duolingo.\nIt helps you keep track of follows, clean up friends, keep your streak\nand speed up routine work in your account.",
+      "help.whatCan": "What it can do:",
+      "help.f1": "Follow-back checking on profiles and in the friends list",
+      "help.f2": "Who followed / unfollowed, action history with undo",
+      "help.f3": "Unfollowing, blocking, exceptions (🛡), block list",
+      "help.f4": "Inactive friends: streak, XP, mass actions",
+      "help.f5": "Heart protection, short lessons, auto solver",
+      "help.f6": "Quests, shop, gems, streak, league, XP boost",
+      "help.credits1": "Some mechanics (lessons, quests, shop, gems, league, XP)\nwere written from scratch, inspired by a user's project",
+      "help.credits2": "The idea of user tags came from",
+      "help.warn": "Mass actions and cheats are at your own risk.\nThe JWT token is not sent to third parties.",
+      "help.warn2": "Remember that by using cheat features you won't learn the language — they are made for fun!",
+      // license
+      "lic.title": "License",
+      "lic.free": "✅ Use for free",
+      "lic.share": "✅ Share with attribution",
+      "lic.commercial": "❌ Commercial use",
+      "lic.derivatives": "❌ Modifications and derivatives",
+      "lic.commercialNote": "For commercial use, contact the author to obtain a license.",
+      "lic.full": "Full text",
+      // bug report (modal and template)
+      "bug.title": "🐛 Bug report",
+      "bug.how": "How do you want to send the bug report?",
+      "bug.version": "**Script version:** ",
+      "bug.browser": "**Browser:** ",
+      "bug.theme": "**Window theme:** ",
+      "bug.steps": "**Steps to reproduce:**",
+      "bug.expected": "**Expected behavior:**",
+      "bug.actual": "**Actual behavior:**",
+      "bug.extra": "**Additional:**",
+      // toggles (extra)
+      "tg.autoOn": "Auto-check enabled",
+      "tg.autoOff": "Auto-check disabled",
+      "tg.badgeOn": "Badge enabled",
+      "tg.badgeOff": "Badge disabled",
+      "tg.freeMaxOn": "Free Max / Super enabled",
+      "tg.freeMaxOff": "Free Max / Super disabled",
+      "tg.xpBoostOn": "Fake XP boost enabled",
+      "tg.xpBoostOff": "Fake XP boost disabled",
+      "tg.xpBoost15": "Fake x2 · 15 min",
+      "tg.xpBoost60": "Fake x2 · 60 min",
+      "tg.heartsOn": "on — hearts are not spent",
+      "tg.heartsOff": "off — spending as usual",
     },
   };
 
@@ -1516,7 +1650,7 @@
   /** Проверяет, подписан ли `target` на меня. */
   async function checkFollowsMe(targetUsername, targetId) {
     const me = await getMe();
-    if (!me || !me.id) throw new Error("Не удалось определить ваш аккаунт");
+    if (!me || !me.id) throw new Error(t("ui.noAccount2"));
 
     const meId = String(me.id);
     const meName = (me.username || "").toLowerCase();
@@ -4308,8 +4442,8 @@
     badge.innerHTML = `
         <span class="dh-badge-icon">…</span>
         <span>
-            <span class="dh-badge-text">Проверка…</span>
-            <span class="dh-badge-sub">нажми, чтобы открыть панель</span>
+            <span class="dh-badge-text">${t("ui.badgeDefault")}</span>
+            <span class="dh-badge-sub">${t("ui.badgeHint")}</span>
         </span>
     `;
     shadow.appendChild(badge);
@@ -4323,17 +4457,17 @@
             <span class="dh-title-text">Duolingo Helper</span>
             <span class="dh-chip" id="dh-version-chip"></span>
             <div class="dh-win-btns">
-                <button class="dh-win-btn" id="dh-about-btn" title="О скрипте" style="width:22px;height:22px">?</button>
-                <button class="dh-win-btn" id="dh-bug-btn" title="Сообщить об ошибке" style="width:22px;height:22px">🐞</button>
-                <button class="dh-win-btn min" id="dh-min-btn" title="Свернуть">–</button>
-                <button class="dh-win-btn close" id="dh-close-btn" title="Закрыть">×</button>
+                <button class="dh-win-btn" id="dh-about-btn" title="${t("ui.about")}" style="width:22px;height:22px">?</button>
+                <button class="dh-win-btn" id="dh-bug-btn" title="${t("ui.bug")}" style="width:22px;height:22px">🐞</button>
+                <button class="dh-win-btn min" id="dh-min-btn" title="${t("ui.minimize")}">–</button>
+                <button class="dh-win-btn close" id="dh-close-btn" title="${t("ui.close")}">×</button>
             </div>
         </div>
 
         <div class="dh-body">
             <div class="dh-update-banner" id="dh-update-banner">
                 <span id="dh-update-text"></span>
-                <button class="dh-update-btn" id="dh-update-btn">⬆️ Установить</button>
+                <button class="dh-update-btn" id="dh-update-btn">${t("ui.install")}</button>
             </div>
 
             <div class="dh-tabs">
@@ -4883,9 +5017,9 @@
             </div>
         </div>
         <div class="dh-footer">
-            <a class="dh-donate-link" href="https://vidrimers.su/donate" target="_blank" rel="noopener">Поддержать проект</a>
+            <a class="dh-donate-link" href="https://vidrimers.su/donate" target="_blank" rel="noopener">${t("ui.donate")}</a>
             <span style="opacity:0.4;margin:0 6px">·</span>
-            <a class="dh-donate-link" id="dh-license-link" href="#" style="cursor:pointer">Лицензия</a>
+            <a class="dh-donate-link" id="dh-license-link" href="#" style="cursor:pointer">${t("ui.license")}</a>
         </div>
         <input type="file" id="dh-import-file" accept="application/json,.json" style="display:none" />
     `;
@@ -5107,8 +5241,8 @@
     if (els.setHearts) els.setHearts.classList.toggle("on", on);
     if (els.heartsStatus) {
       els.heartsStatus.textContent = on
-        ? "включена — сердца не списываются"
-        : "выключена — списание как обычно";
+        ? t("tg.heartsOn")
+        : t("tg.heartsOff");
     }
   }
 
@@ -7688,7 +7822,7 @@
         if (statusEl) statusEl.textContent = "";
       }
     } catch {
-      if (btn) { btn.textContent = "🔗 Привязать"; btn.disabled = false; btn.dataset.mode = "link"; }
+      if (btn) { btn.textContent = t("tglink.linkedBtn"); btn.disabled = false; btn.dataset.mode = "link"; }
     }
   }
 
@@ -8003,7 +8137,7 @@ function savePage() {
     const url = URL.createObjectURL(blob);
     window.open(url, "_blank");
     setTimeout(() => URL.revokeObjectURL(url), 30000);
-    showToast("✓ Статистика открыта в новой вкладке");
+    showToast(t("ui.statsOpened"));
   }
 
   /** Переключение на другой аккаунт (JWT swap + reload). */
@@ -10044,43 +10178,39 @@ function savePage() {
     overlay.className = "dh-confirm-overlay dh-theme-" + theme;
     overlay.innerHTML = `
       <div class="dh-confirm-box" style="width:420px">
-        <div class="dh-confirm-title">Справка</div>
+        <div class="dh-confirm-title">${t("help.title")}</div>
         <div class="dh-confirm-body" style="max-height:55vh;overflow-y:auto;line-height:1.55">
           <p style="margin:0 0 10px">
-            Userscript для Tampermonkey — расширение для Duolingo.
-            Помогает следить за подписками, чистить друзей, держать серию
-            и ускорять рутину в аккаунте.
+            ${t("help.intro")}
           </p>
-          <p style="margin:0 0 8px"><strong>Что умеет:</strong></p>
+          <p style="margin:0 0 8px"><strong>${t("help.whatCan")}</strong></p>
           <ul style="margin:0 0 10px;padding-left:18px">
-            <li>Проверка взаимной подписки на профиле и в списке друзей</li>
-            <li>Кто подписался / отписался, история действий с откатом</li>
-            <li>Отписка, блокировка, исключения (🛡), блок-лист</li>
-            <li>Неактивные друзья: streak, XP, массовые действия</li>
-            <li>Защита сердец, короткие уроки, автосолвер</li>
-            <li>Квесты, магазин, гемы, streak, лига, XP-буст</li>
+            <li>${t("help.f1")}</li>
+            <li>${t("help.f2")}</li>
+            <li>${t("help.f3")}</li>
+            <li>${t("help.f4")}</li>
+            <li>${t("help.f5")}</li>
+            <li>${t("help.f6")}</li>
             <li>Темы: Win95 / WinXP / Vista / Win11 / Material 3 / iOS Liquid Glass / MacOS / iOS old / Die my Darling</li>
           </ul>
           <p style="margin:0 0 10px">
-            Часть механик (уроки, квесты, магазин, гемы, лига, XP)
-            написана с нуля, вдохновившись проектом пользователя
+            ${t("help.credits1")}
             <strong>DuoHacker</strong>.
           </p>
           <p style="margin:0 0 10px">
-            Идея меток на пользователей взята из
+            ${t("help.credits2")}
             <a href="https://github.com/Vidrimers/Universal-eblan-marker" target="_blank" rel="noopener"
                style="color:#58cc02;text-decoration:underline">💀 Universal Eblan Marker</a>.
           </p>
           <p style="margin:0;color:#888;font-size:11px">
-            Массовые действия и читы — на свой страх и риск.
-            JWT-токен никуда не отправляется.
+            ${t("help.warn")}
           </p>
 		  <p style="margin:0;color:#888;font-size:11px">
-            Помните, что используя читерские функции, вы не выучите язык: они сделаны для развлечения!
+            ${t("help.warn2")}
           </p>
         </div>
         <div class="dh-confirm-actions">
-          <button class="dh-btn dh-btn-primary" data-about="close">Понятно</button>
+          <button class="dh-btn dh-btn-primary" data-about="close">${t("ui.ok")}</button>
         </div>
       </div>
     `;
@@ -10099,25 +10229,25 @@ function savePage() {
     overlay.className = "dh-confirm-overlay dh-theme-" + theme;
     overlay.innerHTML = `
       <div class="dh-confirm-box" style="width:400px">
-        <div class="dh-confirm-title">Лицензия</div>
+        <div class="dh-confirm-title">${t("lic.title")}</div>
         <div class="dh-confirm-body" style="line-height:1.55">
           <p style="margin:0 0 10px">
             <strong>CC BY-NC-ND 4.0</strong><br/>
             Creative Commons Attribution-NonCommercial-NoDerivatives 4.0 International
           </p>
           <div style="margin:0 0 10px;font-size:12px">
-            <div style="margin:3px 0">✅ Использовать бесплатно</div>
-            <div style="margin:3px 0">✅ Делиться с указанием автора</div>
-            <div style="margin:3px 0">❌ Коммерческое использование</div>
-            <div style="margin:3px 0">❌ Переделки и производные</div>
+            <div style="margin:3px 0">${t("lic.free")}</div>
+            <div style="margin:3px 0">${t("lic.share")}</div>
+            <div style="margin:3px 0">${t("lic.commercial")}</div>
+            <div style="margin:3px 0">${t("lic.derivatives")}</div>
           </div>
           <p style="margin:0 0 10px;font-size:11px;color:#888">
-            Для коммерческого использования свяжитесь с автором для получения лицензии.
+            ${t("lic.commercialNote")}
           </p>
         </div>
         <div class="dh-confirm-actions">
-          <button class="dh-btn" data-license="full">Полный текст</button>
-          <button class="dh-btn dh-btn-primary" data-license="close">Понятно</button>
+          <button class="dh-btn" data-license="full">${t("lic.full")}</button>
+          <button class="dh-btn dh-btn-primary" data-license="close">${t("ui.ok")}</button>
         </div>
       </div>`;
     shadow.appendChild(overlay);
@@ -10374,14 +10504,14 @@ function savePage() {
     overlay.className = "dh-confirm-overlay dh-theme-" + theme;
     overlay.innerHTML = `
       <div class="dh-confirm-box" style="width:340px">
-        <div class="dh-confirm-title">🐛 Багрепорт</div>
+        <div class="dh-confirm-title">${t("bug.title")}</div>
         <div class="dh-confirm-body">
-          <p style="margin:0 0 12px">Как хотите отправить багрепорт?</p>
+          <p style="margin:0 0 12px">${t("bug.how")}</p>
         </div>
         <div class="dh-confirm-actions" style="justify-content:center;gap:10px">
           <button class="dh-btn dh-btn-primary" data-bug="github">GitHub</button>
           <button class="dh-btn" data-bug="telegram">Telegram</button>
-          <button class="dh-btn" data-bug="cancel">Отмена</button>
+          <button class="dh-btn" data-bug="cancel">${t("ui.cancel")}</button>
         </div>
       </div>`;
     shadow.appendChild(overlay);
@@ -10402,19 +10532,19 @@ function savePage() {
     const ver = (typeof GM_info !== "undefined" && GM_info.script && GM_info.script.version) || CURRENT_VERSION;
     const body = encodeURIComponent(
       [
-        "**Версия скрипта:** " + ver,
-        "**Браузер:** ",
-        "**Тема окна:** " + (DATA.settings.theme || "win95"),
+        t("bug.version") + ver,
+        t("bug.browser"),
+        t("bug.theme") + (DATA.settings.theme || "win95"),
         "",
-        "**Шаги воспроизведения:**",
+        t("bug.steps"),
         "1. ",
         "2. ",
         "",
-        "**Ожидаемое поведение:**",
+        t("bug.expected"),
         "",
-        "**Фактическое поведение:**",
+        t("bug.actual"),
         "",
-        "**Дополнительно:**",
+        t("bug.extra"),
         "- ",
       ].join("\n"),
     );
@@ -10430,7 +10560,7 @@ function savePage() {
   async function openTelegramBugReport() {
     const myId = getMyId();
     if (!myId) {
-      showToast("Не удалось определить аккаунт", true);
+      showToast(t("ui.noAccount"), true);
       return;
     }
     // проверяем привязку TG
@@ -10636,7 +10766,7 @@ function savePage() {
     }
 
     badge.className = state;
-    badge.title = "Duolingo Helper — нажми, чтобы открыть панель";
+    badge.title = t("ui.badgeTitle");
     badge.querySelector(".dh-inline-icon").textContent =
       state === "yes" ? "✅" : state === "no" ? "❌" : state === "checking" ? "⏳" : "⚠️";
     badge.querySelector(".dh-inline-text").textContent = title;
@@ -10683,7 +10813,7 @@ function savePage() {
     const el = document.createElement("span");
     el.id = "dh-inline-tag";
     el.textContent = tag.label;
-    el.title = tag.note || "Метка";
+    el.title = tag.note || t("f.tagTitle");
     el.style.cssText =
       "display:inline-flex;align-items:center;margin-left:8px;padding:2px 10px;" +
       "border-radius:999px;font:700 11px/1.3 Tahoma,sans-serif;white-space:nowrap;" +
@@ -10735,7 +10865,7 @@ function savePage() {
     els.badgeIcon.textContent =
       state === "yes" ? "✅" : state === "no" ? "❌" : state === "checking" ? "⏳" : "⚠️";
     els.badgeText.textContent = title;
-    els.badgeSub.textContent = sub || "нажми, чтобы открыть панель";
+    els.badgeSub.textContent = sub || t("ui.badgeHint");
   }
 
   /** SPA может убрать/перерисовать шапку — вернуть плашку к имени. */
@@ -11093,7 +11223,7 @@ function savePage() {
   function showUpdateBanner(remoteVersion) {
     try {
       if (!els.updateBanner || !els.updateText || !els.updateBtn) return;
-      els.updateText.textContent = `🆕 Доступно обновление: v${CURRENT_VERSION} → v${remoteVersion}`;
+      els.updateText.textContent = t("upd.banner", { a: CURRENT_VERSION, b: remoteVersion });
       els.updateBanner.style.display = "flex";
       els.updateBtn.onclick = () => startUpdateReload();
     } catch (e) {
@@ -11105,7 +11235,7 @@ function savePage() {
   function startUpdateReload() {
     window.open(installUrl, "_blank");
     let left = 8;
-    showToast(`Установка обновления… перезагрузка через ${left}…`);
+    showToast(t("upd.installing", { n: left }));
     const tick = setInterval(() => {
       left -= 1;
       if (left <= 0) {
@@ -11113,7 +11243,7 @@ function savePage() {
         location.reload();
         return;
       }
-      showToast(`Установка обновления… перезагрузка через ${left}…`);
+      showToast(t("upd.installing", { n: left }));
     }, 1000);
   }
 
@@ -11181,15 +11311,15 @@ function savePage() {
     if (els.checkUpdateBtn) {
       els.checkUpdateBtn.addEventListener("click", async () => {
         const btn = els.checkUpdateBtn;
-        btn.textContent = "⏳ Проверяем...";
+        btn.textContent = t("upd.checking");
         btn.disabled = true;
         GM_setValue(UPDATE_CHECK_KEY, 0);
         try {
           const result = await checkForUpdates(true);
           if (result === "update") {
-            showToast("Найдено обновление — см. плашку вверху панели");
+            showToast(t("upd.found"));
           } else if (result === "current") {
-            showToast("✓ Обновлений нет, версия актуальна");
+            showToast(t("upd.none"));
           } else {
             showToast(t("set.checkUpdateFail"), true);
           }
@@ -11269,7 +11399,7 @@ function savePage() {
     els.modal.classList.remove("dh-min");
     if (els.minBtn) {
       els.minBtn.textContent = "–";
-      els.minBtn.title = "Свернуть";
+      els.minBtn.title = t("ui.minimize");
     }
 
     if (state === "closed") {
@@ -11313,7 +11443,7 @@ function savePage() {
       });
       if (els.minBtn) {
         els.minBtn.textContent = "▢";
-        els.minBtn.title = "Развернуть";
+        els.minBtn.title = t("ui.restore");
       }
     } else {
       const pos = preMinPos
@@ -11329,7 +11459,7 @@ function savePage() {
       preMinPos = null;
       if (els.minBtn) {
         els.minBtn.textContent = "–";
-        els.minBtn.title = "Свернуть";
+        els.minBtn.title = t("ui.minimize");
       }
     }
 
@@ -11366,7 +11496,7 @@ function savePage() {
       preMinPos = null;
       if (els.minBtn) {
         els.minBtn.textContent = "–";
-        els.minBtn.title = "Свернуть";
+        els.minBtn.title = t("ui.minimize");
       }
       saveWindowState();
     }, 300);
@@ -11819,7 +11949,7 @@ function savePage() {
       DATA.settings.autoCheck = !DATA.settings.autoCheck;
       saveData();
       syncSwitches();
-      showToast(DATA.settings.autoCheck ? "Автопроверка включена" : "Автопроверка выключена");
+      showToast(DATA.settings.autoCheck ? t("tg.autoOn") : t("tg.autoOff"));
     });
 
     els.setBadge.addEventListener("click", () => {
@@ -11828,7 +11958,7 @@ function savePage() {
       syncSwitches();
       if (!DATA.settings.showBadge) hideBadge();
       else onNavigate();
-      showToast(DATA.settings.showBadge ? "Бейдж включён" : "Бейдж выключен");
+      showToast(DATA.settings.showBadge ? t("tg.badgeOn") : t("tg.badgeOff"));
     });
 
     if (els.setStart) {
@@ -11965,8 +12095,8 @@ function savePage() {
         if (els.setFreeSuper) els.setFreeSuper.classList.toggle("on", DATA.settings.freeSuper);
         showToast(
           DATA.settings.freeSuper
-            ? "Free Max / Super включён"
-            : "Free Max / Super выключен",
+            ? t("tg.freeMaxOn")
+            : t("tg.freeMaxOff"),
         );
       });
     }
@@ -12004,8 +12134,8 @@ function savePage() {
         syncXpBoostFlag();
         showToast(
           DATA.settings.fakeXpBoost
-            ? "Фейк XP-буст включён"
-            : "Фейк XP-буст выключен",
+            ? t("tg.xpBoostOn")
+            : t("tg.xpBoostOff"),
         );
       });
     }
@@ -12015,7 +12145,7 @@ function savePage() {
         DATA.settings.fakeXpBoost = true;
         saveData();
         syncXpBoostFlag();
-        showToast("Фейк x2 · 15 мин");
+        showToast(t("tg.xpBoost15"));
       });
     }
     if (els.xpBoost60) {
@@ -12024,7 +12154,7 @@ function savePage() {
         DATA.settings.fakeXpBoost = true;
         saveData();
         syncXpBoostFlag();
-        showToast("Фейк x2 · 60 мин");
+        showToast(t("tg.xpBoost60"));
       });
     }
     if (els.xpStories) {
@@ -12116,16 +12246,16 @@ function savePage() {
     // кастомный селект сортировки «Активность»
     if (els.activitySort && els.activitySortOpts) {
       const sortLabels = {
-        xp_desc: "Больше XP",
-        xp_asc: "Меньше XP",
-        streak_desc: "Больше дней",
-        streak_asc: "Меньше дней",
-        name_asc: "По имени A→Z",
-        name_desc: "По имени Z→A",
+        xp_desc: t("friends.sortXpDesc"),
+        xp_asc: t("friends.sortXpAsc"),
+        streak_desc: t("friends.sortStreakDesc"),
+        streak_asc: t("friends.sortStreakAsc"),
+        name_asc: t("friends.sortNameAsc"),
+        name_desc: t("friends.sortNameDesc"),
       };
       if (els.activitySortText) {
         els.activitySortText.textContent =
-          sortLabels[DATA.settings.activitySort] || "Больше XP";
+          sortLabels[DATA.settings.activitySort] || t("friends.sortXpDesc");
       }
       els.activitySort.addEventListener("click", (e) => {
         if (els.activitySort.dataset.ready !== "1") return;
