@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Duolingo Helper
 // @namespace    https://github.com/Vidrimers/Duolingo-helper
-// @version      0.11.3
+// @version      0.11.4
 // @description  Проверка взаимной подписки на профилях Duolingo. Панель, бейджи, кеш.
 // @author       Vidrimers
 // @match        *://*.duolingo.com/*
@@ -406,6 +406,103 @@
       "xp.error": "Ошибка накрутки XP",
       "xp.stopped": "Накрутка XP остановлена",
       "xp.boostStatus": "фейк-буст: x2 · {n} мин",
+      // «Мой аккаунт»
+      "acc.title": "Мой аккаунт",
+      "acc.detecting": "Определение…",
+      "acc.stats": "📊 Статистика",
+      "acc.today": "⚡ Сегодня",
+      "acc.week": "📅 Неделя",
+      "acc.weekChart": "XP за 7 дней",
+      "acc.dash": "📋 Дашборд",
+      "acc.accounts": "👥 Аккаунты",
+      "acc.accountsHint": "Чтобы второй аккаунт появился в списке — залогинься под ним на сайте Duolingo. После этого можно переключаться без повторного входа.",
+      "acc.noSaved": "Нет сохранённых аккаунтов",
+      "acc.switchBtn": "Переключить",
+      "acc.noAccounts": "Нет аккаунтов",
+      "acc.noJwt": "Нет JWT",
+      "acc.active": "Активен",
+      "acc.longAgo": "Давно не заходил",
+      "acc.inactive": "Неактивен",
+      "acc.updated": "📅 Обновлён",
+      "acc.openProfile": "Открыть профиль Duolingo",
+      "acc.rename": "Переименовать",
+      "acc.exportHtml": "Статистика (HTML)",
+      "acc.refresh": "Обновить данные",
+      "acc.labelPrompt": "Ярлык аккаунта",
+      "acc.labelUpdated": "Ярлык обновлён",
+      "acc.deleteConfirm": "Удалить аккаунт {name} ({id})?\nДанные и JWT будут стёрты.",
+      "acc.deleteTitle": "Удаление аккаунта",
+      "acc.deleted": "Аккаунт удалён",
+      "acc.loadingData": "Загрузка данных…",
+      "acc.notFound": "Аккаунт не найден",
+      "acc.noJwtAccount": "Нет JWT для этого аккаунта — войди заново",
+      "acc.switchConfirm": "Переключиться на {name}?",
+      "acc.switchTitle": "Смена аккаунта",
+      "acc.switching": "Переключение…",
+      // me info
+      "me.notLoggedIn": "Не выполнен вход (нет jwt_token)",
+      "me.loading": "Загрузка…",
+      "me.noUsername": "id {id} · username не получен",
+      // линковка Telegram
+      "tglink.noAccount": "Не удалось определить аккаунт",
+      "tglink.linkBtn": "Привязать Telegram",
+      "tglink.unlinkBtn": "Отвязать",
+      "tglink.serverDown": "Сервер недоступен",
+      "tglink.serverDownToast": "Сервер линковки недоступен",
+      "tglink.clickLink": "Нажми для привязки →",
+      "tglink.waiting": "Ожидание…",
+      "tglink.openTg": "Открой ссылку в Telegram для привязки",
+      "tglink.codeError": "Ошибка генерации кода",
+      "tglink.linkedStatus": "Telegram привязан: @{u}",
+      "tglink.linkedBtn": "🔗 Привязать",
+      "tglink.unlinkConfirm": "Отвязать Telegram?\nСвязь между Duolingo и Telegram будет удалена.\nВсе данные и настройки на сервере бота тоже будут удалены (статистика, уведомления, друзья, история действий).",
+      "tglink.unlinkTitle": "Отвязка Telegram",
+      "tglink.unlinkedToast": "✓ Telegram отвязан, данные удалены",
+      "tglink.unlinkError": "Ошибка отвязки",
+      "tglink.timeout": "Время ожидания истекло",
+      "tglink.linkedToast": "✓ Telegram привязан",
+      "tglink.needLinkBug": "Привязать Telegram можно в блоке «Аккаунты»",
+      "tglink.checkFailed": "Не удалось проверить привязку",
+      // приватность
+      "priv.title": "🔒 Приватность",
+      "priv.hint": "Настройки приватности Duolingo. Состояние загружается с сервера.",
+      "priv.loadError": "Не удалось загрузить настройки",
+      "priv.on": "— включено",
+      "priv.off": "— выключено",
+      "priv.saveError": "Не удалось сохранить: {label}",
+      "priv.disable_social": "Скрыть профиль",
+      "priv.disable_social.desc": "Подписки и активность не видны другим",
+      "priv.disable_leaderboards": "Скрыть из лидербордов",
+      "priv.disable_leaderboards.desc": "Не показывать в таблицах",
+      "priv.disable_friends_quests": "Без квестов с друзьями",
+      "priv.disable_friends_quests.desc": "Отключить совместные квесты",
+      "priv.disable_shared_streak": "Без общего streak",
+      "priv.disable_shared_streak.desc": "Отключить общий streak с друзьями",
+      "priv.disable_kudos": "Без лайков",
+      "priv.disable_kudos.desc": "Отключить получение kudos",
+      "priv.disable_clubs": "Без клубов",
+      "priv.disable_clubs.desc": "Отключить функцию клубов",
+      "priv.disable_personalized_ads": "Без персональной рекламы",
+      "priv.disable_personalized_ads.desc": "Отключить таргетинг",
+      "priv.disable_third_party_tracking": "Без сторонней аналитики",
+      "priv.disable_third_party_tracking.desc": "Отключить трекинг третьих лиц",
+      "priv.disable_stream": "Скрыть стрим",
+      "priv.disable_stream.desc": "Не показывать ленту активности",
+      "priv.disable_profile_country": "Скрыть страну",
+      "priv.disable_profile_country.desc": "Страна не видна в профиле",
+      "priv.disable_mature_words": "Взрослые слова",
+      "priv.disable_mature_words.desc": "Показывать лексику для взрослых",
+      "priv.disable_feed_card_public_visibility": "Скрыть карточки в ленте",
+      "priv.disable_feed_card_public_visibility.desc": "Профиль не в публичной ленте",
+      // HTML-экспорт статистики
+      "exp.title": "Duolingo — Статистика",
+      "exp.h1": "🦉 Duolingo — Статистика",
+      "exp.h2": "📊 Общая статистика",
+      "exp.totalXp": "⚡ Всего XP",
+      "exp.streak": "Серия дней",
+      "exp.save": "💾 Сохранить страницу",
+      "exp.print": "🖨 Печать",
+      "exp.footer": "Создано Duolingo Helper · Лицензия CC BY-NC-ND 4.0",
     },
     en: {
       "lang.changed": "Interface language changed",
@@ -743,6 +840,103 @@
       "xp.error": "XP farming failed",
       "xp.stopped": "XP farming stopped",
       "xp.boostStatus": "fake boost: x2 · {n} min",
+      // My account
+      "acc.title": "My account",
+      "acc.detecting": "Detecting…",
+      "acc.stats": "📊 Stats",
+      "acc.today": "⚡ Today",
+      "acc.week": "📅 Week",
+      "acc.weekChart": "XP over 7 days",
+      "acc.dash": "📋 Dashboard",
+      "acc.accounts": "👥 Accounts",
+      "acc.accountsHint": "To see a second account in the list — log in with it on the Duolingo site. After that you can switch without logging in again.",
+      "acc.noSaved": "No saved accounts",
+      "acc.switchBtn": "Switch",
+      "acc.noAccounts": "No accounts",
+      "acc.noJwt": "No JWT",
+      "acc.active": "Active",
+      "acc.longAgo": "Haven't visited in a while",
+      "acc.inactive": "Inactive",
+      "acc.updated": "📅 Updated",
+      "acc.openProfile": "Open Duolingo profile",
+      "acc.rename": "Rename",
+      "acc.exportHtml": "Stats (HTML)",
+      "acc.refresh": "Refresh data",
+      "acc.labelPrompt": "Account label",
+      "acc.labelUpdated": "Label updated",
+      "acc.deleteConfirm": "Delete account {name} ({id})?\nThe data and JWT will be erased.",
+      "acc.deleteTitle": "Deleting an account",
+      "acc.deleted": "Account deleted",
+      "acc.loadingData": "Loading data…",
+      "acc.notFound": "Account not found",
+      "acc.noJwtAccount": "No JWT for this account — log in again",
+      "acc.switchConfirm": "Switch to {name}?",
+      "acc.switchTitle": "Switching account",
+      "acc.switching": "Switching…",
+      // me info
+      "me.notLoggedIn": "Not logged in (no jwt_token)",
+      "me.loading": "Loading…",
+      "me.noUsername": "id {id} · username not received",
+      // Telegram linking
+      "tglink.noAccount": "Couldn't detect the account",
+      "tglink.linkBtn": "Link Telegram",
+      "tglink.unlinkBtn": "Unlink",
+      "tglink.serverDown": "Server unavailable",
+      "tglink.serverDownToast": "Linking server unavailable",
+      "tglink.clickLink": "Click to link →",
+      "tglink.waiting": "Waiting…",
+      "tglink.openTg": "Open the link in Telegram to link",
+      "tglink.codeError": "Code generation failed",
+      "tglink.linkedStatus": "Telegram linked: @{u}",
+      "tglink.linkedBtn": "🔗 Link",
+      "tglink.unlinkConfirm": "Unlink Telegram?\nThe link between Duolingo and Telegram will be removed.\nAll data and settings on the bot's server will be deleted too (stats, notifications, friends, action history).",
+      "tglink.unlinkTitle": "Unlinking Telegram",
+      "tglink.unlinkedToast": "✓ Telegram unlinked, data deleted",
+      "tglink.unlinkError": "Unlink failed",
+      "tglink.timeout": "Waiting time expired",
+      "tglink.linkedToast": "✓ Telegram linked",
+      "tglink.needLinkBug": "You can link Telegram in the \"Accounts\" block",
+      "tglink.checkFailed": "Couldn't check the link",
+      // privacy
+      "priv.title": "🔒 Privacy",
+      "priv.hint": "Duolingo privacy settings. The state is loaded from the server.",
+      "priv.loadError": "Couldn't load settings",
+      "priv.on": "— enabled",
+      "priv.off": "— disabled",
+      "priv.saveError": "Couldn't save: {label}",
+      "priv.disable_social": "Hide profile",
+      "priv.disable_social.desc": "Subscriptions and activity are invisible to others",
+      "priv.disable_leaderboards": "Hide from leaderboards",
+      "priv.disable_leaderboards.desc": "Don't show in tables",
+      "priv.disable_friends_quests": "No friends quests",
+      "priv.disable_friends_quests.desc": "Disable shared quests",
+      "priv.disable_shared_streak": "No shared streak",
+      "priv.disable_shared_streak.desc": "Disable the shared streak with friends",
+      "priv.disable_kudos": "No kudos",
+      "priv.disable_kudos.desc": "Disable receiving kudos",
+      "priv.disable_clubs": "No clubs",
+      "priv.disable_clubs.desc": "Disable the clubs feature",
+      "priv.disable_personalized_ads": "No personalized ads",
+      "priv.disable_personalized_ads.desc": "Disable ad targeting",
+      "priv.disable_third_party_tracking": "No third-party analytics",
+      "priv.disable_third_party_tracking.desc": "Disable third-party tracking",
+      "priv.disable_stream": "Hide stream",
+      "priv.disable_stream.desc": "Don't show the activity feed",
+      "priv.disable_profile_country": "Hide country",
+      "priv.disable_profile_country.desc": "The country is not visible on the profile",
+      "priv.disable_mature_words": "Mature words",
+      "priv.disable_mature_words.desc": "Show adult vocabulary",
+      "priv.disable_feed_card_public_visibility": "Hide feed cards",
+      "priv.disable_feed_card_public_visibility.desc": "The profile is not in the public feed",
+      // HTML stats export
+      "exp.title": "Duolingo — Stats",
+      "exp.h1": "🦉 Duolingo — Stats",
+      "exp.h2": "📊 General stats",
+      "exp.totalXp": "⚡ Total XP",
+      "exp.streak": "Streak",
+      "exp.save": "💾 Save page",
+      "exp.print": "🖨 Print",
+      "exp.footer": "Made with Duolingo Helper · CC BY-NC-ND 4.0 license",
     },
   };
 
@@ -4007,24 +4201,24 @@
 
                 <div class="dh-acc" data-acc>
                     <button type="button" class="dh-acc-head">
-                        <span class="dh-acc-title">Мой аккаунт</span>
+                        <span class="dh-acc-title">${t("acc.title")}</span>
                         <span class="dh-acc-arrow">▾</span>
                     </button>
                     <div class="dh-acc-body"><div class="dh-acc-inner">
-                        <div class="dh-muted" id="dh-me-info">Определение…</div>
+                        <div class="dh-muted" id="dh-me-info">${t("acc.detecting")}</div>
                         <div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(128,128,128,0.25)">
                             <button type="button" class="dh-sub-toggle" id="dh-stats-toggle" style="width:100%;display:flex;align-items:center;justify-content:space-between;background:none;border:none;cursor:pointer;padding:6px 0;font:inherit;color:inherit">
-                                <span class="dh-card-title" style="margin:0">📊 Статистика</span>
+                                <span class="dh-card-title" style="margin:0">${t("acc.stats")}</span>
                                 <span class="dh-sub-arrow">▸</span>
                             </button>
                             <div class="dh-sub-body" id="dh-stats-body"><div class="dh-sub-inner" style="margin-top:6px">
                                 <div style="display:flex;gap:6px;margin-bottom:8px">
                                     <div style="flex:1;background:rgba(128,128,128,0.08);border-radius:8px;padding:8px 6px;text-align:center">
-                                        <div style="font-size:9px;opacity:0.6">⚡ Сегодня</div>
+                                        <div style="font-size:9px;opacity:0.6">${t("acc.today")}</div>
                                         <div style="font-size:15px;font-weight:700" id="dh-stat-today">…</div>
                                     </div>
                                     <div style="flex:1;background:rgba(128,128,128,0.08);border-radius:8px;padding:8px 6px;text-align:center">
-                                        <div style="font-size:9px;opacity:0.6">📅 Неделя</div>
+                                        <div style="font-size:9px;opacity:0.6">${t("acc.week")}</div>
                                         <div style="font-size:15px;font-weight:700" id="dh-stat-week">…</div>
                                     </div>
                                     <div style="flex:1;background:rgba(128,128,128,0.08);border-radius:8px;padding:8px 6px;text-align:center">
@@ -4033,14 +4227,14 @@
                                     </div>
                                 </div>
                                 <div style="margin-bottom:8px">
-                                    <div style="font-size:9px;opacity:0.6;margin-bottom:3px">XP за 7 дней</div>
+                                    <div style="font-size:9px;opacity:0.6;margin-bottom:3px">${t("acc.weekChart")}</div>
                                     <div id="dh-stat-chart" style="display:flex;align-items:flex-end;gap:3px;height:36px"></div>
                                 </div>
                             </div></div>
                         </div>
                         <div style="margin-top:4px;padding-top:8px;border-top:1px solid rgba(128,128,128,0.25)">
                             <button type="button" class="dh-sub-toggle" id="dh-dash-toggle" style="width:100%;display:flex;align-items:center;justify-content:space-between;background:none;border:none;cursor:pointer;padding:6px 0;font:inherit;color:inherit">
-                                <span class="dh-card-title" style="margin:0">📋 Дашборд</span>
+                                <span class="dh-card-title" style="margin:0">${t("acc.dash")}</span>
                                 <span class="dh-sub-arrow">▸</span>
                             </button>
                             <div class="dh-sub-body" id="dh-dash-body"><div class="dh-sub-inner" style="margin-top:6px">
@@ -4049,21 +4243,21 @@
                         </div>
                         <div style="margin-top:4px;padding-top:8px;border-top:1px solid rgba(128,128,128,0.25)">
                             <button type="button" class="dh-sub-toggle" id="dh-acc-toggle" style="width:100%;display:flex;align-items:center;justify-content:space-between;background:none;border:none;cursor:pointer;padding:6px 0;font:inherit;color:inherit">
-                                <span class="dh-card-title" style="margin:0">👥 Аккаунты</span>
+                                <span class="dh-card-title" style="margin:0">${t("acc.accounts")}</span>
                                 <span class="dh-sub-arrow">▸</span>
                             </button>
                             <div class="dh-sub-body" id="dh-acc-list-wrap"><div class="dh-sub-inner" style="margin-top:6px">
-                                <div class="dh-muted" style="margin-bottom:6px;font-size:10px">Чтобы второй аккаунт появился в списке — залогинься под ним на сайте Duolingo. После этого можно переключаться без повторного входа.</div>
+                                <div class="dh-muted" style="margin-bottom:6px;font-size:10px">${t("acc.accountsHint")}</div>
                                 <div id="dh-acc-list" style="display:flex;flex-direction:column;gap:4px"></div>
                             </div></div>
                         </div>
                         <div style="margin-top:4px;padding-top:8px;border-top:1px solid rgba(128,128,128,0.25)">
                             <button type="button" class="dh-sub-toggle" id="dh-privacy-toggle" style="width:100%;display:flex;align-items:center;justify-content:space-between;background:none;border:none;cursor:pointer;padding:6px 0;font:inherit;color:inherit">
-                                <span class="dh-card-title" style="margin:0">🔒 Приватность</span>
+                                <span class="dh-card-title" style="margin:0">${t("priv.title")}</span>
                                 <span class="dh-sub-arrow">▸</span>
                             </button>
                             <div class="dh-sub-body" id="dh-privacy-body"><div class="dh-sub-inner" style="margin-top:6px">
-                                <div class="dh-muted" style="margin-bottom:6px;font-size:10px">Настройки приватности Duolingo. Состояние загружается с сервера.</div>
+                                <div class="dh-muted" style="margin-bottom:6px;font-size:10px">${t("priv.hint")}</div>
                                 <div id="dh-privacy-list"></div>
                             </div></div>
                         </div>
@@ -6987,7 +7181,7 @@
     const ids = Object.keys(accounts).filter((k) => k !== "anon");
     box.innerHTML = "";
     if (!ids.length) {
-      box.innerHTML = '<div class="dh-muted">Нет сохранённых аккаунтов</div>';
+      box.innerHTML = `<div class="dh-muted">${t("acc.noSaved")}</div>`;
       return;
     }
     for (const id of ids) {
@@ -7003,7 +7197,7 @@
         </div>
         ${isCur
           ? '<button class="dh-btn" id="dh-tg-link-btn" style="padding:3px 10px;font-size:10px;flex-shrink:0">…</button>'
-          : '<button class="dh-btn" data-switch="' + id + '" style="padding:3px 10px;font-size:10px;flex-shrink:0">Переключить</button>'}`;
+          : `<button class="dh-btn" data-switch="${id}" style="padding:3px 10px;font-size:10px;flex-shrink:0">${t("acc.switchBtn")}</button>`}`;
       const b = row.querySelector("[data-switch]");
       if (b) {
         b.addEventListener("click", () => switchToAccount(id));
@@ -7032,18 +7226,18 @@
   // ========== Приватность ==========
   // ========== Приватность ==========
   const PRIVACY_SETTINGS = [
-    { id: "disable_social", label: "Скрыть профиль", desc: "Подписки и активность не видны другим" },
-    { id: "disable_leaderboards", label: "Скрыть из лидербордов", desc: "Не показывать в таблицах" },
-    { id: "disable_friends_quests", label: "Без квестов с друзьями", desc: "Отключить совместные квесты" },
-    { id: "disable_shared_streak", label: "Без общего streak", desc: "Отключить общий streak с друзьями" },
-    { id: "disable_kudos", label: "Без лайков", desc: "Отключить получение kudos" },
-    { id: "disable_clubs", label: "Без клубов", desc: "Отключить функцию клубов" },
-    { id: "disable_personalized_ads", label: "Без персональной рекламы", desc: "Отключить таргетинг" },
-    { id: "disable_third_party_tracking", label: "Без сторонней аналитики", desc: "Отключить трекинг третьих лиц" },
-    { id: "disable_stream", label: "Скрыть стрим", desc: "Не показывать ленту активности" },
-    { id: "disable_profile_country", label: "Скрыть страну", desc: "Страна не видна в профиле" },
-    { id: "disable_mature_words", label: "Взрослые слова", desc: "Показывать лексику для взрослых" },
-    { id: "disable_feed_card_public_visibility", label: "Скрыть карточки в ленте", desc: "Профиль не в публичной ленте" },
+    { id: "disable_social", label: t("priv.disable_social"), desc: t("priv.disable_social.desc") },
+    { id: "disable_leaderboards", label: t("priv.disable_leaderboards"), desc: t("priv.disable_leaderboards.desc") },
+    { id: "disable_friends_quests", label: t("priv.disable_friends_quests"), desc: t("priv.disable_friends_quests.desc") },
+    { id: "disable_shared_streak", label: t("priv.disable_shared_streak"), desc: t("priv.disable_shared_streak.desc") },
+    { id: "disable_kudos", label: t("priv.disable_kudos"), desc: t("priv.disable_kudos.desc") },
+    { id: "disable_clubs", label: t("priv.disable_clubs"), desc: t("priv.disable_clubs.desc") },
+    { id: "disable_personalized_ads", label: t("priv.disable_personalized_ads"), desc: t("priv.disable_personalized_ads.desc") },
+    { id: "disable_third_party_tracking", label: t("priv.disable_third_party_tracking"), desc: t("priv.disable_third_party_tracking.desc") },
+    { id: "disable_stream", label: t("priv.disable_stream"), desc: t("priv.disable_stream.desc") },
+    { id: "disable_profile_country", label: t("priv.disable_profile_country"), desc: t("priv.disable_profile_country.desc") },
+    { id: "disable_mature_words", label: t("priv.disable_mature_words"), desc: t("priv.disable_mature_words.desc") },
+    { id: "disable_feed_card_public_visibility", label: t("priv.disable_feed_card_public_visibility"), desc: t("priv.disable_feed_card_public_visibility.desc") },
   ];
 
   async function loadPrivacyStatus() {
@@ -7069,7 +7263,7 @@
       DATA.privacySnapshot = map;
       renderPrivacyList(map);
     } catch {
-      els.privacyList.innerHTML = '<div class="dh-muted">Не удалось загрузить настройки</div>';
+      els.privacyList.innerHTML = `<div class="dh-muted">${t("priv.loadError")}</div>`;
     }
   }
 
@@ -7098,9 +7292,9 @@
           sw.style.opacity = "";
           if (ok) {
             sw.classList.toggle("on", newVal);
-            showToast(item.label + (newVal ? " — включено" : " — выключено"));
+            showToast(item.label + (newVal ? t("priv.on") : t("priv.off")));
           } else {
-            showToast("Не удалось сохранить: " + item.label, true);
+            showToast(t("priv.saveError", { label: item.label }), true);
           }
         });
       }
@@ -7244,7 +7438,7 @@
   /** Линковка Telegram: генерация кода и показ ссылки. */
   async function startTelegramLink(btn, statusEl) {
     const myId = getMyId();
-    if (!myId) { showToast("Не удалось определить аккаунт", true); return; }
+    if (!myId) { showToast(t("tglink.noAccount"), true); return; }
     const jwt = getToken();
     console.log("[TG-LINK] getToken() =", jwt ? "YES len=" + jwt.length : "NULL");
     btn.disabled = true;
@@ -7266,24 +7460,24 @@
       });
       if (!res || !res.deepLink) {
         btn.disabled = false;
-        btn.textContent = "Привязать Telegram";
-        if (statusEl) statusEl.textContent = "Сервер недоступен";
-        showToast("Сервер линковки недоступен", true);
+        btn.textContent = t("tglink.linkBtn");
+        if (statusEl) statusEl.textContent = t("tglink.serverDown");
+        showToast(t("tglink.serverDownToast"), true);
         return;
       }
       // показываем ссылку и начинаем поллинг статуса
       if (statusEl) {
         statusEl.innerHTML =
-          `<a href="${res.deepLink}" target="_blank" style="color:#58cc02;text-decoration:underline">Нажми для привязки →</a>`;
+          `<a href="${res.deepLink}" target="_blank" style="color:#58cc02;text-decoration:underline">${t("tglink.clickLink")}</a>`;
       }
-      btn.textContent = "Ожидание…";
-      showToast("Открой ссылку в Telegram для привязки");
+      btn.textContent = t("tglink.waiting");
+      showToast(t("tglink.openTg"));
       // поллинг статуса
       pollLinkStatus(myId, btn, statusEl);
     } catch {
       btn.disabled = false;
-      btn.textContent = "Привязать Telegram";
-      showToast("Ошибка генерации кода", true);
+      btn.textContent = t("tglink.linkBtn");
+      showToast(t("tglink.codeError"), true);
     }
   }
 
@@ -7302,15 +7496,15 @@
       });
       if (res && res.linked) {
         if (btn) {
-          btn.textContent = "Отвязать";
+          btn.textContent = t("tglink.unlinkBtn");
           btn.disabled = false;
           btn.dataset.mode = "unlink";
           btn.classList.add("dh-btn-danger");
         }
-        if (statusEl) statusEl.textContent = "Telegram привязан: @" + (res.tgUsername || "telegram") + (res.tgUserId ? " · id: " + res.tgUserId : "");
+        if (statusEl) statusEl.textContent = t("tglink.linkedStatus", { u: res.tgUsername || "telegram" }) + (res.tgUserId ? " · id: " + res.tgUserId : "");
       } else {
         if (btn) {
-          btn.textContent = "🔗 Привязать";
+          btn.textContent = t("tglink.linkedBtn");
           btn.disabled = false;
           btn.dataset.mode = "link";
           btn.classList.remove("dh-btn-danger");
@@ -7325,8 +7519,8 @@
   /** Отвязка Telegram. */
   async function unlinkTelegram(duoId, btn, statusEl) {
     const ok = await showConfirm(
-      "Отвязать Telegram?\nСвязь между Duolingo и Telegram будет удалена.\nВсе данные и настройки на сервере бота тоже будут удалены (статистика, уведомления, друзья, история действий).",
-      "Отвязка Telegram",
+      t("tglink.unlinkConfirm"),
+      t("tglink.unlinkTitle"),
     );
     if (!ok) return;
     btn.disabled = true;
@@ -7345,21 +7539,21 @@
         });
       });
       if (res && res.ok) {
-        btn.textContent = "🔗 Привязать";
+        btn.textContent = t("tglink.linkedBtn");
         btn.disabled = false;
         btn.dataset.mode = "link";
         btn.classList.remove("dh-btn-danger");
         if (statusEl) statusEl.textContent = "";
-        showToast("✓ Telegram отвязан, данные удалены");
+        showToast(t("tglink.unlinkedToast"));
       } else {
-        btn.textContent = "Отвязать";
+        btn.textContent = t("tglink.unlinkBtn");
         btn.disabled = false;
-        showToast("Ошибка отвязки", true);
+        showToast(t("tglink.unlinkError"), true);
       }
     } catch {
-      btn.textContent = "Отвязать";
+      btn.textContent = t("tglink.unlinkBtn");
       btn.disabled = false;
-      showToast("Ошибка отвязки", true);
+      showToast(t("tglink.unlinkError"), true);
     }
   }
 
@@ -7367,8 +7561,8 @@
   function pollLinkStatus(duoId, btn, statusEl, attempts) {
     attempts = attempts || 0;
     if (attempts > 60) {
-      if (btn) { btn.textContent = "Привязать Telegram"; btn.disabled = false; }
-      if (statusEl) statusEl.textContent = "Время ожидания истекло";
+      if (btn) { btn.textContent = t("tglink.linkBtn"); btn.disabled = false; }
+      if (statusEl) statusEl.textContent = t("tglink.timeout");
       return;
     }
     setTimeout(async () => {
@@ -7385,13 +7579,13 @@
         });
         if (res && res.linked) {
           if (btn) {
-            btn.textContent = "Отвязать";
+            btn.textContent = t("tglink.unlinkBtn");
             btn.disabled = false;
             btn.dataset.mode = "unlink";
             btn.classList.add("dh-btn-danger");
           }
-          if (statusEl) statusEl.textContent = "Telegram привязан: @" + (res.tgUsername || "telegram") + (res.tgUserId ? " · id: " + res.tgUserId : "");
-          showToast("✓ Telegram привязан");
+          if (statusEl) statusEl.textContent = t("tglink.linkedStatus", { u: res.tgUsername || "telegram" }) + (res.tgUserId ? " · id: " + res.tgUserId : "");
+          showToast(t("tglink.linkedToast"));
           return;
         }
       } catch {}
@@ -7409,7 +7603,7 @@
     const ids = Object.keys(accounts).filter((k) => k !== "anon");
     box.innerHTML = "";
     if (!ids.length) {
-      box.innerHTML = '<div class="dh-muted">Нет аккаунтов</div>';
+      box.innerHTML = `<div class="dh-muted">${t("acc.noAccounts")}</div>`;
       return;
     }
     for (const id of ids) {
@@ -7423,7 +7617,7 @@
       // цветовая полоса: зелёная = активен (JWT есть и обновлён недавно), жёлтая = есть JWT но давно, красная = нет JWT
       const age = a.updatedAt ? (Date.now() - a.updatedAt) / 86400000 : 999;
       const statusColor = !hasJwt ? "#c0392b" : age < 7 ? "#58CC02" : age < 30 ? "#f39c12" : "#c0392b";
-      const statusText = !hasJwt ? "Нет JWT" : age < 7 ? "Активен" : age < 30 ? "Давно не заходил" : "Неактивен";
+      const statusText = !hasJwt ? t("acc.noJwt") : age < 7 ? t("acc.active") : age < 30 ? t("acc.longAgo") : t("acc.inactive");
 
       const card = document.createElement("div");
       card.className = "dh-shop-card";
@@ -7456,16 +7650,16 @@
               <div style="font-size:13px;font-weight:700" data-xp="${id}">…</div>
             </div>
             <div style="flex:1;min-width:55px;background:rgba(128,128,128,0.08);border-radius:6px;padding:4px 6px">
-              <div style="font-size:9px;opacity:0.6">📅 Обновлён</div>
+              <div style="font-size:9px;opacity:0.6">${t("acc.updated")}</div>
               <div style="font-size:10px;font-weight:600">${updated}</div>
             </div>
           </div>
           <div style="display:flex;align-items:center;gap:6px;width:100%;flex-wrap:wrap">
             <div style="font-size:9px;opacity:0.6;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">ID: ${id} · JWT: ${hasJwt ? "✓" : "✗"} · ${statusText}</div>
-            <button class="dh-btn" data-open="${id}" style="padding:3px 8px;font-size:10px;flex-shrink:0" title="Открыть профиль Duolingo">👤</button>
-            <button class="dh-btn" data-rename="${id}" style="padding:3px 8px;font-size:10px;flex-shrink:0" title="Переименовать">✏</button>
-            <button class="dh-btn" data-export="${id}" style="padding:3px 8px;font-size:10px;flex-shrink:0" title="Статистика (HTML)">📥</button>
-            <button class="dh-btn" data-refresh="${id}" style="padding:3px 8px;font-size:10px;flex-shrink:0" title="Обновить данные">🔄</button>
+            <button class="dh-btn" data-open="${id}" style="padding:3px 8px;font-size:10px;flex-shrink:0" title="${t("acc.openProfile")}">👤</button>
+            <button class="dh-btn" data-rename="${id}" style="padding:3px 8px;font-size:10px;flex-shrink:0" title="${t("acc.rename")}">✏</button>
+            <button class="dh-btn" data-export="${id}" style="padding:3px 8px;font-size:10px;flex-shrink:0" title="${t("acc.exportHtml")}">📥</button>
+            <button class="dh-btn" data-refresh="${id}" style="padding:3px 8px;font-size:10px;flex-shrink:0" title="${t("acc.refresh")}">🔄</button>
           </div>
         </div>`;
       box.appendChild(card);
@@ -7476,14 +7670,14 @@
         window.open("https://www.duolingo.com/profile/" + name, "_blank");
       });
       card.querySelector("[data-rename]")?.addEventListener("click", async () => {
-        const newLabel = await showPromptPrompt("Ярлык аккаунта", a.label || name);
+        const newLabel = await showPromptPrompt(t("acc.labelPrompt"), a.label || name);
         if (newLabel === null) return;
         const store2 = DATA._store || {};
         if (!store2.accounts[id]) return;
         store2.accounts[id].label = newLabel.trim() || undefined;
         GM_setValue(STORAGE_KEY, JSON.stringify(store2));
         renderAccounts();
-        showToast("Ярлык обновлён");
+        showToast(t("acc.labelUpdated"));
       });
       card.querySelector("[data-refresh]")?.addEventListener("click", (e) => {
         e.target.textContent = "…";
@@ -7498,15 +7692,15 @@
       if (delBtn) {
         delBtn.addEventListener("click", async () => {
           const ok = await showConfirm(
-            `Удалить аккаунт ${name} (${id})?\nДанные и JWT будут стёрты.`,
-            "Удаление аккаунта",
+            t("acc.deleteConfirm", { name, id }),
+            t("acc.deleteTitle"),
           );
           if (!ok) return;
           delete store.accounts[id];
           DATA._store = store;
           GM_setValue(STORAGE_KEY, JSON.stringify(store));
           renderAccounts();
-          showToast("Аккаунт удалён");
+          showToast(t("acc.deleted"));
         });
       }
     }
@@ -7544,7 +7738,7 @@
   /** HTML-экспорт словаря и прогресса аккаунта. */
   /** HTML-экспорт статистики и прогресса аккаунта. */
   async function exportVocabHtml(accId, accName) {
-    showToast("Загрузка данных…");
+    showToast(t("acc.loadingData"));
     const fetchJson = (url) => new Promise((resolve) => {
       GM_xmlhttpRequest({
         method: "GET", url,
@@ -7567,7 +7761,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Duolingo — Статистика · ${displayName}</title>
+<title>${t("exp.title")} · ${displayName}</title>
 <style>
   * { margin:0; padding:0; box-sizing:border-box; }
   body { font-family:'Segoe UI',system-ui,sans-serif; background:#F3F3F3; color:#1A1A1A; }
@@ -7592,28 +7786,28 @@
 <body>
 <div class="page">
   <div class="header">
-    <h1>🦉 Duolingo — Статистика</h1>
+    <h1>${t("exp.h1")}</h1>
     <div class="sub">${displayName}${username ? " · @" + username : ""} · ${today}</div>
   </div>
   <div class="section">
-    <h2>📊 Общая статистика</h2>
+    <h2>${t("exp.h2")}</h2>
     <div class="stats-grid">
       <div class="stat-box">
         <div class="value">${fmtNum(totalXp)}</div>
-        <div class="label">⚡ Всего XP</div>
+        <div class="label">${t("exp.totalXp")}</div>
       </div>
       <div class="stat-box">
         <div class="value">🔥 ${streak}</div>
-        <div class="label">Серия дней</div>
+        <div class="label">${t("exp.streak")}</div>
       </div>
     </div>
   </div>
   <div class="center">
-    <button class="save-btn" onclick="savePage()">💾 Сохранить страницу</button>
-    <button class="print-btn" onclick="window.print()">🖨 Печать</button>
+    <button class="save-btn" onclick="savePage()">${t("exp.save")}</button>
+    <button class="print-btn" onclick="window.print()">${t("exp.print")}</button>
   </div>
   <div class="footer">
-    Создано Duolingo Helper · Лицензия CC BY-NC-ND 4.0
+    ${t("exp.footer")}
   </div>
 </div>
 <script>
@@ -7640,14 +7834,14 @@ function savePage() {
   async function switchToAccount(id) {
     const store = DATA._store || {};
     const acc = (store.accounts || {})[id];
-    if (!acc) { showToast("Аккаунт не найден", true); return; }
+    if (!acc) { showToast(t("acc.notFound"), true); return; }
     if (!acc.jwt) {
-      showToast("Нет JWT для этого аккаунта — войди заново", true);
+      showToast(t("acc.noJwtAccount"), true);
       return;
     }
     const ok = await showConfirm(
-      `Переключиться на ${((acc.me && acc.me.username) || acc.username || id)}?`,
-      "Смена аккаунта",
+      t("acc.switchConfirm", { name: ((acc.me && acc.me.username) || acc.username || id) }),
+      t("acc.switchTitle"),
     );
     if (!ok) return;
     saveToSlot(DATA._accountId || currentAccountId());
@@ -7656,7 +7850,7 @@ function savePage() {
       document.cookie = "jwt_token=" + encodeURIComponent(acc.jwt) + "; path=/; domain=.duolingo.com; max-age=31536000; secure; samesite=none";
       localStorage.setItem("jwt_token", acc.jwt);
     } catch {}
-    showToast("Переключение…");
+    showToast(t("acc.switching"));
     location.reload();
   }
 
@@ -10076,11 +10270,11 @@ function savePage() {
         });
       });
       if (!res || !res.linked) {
-        showToast("Привязать Telegram можно в блоке «Аккаунты»", true);
+        showToast(t("tglink.needLinkBug"), true);
         return;
       }
     } catch {
-      showToast("Не удалось проверить привязку", true);
+      showToast(t("tglink.checkFailed"), true);
       return;
     }
     // открываем бота с /bugreport
@@ -10563,15 +10757,15 @@ function savePage() {
     if (!els.meInfo) return;
     const myId = getMyId();
     if (!myId) {
-      els.meInfo.textContent = "Не выполнен вход (нет jwt_token)";
+      els.meInfo.textContent = t("me.notLoggedIn");
       return;
     }
-    els.meInfo.textContent = "Загрузка…";
+    els.meInfo.textContent = t("me.loading");
     const me = await getMe();
     if (me && me.username) {
       els.meInfo.textContent = `@${me.username} · id ${me.id}`;
     } else {
-      els.meInfo.textContent = `id ${myId} · username не получен`;
+      els.meInfo.textContent = t("me.noUsername", { id: myId });
     }
   }
 
