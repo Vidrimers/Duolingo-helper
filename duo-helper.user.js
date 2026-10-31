@@ -10255,8 +10255,8 @@ function savePage() {
           </p>
           <p style="margin:0 0 10px">
             ${t("help.credits2")}
-            <a href="https://github.com/Vidrimers/Universal-eblan-marker" target="_blank" rel="noopener"
-               style="color:#58cc02;text-decoration:underline">💀 Universal Eblan Marker</a>.
+            <a href="https://github.com/Vidrimers/Universal-marker" target="_blank" rel="noopener"
+               style="color:#58cc02;text-decoration:underline">💀 Universal Marker</a>.
           </p>
           <p style="margin:0;color:#888;font-size:11px">
             ${t("help.warn")}
