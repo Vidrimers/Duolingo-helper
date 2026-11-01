@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Duolingo Helper
 // @namespace    https://github.com/Vidrimers/Duolingo-helper
-// @version      0.11.9
+// @version      0.11.10
 // @description  Follow-back check for Duolingo profiles. Panel, badges, cache. / Проверка взаимной подписки на профилях Duolingo.
 // @author       Vidrimers
 // @license      CC BY-NC-ND 4.0
@@ -42,6 +42,8 @@
   const MARKER_ATTR = "data-dh-marked";
   const HOST_ID = "dh-root-host";
   const BOT_API = "http://89.124.70.156:3777";
+// маркер сборки: prepare-gf.mjs заменяет "github" на "public" для копии с площадок
+const BUILD_KIND = "github";
 
   // локальная дата (YYYY-MM-DD) — не UTC, чтобы «сегодня» считалось по времени пользователя
   function localDateStr(d = new Date()) {
@@ -459,6 +461,7 @@
       "tglink.codeError": "Ошибка генерации кода",
       "tglink.linkedStatus": "Telegram привязан: @{u}",
       "tglink.linkedBtn": "🔗 Привязать",
+      "tglink.netError": "⚠️ Нет связи с сервером бота",
       "tglink.unlinkConfirm": "Отвязать Telegram?\nСвязь между Duolingo и Telegram будет удалена.\nВсе данные и настройки на сервере бота тоже будут удалены (статистика, уведомления, друзья, история действий).",
       "tglink.unlinkTitle": "Отвязка Telegram",
       "tglink.unlinkedToast": "✓ Telegram отвязан, данные удалены",
@@ -1062,6 +1065,7 @@
       "tglink.codeError": "Code generation failed",
       "tglink.linkedStatus": "Telegram linked: @{u}",
       "tglink.linkedBtn": "🔗 Link",
+      "tglink.netError": "⚠️ Bot server unreachable",
       "tglink.unlinkConfirm": "Unlink Telegram?\nThe link between Duolingo and Telegram will be removed.\nAll data and settings on the bot's server will be deleted too (stats, notifications, friends, action history).",
       "tglink.unlinkTitle": "Unlinking Telegram",
       "tglink.unlinkedToast": "✓ Telegram unlinked, data deleted",
@@ -7748,6 +7752,7 @@
             streak,
             excludeList: DATA.excludeList || [],
             scriptVersion: (typeof GM_info !== "undefined" && GM_info.script && GM_info.script.version) || "",
+            build: BUILD_KIND,
             lang: uiLang(),
           }),
           timeout: 5000,
@@ -7855,11 +7860,22 @@
           method: "GET",
           url: BOT_API + "/api/link-status?duolingoUserId=" + encodeURIComponent(duoId),
           timeout: 10000,
-          onload(r) { try { resolve(JSON.parse(r.responseText || "{}")); } catch { resolve(null); } },
-          onerror() { resolve(null); },
-          ontimeout() { resolve(null); },
+          onload(r) { try { resolve(JSON.parse(r.responseText || "{}")); } catch { resolve({ net: true }); } },
+          onerror() { resolve({ net: true }); },
+          ontimeout() { resolve({ net: true }); },
         });
       });
+      if (res && res.net) {
+        // сервер недоступен — не показываем ложное «не привязано»
+        if (btn) {
+          btn.textContent = t("tglink.linkBtn");
+          btn.disabled = true;
+          btn.dataset.mode = "link";
+          btn.classList.remove("dh-btn-danger");
+        }
+        if (statusEl) statusEl.textContent = t("tglink.netError");
+        return;
+      }
       if (res && res.linked) {
         if (btn) {
           btn.textContent = t("tglink.unlinkBtn");
@@ -9887,8 +9903,10 @@ function savePage() {
       for (var i = 0; i < rows.length; i++) {
         var el = rows[i];
         var t = (el.textContent || "").replace(/\s+/g, " ").trim();
-        // XP — число перед "очков"
-        var xpM = t.match(/(\d[\d\s]*)\s*очк/);
+        // XP — число перед «очк». Паттерн не захватывает цифры из ника
+        // («gweTqWc2 356» → 356, «trần 2010 9» → 9): начало числа — только
+        // после не-буквы/не-цифры, группы разрядов — ровно по 3 цифры.
+        var xpM = t.match(/(?:^|[^\p{L}\p{N}_])(\d{1,3}(?: \d{3})*|\d+)\s*очк/u);
         if (!xpM) continue;
         var xp = parseInt(xpM[1].replace(/\s/g, ""), 10);
         if (isNaN(xp)) continue;
@@ -11214,7 +11232,7 @@ function savePage() {
   // версия из Tampermonkey — не расходится с @version в шапке
   const CURRENT_VERSION =
     (typeof GM_info !== "undefined" && GM_info.script && GM_info.script.version) ||
-    "0.3.5";
+    "0.11.10";
   // запасная ссылка установки, если API не дал download_url
   let installUrl =
     "https://raw.githubusercontent.com/Vidrimers/Duolingo-helper/refs/heads/master/duo-helper.user.js";
@@ -12082,6 +12100,8 @@ function savePage() {
             e.stopPropagation();
             DATA.settings.lang = opt.dataset.lang || "ru";
             saveData();
+            // тут же отдаём язык боту — иначе TG ждёт до следующего sync-stats
+            try { collectStats(); } catch {}
             // строки вшиты в шаблон на момент createUI — пересобираем панель целиком,
             // сохраняя состояние окна (открыто/свёрнуто), иначе оно создаётся закрытым
             try {
@@ -12571,21 +12591,23 @@ function savePage() {
     const status = els.cloudStatus;
     if (!saveBtn || !loadBtn) return;
     const myId = getMyId();
-    const lock = () => {
+    const lock = (net) => {
+      const msg = net ? t("tglink.netError") : t("set.needTg");
       saveBtn.disabled = true;
       loadBtn.disabled = true;
-      saveBtn.title = t("set.needTg");
-      loadBtn.title = t("set.needTg");
+      saveBtn.title = msg;
+      loadBtn.title = msg;
       if (loadBtn) loadBtn.style.display = "";
-      if (delBtn) { delBtn.disabled = true; delBtn.title = t("set.needTg"); delBtn.style.display = ""; }
-      if (status) status.textContent = t("cloud.statusNeedTg");
+      if (delBtn) { delBtn.disabled = true; delBtn.title = msg; delBtn.style.display = ""; }
+      if (status) status.textContent = net ? t("tglink.netError") : t("cloud.statusNeedTg");
     };
     if (!myId) { lock(); return; }
     const linked = await cloudRequest(
       BOT_API + "/api/link-status?duolingoUserId=" + encodeURIComponent(myId),
       { method: "GET" }
     );
-    if (!linked || !linked.linked) { lock(); return; }
+    if (!linked) { lock(true); return; }
+    if (!linked.linked) { lock(); return; }
     saveBtn.disabled = false;
     saveBtn.title = "";
     const meta = await cloudRequest(

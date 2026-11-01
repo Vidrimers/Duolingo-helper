@@ -184,5 +184,9 @@ try {
 try {
   db.exec(`ALTER TABLE users ADD COLUMN lang TEXT`);
 } catch {}
+// миграция: источник установки скрипта (github / public) — статистика для админа
+try {
+  db.exec(`ALTER TABLE script_installs ADD COLUMN build TEXT`);
+} catch {}
 
 export default db;

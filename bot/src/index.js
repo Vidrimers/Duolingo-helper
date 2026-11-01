@@ -1293,13 +1293,26 @@ bot.on("callback_query", async (ctx) => {
     const installCount = db.prepare("SELECT COUNT(*) as n FROM script_installs").get().n;
     const banCount = db.prepare("SELECT COUNT(*) as n FROM banned_users").get().n;
     // версии скрипта: сколько человек на каждой (по последнему sync-stats)
-    const verRows = db.prepare("SELECT version, COUNT(*) as n FROM script_installs GROUP BY version").all();
+    const verRows = db.prepare("SELECT version, build, COUNT(*) as n FROM script_installs GROUP BY version, build").all();
     let verLine = "";
     if (verRows.length) {
       const known = verRows.filter((r) => r.version).sort((a, b) => cmpVersion(b.version, a.version));
-      const unknown = verRows.find((r) => !r.version);
-      const parts = known.map((r) => `${r.version} — ${r.n}`);
-      if (unknown) parts.push(`без версии — ${unknown.n}`);
+      const unknown = verRows.filter((r) => !r.version);
+      // агрегируем по версии, внутри — разбивка по источнику сборки (github / public)
+      const byVer = new Map();
+      for (const r of known) {
+        if (!byVer.has(r.version)) byVer.set(r.version, { n: 0, builds: new Map() });
+        const e = byVer.get(r.version);
+        e.n += r.n;
+        const b = r.build || "?";
+        e.builds.set(b, (e.builds.get(b) || 0) + r.n);
+      }
+      const parts = [...byVer.entries()].map(([v, e]) => {
+        const bl = [...e.builds.entries()].map(([b, n]) => `${b}: ${n}`).join(", ");
+        return `${v} — ${e.n} (${bl})`;
+      });
+      const unknownN = unknown.reduce((s, r) => s + r.n, 0);
+      if (unknownN) parts.push(`без версии — ${unknownN}`);
       verLine = `\n   📈 ${parts.join(" · ")}`;
     }
     await ctx.editMessageText(
@@ -1375,7 +1388,7 @@ bot.on("callback_query", async (ctx) => {
     for (const r of rows) {
       const name = r.username || r.duolingo_user_id;
       text += `📦 <b>${name}</b> · <code>${r.duolingo_user_id}</code>\n`;
-      text += `   📅 ${r.first_seen}${r.version ? " · v" + r.version : ""}\n\n`;
+      text += `   📅 ${r.first_seen}${r.version ? " · v" + r.version : ""}${r.build ? " · " + r.build : ""}\n\n`;
     }
     const kb = [];
     const nav = [];
@@ -2554,7 +2567,7 @@ const httpServer = createServer((req, res) => {
     req.on("data", (chunk) => { body += chunk; });
     req.on("end", () => {
       try {
-        const { duolingoUserId, duolingoUsername, xpLog, totalXp, streak, excludeList, scriptVersion, lang } = JSON.parse(body || "{}");
+        const { duolingoUserId, duolingoUsername, xpLog, totalXp, streak, excludeList, scriptVersion, lang, build } = JSON.parse(body || "{}");
         if (!duolingoUserId) {
           res.writeHead(400, { "Content-Type": "application/json" });
           res.end(JSON.stringify({ error: "duolingoUserId required" }));
@@ -2571,7 +2584,7 @@ const httpServer = createServer((req, res) => {
         try {
           const existing = db.prepare("SELECT duolingo_user_id FROM script_installs WHERE duolingo_user_id = ?").get(String(duolingoUserId));
           if (!existing) {
-            db.prepare("INSERT OR IGNORE INTO script_installs (duolingo_user_id, username, version) VALUES (?, ?, ?)").run(String(duolingoUserId), duolingoUsername || null, scriptVersion || null);
+            db.prepare("INSERT OR IGNORE INTO script_installs (duolingo_user_id, username, version, build) VALUES (?, ?, ?, ?)").run(String(duolingoUserId), duolingoUsername || null, scriptVersion || null, build || null);
             // уведомление админу
             const uname = duolingoUsername || duolingoUserId;
             bot.api.sendMessage(config.adminTgId,
@@ -2588,6 +2601,9 @@ const httpServer = createServer((req, res) => {
             }
             if (scriptVersion) {
               db.prepare("UPDATE script_installs SET version = ? WHERE duolingo_user_id = ?").run(String(scriptVersion), String(duolingoUserId));
+            }
+            if (build) {
+              db.prepare("UPDATE script_installs SET build = ? WHERE duolingo_user_id = ?").run(String(build), String(duolingoUserId));
             }
           }
         } catch {}

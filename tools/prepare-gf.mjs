@@ -55,6 +55,17 @@ cut(/^\/\/ @connect\s+api\.github\.com[^\n]*\n/gm, "@connect api.github.com");
   }
 }
 
+// 2b) маркер сборки: public-копия помечается для статистики источника установки
+{
+  const next = text.replace(/BUILD_KIND = "github"/, 'BUILD_KIND = "public"');
+  if (next === text) {
+    console.warn("⚠️  не найдено (пропущено): BUILD_KIND → public");
+  } else {
+    log.push("BUILD_KIND → public");
+    text = next;
+  }
+}
+
 // 3) блок «ПРОВЕРКА ОБНОВЛЕНИЙ» — вырезается целиком, остаётся CURRENT_VERSION
 // (его используют шаблоны багрепортов). Границы — секционные комментарии.
 const startMark = "  // ========== ПРОВЕРКА ОБНОВЛЕНИЙ ==========";
@@ -65,12 +76,13 @@ if (s === -1 || e === -1 || e < s) {
   console.error("❌ не найдены границы блока апдейтера — вырезание отменено");
   process.exit(1);
 }
+const version = (text.match(/^\/\/ @version\s+(\S+)/m) || [])[1] || "0.0.0";
 const replacement =
   startMark + "\n" +
   "  // (для Greasy Fork вырезано: апдейтер и адреса GitHub не публикуются)\n" +
   "  const CURRENT_VERSION =\n" +
   "    (typeof GM_info !== \"undefined\" && GM_info.script && GM_info.script.version) ||\n" +
-  "    \"0.3.5\";\n\n";
+  "    \"" + version + "\";\n\n";
 text = text.slice(0, s) + replacement + text.slice(e);
 log.push(`блок апдейтера (${e - s} символов → константа CURRENT_VERSION)`);
 
