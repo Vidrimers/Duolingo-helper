@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Duolingo Helper
 // @namespace    https://github.com/Vidrimers/Duolingo-helper
-// @version      0.11.11
+// @version      0.12.0
 // @description  Follow-back check for Duolingo profiles. Panel, badges, cache. / Проверка взаимной подписки на профилях Duolingo.
 // @author       Vidrimers
 // @license      CC BY-NC-ND 4.0
@@ -307,7 +307,7 @@ const BUILD_KIND = "github";
       "tool.stkDesc": "Восстановление/накрутка дней серии через подмену дат в sessions. Нарушает правила Duolingo.",
       "tool.stkRun": "Накрутить дни",
       "tool.lb": "⚠️ Лига {risk}",
-      "tool.lbDesc": "Таблица лиги, вступление, накрутка до целевого места и реакции.",
+      "tool.lbDesc": "Таблица лиги, вступление и накрутка до целевого места.",
       "tool.lbTable": "Таблица",
       "tool.lbJoin": "Вступить",
       "tool.lbFarm": "Фарм до места",
@@ -395,6 +395,23 @@ const BUILD_KIND = "github";
       "lb.joinFailed": "Не удалось вступить в лигу",
       "lb.farmTo": "Фарм до места #{n}…",
       "lb.noLeagueJoin": "Нет лиги — пробую вступить…",
+      "lb.massAdd": "➕ Добавить всех",
+      "lb.massUnf": "✕ Отписаться от всех",
+      "lb.addTitle": "Отправить заявку в друзья",
+      "lb.unfTitle": "Отписаться",
+      "lb.unfAsk": "Отписаться от {u}?",
+      "lb.sent": "✓ Заявка отправлена",
+      "lb.sendFail": "Не удалось отправить заявку",
+      "lb.unfDone": "✓ Отписался",
+      "lb.massAddAsk": "Отправить заявки в друзья всем из лиги ({n} чел.)?",
+      "lb.massAddNone": "Добавлять некого — все уже подписаны",
+      "lb.massUnfAsk": "От кого отписаться?",
+      "lb.massUnfAll": "Все из лиги",
+      "lb.massUnfNonf": "Только неподписанные",
+      "lb.massUnfNone": "Отписываться не от кого",
+      "lb.massProgress": "Обработано {i} из {n}…",
+      "lb.massDone": "Готово: {ok} из {n}",
+      "lb.needTable": "Сначала загрузите таблицу",
       "lb.joinMiss": "Не удалось попасть в лигу",
       "lb.goal": "Цель достигнута: #{n}",
       "lb.goalToast": "🏆 Место #{n}",
@@ -911,7 +928,7 @@ const BUILD_KIND = "github";
       "tool.stkDesc": "Restoring/farming streak days by faking dates in sessions. Violates Duolingo rules.",
       "tool.stkRun": "Add streak days",
       "tool.lb": "⚠️ League {risk}",
-      "tool.lbDesc": "League table, joining, farming to a target place and reactions.",
+      "tool.lbDesc": "League table, joining and farming to a target place.",
       "tool.lbTable": "Table",
       "tool.lbJoin": "Join",
       "tool.lbFarm": "Farm to place",
@@ -999,6 +1016,23 @@ const BUILD_KIND = "github";
       "lb.joinFailed": "Couldn't join the league",
       "lb.farmTo": "Farming to place #{n}…",
       "lb.noLeagueJoin": "No league — trying to join…",
+      "lb.massAdd": "➕ Add everyone",
+      "lb.massUnf": "✕ Unfollow everyone",
+      "lb.addTitle": "Send a friend request",
+      "lb.unfTitle": "Unfollow",
+      "lb.unfAsk": "Unfollow {u}?",
+      "lb.sent": "✓ Request sent",
+      "lb.sendFail": "Failed to perform the action",
+      "lb.unfDone": "✓ Unfollowed",
+      "lb.massAddAsk": "Send friend requests to everyone in the league ({n} people)?",
+      "lb.massAddNone": "Nothing to add — already following everyone",
+      "lb.massUnfAsk": "Unfollow whom?",
+      "lb.massUnfAll": "Everyone in the league",
+      "lb.massUnfNonf": "Only those who don't follow back",
+      "lb.massUnfNone": "Nobody to unfollow",
+      "lb.massProgress": "Processed {i} of {n}…",
+      "lb.massDone": "Done: {ok} of {n}",
+      "lb.needTable": "Load the table first",
       "lb.joinMiss": "Couldn't get into a league",
       "lb.goal": "Target reached: #{n}",
       "lb.goalToast": "🏆 Place #{n}",
@@ -2474,6 +2508,8 @@ const BUILD_KIND = "github";
             }
             .dh-lb-row .score {
                 flex-shrink: 0;
+                width: 56px;
+                text-align: right;
                 font-variant-numeric: tabular-nums;
                 font-weight: 700;
             }
@@ -2487,6 +2523,15 @@ const BUILD_KIND = "github";
             }
             .dh-lb-row .gap.up { color: #1F7A1F; }
             .dh-lb-row .gap.down { color: #B02A1E; }
+            .dh-lb-row .lb-acts {
+                flex-shrink: 0;
+                width: 46px;
+                display: flex;
+                justify-content: flex-end;
+            }
+        .dh-lb-act { display: inline-flex; gap: 4px; align-items: center; margin-left: 6px; }
+        .dh-lb-state { padding: 2px 8px; font-size: 12px; line-height: 1.2; }
+        .dh-lb-state:disabled { opacity: 0.55; }
 
             .dh-switch {
                 position: relative;
@@ -4925,6 +4970,7 @@ const BUILD_KIND = "github";
                         <div class="dh-row" style="margin-bottom:6px">
                             <button class="dh-btn dh-btn-primary" id="dh-lb-load">${t("tool.lbTable")}</button>
                             <button class="dh-btn" id="dh-lb-join">${t("tool.lbJoin")}</button>
+                            <button class="dh-btn" id="dh-lb-addall" disabled>${t("lb.massAdd")}</button>
                         </div>
                         <div class="dh-row" style="margin-bottom:6px">
                             <input class="dh-num-input" id="dh-lb-target" type="number" min="1" max="100" value="3" style="width:56px" />
@@ -5165,6 +5211,7 @@ const BUILD_KIND = "github";
       streakStatus: modal.querySelector("#dh-streak-status"),
       lbLoad: modal.querySelector("#dh-lb-load"),
       lbJoin: modal.querySelector("#dh-lb-join"),
+      lbAddAll: modal.querySelector("#dh-lb-addall"),
       lbStatus: modal.querySelector("#dh-lb-status"),
       lbList: modal.querySelector("#dh-lb-list"),
       lbTarget: modal.querySelector("#dh-lb-target"),
@@ -7307,8 +7354,10 @@ const BUILD_KIND = "github";
         <span class="rank">${rankTxt}</span>
         <span class="name">${u.display_name || u.name || u.username || u.user_id}</span>
         <span class="score">${Number(u.score || 0)}</span>
-        ${gapHtml}`;
+        ${gapHtml}
+        <span class="lb-acts">${leagueActionsHtml(u.user_id)}</span>`;
       els.lbList.appendChild(row);
+      bindLeagueRowActions(row);
     });
 
     const prom = rankings.slice(0, 10).some((u) => String(u.user_id) === myId);
@@ -7321,6 +7370,398 @@ const BUILD_KIND = "github";
         (data && data.is_promoted ? t("lb.promo") : "") +
         (data && data.is_demoted ? t("lb.demo") : ""),
     );
+    updateAddAllBtn();
+  }
+
+  // ========== ЛИГА: заявки в друзья ==========
+  // Социальные связи для статусов строк: обновляются при открытии «Лиги»
+  // и по кнопке «Таблица», дальше читаются из кеша.
+  let leagueSocial = { following: null, followers: null, at: 0, loading: false };
+  let lastLbData = null;   // последний ответ fetchLeaderboard
+  let lastLbUsers = null;  // Map: username / display_name (lower) → userId
+  let lbUsersLoading = false;
+  let lbUsersLastTry = 0;
+  let lbSiteRefresh = null; // назначается хуком страницы (injectGaps)
+
+  async function refreshLeagueSocial(force) {
+    // без force — не чаще одного запроса в минуту (защита от тесного цикла и лишней сети);
+    // force — явное обновление после действий пользователя, паузу игнорируем
+    if (leagueSocial.loading) return null;
+    if (!force && Date.now() - (leagueSocial.at || 0) < 60000) return null;
+    leagueSocial.loading = true;
+    leagueSocial.at = Date.now();
+    try {
+      const me = await getMe();
+      if (!me || !me.id) {
+        leagueSocial.loading = false;
+        return null;
+      }
+      const [following, followers] = await Promise.all([
+        fetchUserList(me.id, "following"),
+        fetchUserList(me.id, "followers"),
+      ]);
+      leagueSocial = {
+        following: new Set(following.map((u) => String(u.userId))),
+        followers: new Set(followers.map((u) => String(u.userId))),
+        at: Date.now(),
+        loading: false,
+      };
+    } catch (e) {
+      leagueSocial.loading = false;
+      return null;
+    }
+    return leagueSocial;
+  }
+
+  // Освежение статусов при возврате во вкладку / на странице профиля.
+  // Сам refreshLeagueSocial не чаще раза в минуту — сеть не молотится.
+  function refreshLeagueSocialIfStale(force) {
+    try {
+      refreshLeagueSocial(force).then((r) => {
+        if (!r) return;
+        try { if (lbSiteRefresh) lbSiteRefresh(); } catch (e) {}
+        try {
+          if (lastLbData && els.lbList && els.lbList.children.length) {
+            renderLeaderboard(lastLbData);
+          }
+        } catch (e) {}
+      });
+    } catch (e) {}
+  }
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) refreshLeagueSocialIfStale();
+  });
+
+  function leagueStateOf(id) {
+    id = String(id);
+    if (!leagueSocial.following) return "unknown";
+    if (!leagueSocial.following.has(id)) return "none";
+    return leagueSocial.followers.has(id) ? "mutual" : "oneway";
+  }
+
+  function leagueNameOf(id) {
+    id = String(id);
+    const rws = (lastLbData && lastLbData.cohort && lastLbData.cohort.rankings) || [];
+    for (const r of rws) {
+      if (String(r.user_id) === id) return r.display_name || r.name || r.username || id;
+    }
+    return id;
+  }
+
+  // Кнопки состояния строки: ➕ заявка / ❌ не подписаны + ✕ / ✅ взаимно.
+  // Иконки — те же, что во вкладке «Друзья» (❌ Не подписаны / ✅ Взаимно).
+  function leagueActionsHtml(id) {
+    id = String(id);
+    const myId = String(getMyId() || "");
+    if (myId && myId === id) return ""; // свою строку не трогаем
+    const st = leagueStateOf(id);
+    if (st === "unknown") return ""; // статусы ещё не подтянуты
+    if (st === "mutual") {
+      return '<button type="button" class="dh-btn dh-lb-state" data-lb-unf="' + id + '" title="' + t("friends.fMutual") + '">✅</button>';
+    }
+    if (st === "oneway") {
+      // один крестик: состояние «не подписаны» и действие отписки
+      return '<button type="button" class="dh-btn dh-btn-danger dh-lb-state" data-lb-unf="' + id + '" title="' + t("lb.unfTitle") + '">✕</button>';
+    }
+    return '<button type="button" class="dh-btn dh-lb-state" data-lb-add="' + id + '" title="' + t("lb.addTitle") + '">➕</button>';
+  }
+
+  // клики по кнопкам строк — и в панели, и на сайте
+  function bindLeagueRowActions(scope) {
+    scope.addEventListener("click", async (e) => {
+      const addBtn = e.target.closest("[data-lb-add]");
+      const unfBtn = e.target.closest("[data-lb-unf]");
+      if (!addBtn && !unfBtn) return;
+      // строка сайта — это <a>, не даём клику перейти по ссылке
+      e.preventDefault();
+      e.stopPropagation();
+      const btn = addBtn || unfBtn;
+      const id = String(btn.getAttribute(addBtn ? "data-lb-add" : "data-lb-unf"));
+      btn.disabled = true;
+      try {
+        if (addBtn) await leagueFollowOne(id);
+        else await leagueUnfollowOne(id);
+      } finally {
+        btn.disabled = false;
+      }
+      if (lastLbData) renderLeaderboard(lastLbData);
+      if (lbSiteRefresh) {
+        try { lbSiteRefresh(); } catch (e2) {}
+      }
+    });
+  }
+
+  async function leagueFollowOne(id) {
+    const name = leagueNameOf(id);
+    const ok = await followUser(id);
+    if (!ok) {
+      showToast(t("lb.sendFail"), true);
+      return false;
+    }
+    if (leagueSocial.following) leagueSocial.following.add(String(id));
+    logAction({ type: "follow", ids: [String(id)], name });
+    showToast(t("lb.sent"));
+    return true;
+  }
+
+  async function leagueUnfollowOne(id) {
+    const name = leagueNameOf(id);
+    const okGo = await showConfirm(t("lb.unfAsk", { u: name }), t("lb.unfTitle"));
+    if (!okGo) return false;
+    const ok = await unfollowUser(id);
+    if (!ok) {
+      showToast(t("lb.sendFail"), true);
+      return false;
+    }
+    if (leagueSocial.following) leagueSocial.following.delete(String(id));
+    if (leagueSocial.followers) leagueSocial.followers.delete(String(id));
+    logAction({ type: "unfollow", ids: [String(id)], name });
+    showToast(t("lb.unfDone"));
+    return true;
+  }
+
+  // Модалка с несколькими кнопками (выбор: от кого отписаться).
+  function showChoice(message, title, choices) {
+    return new Promise((resolve) => {
+      if (!shadow) {
+        resolve(null);
+        return;
+      }
+      const theme = DATA.settings.theme || "win95";
+      const overlay = document.createElement("div");
+      overlay.className = "dh-confirm-overlay dh-theme-" + theme;
+      overlay.innerHTML = `
+        <div class="dh-confirm-box">
+          <div class="dh-confirm-title"></div>
+          <div class="dh-confirm-body"></div>
+          <div class="dh-confirm-actions"></div>
+        </div>
+      `;
+      overlay.querySelector(".dh-confirm-title").textContent = title || "";
+      overlay.querySelector(".dh-confirm-body").textContent = message;
+      const acts = overlay.querySelector(".dh-confirm-actions");
+      const done = (val) => {
+        overlay.remove();
+        resolve(val);
+      };
+      for (const c of choices) {
+        const b = document.createElement("button");
+        b.className = "dh-btn" + (c.danger ? " dh-btn-danger" : "");
+        b.textContent = c.label;
+        b.addEventListener("click", () => done(c.id));
+        acts.appendChild(b);
+      }
+      const cancel = document.createElement("button");
+      cancel.className = "dh-btn";
+      cancel.textContent = t("ui.cancel");
+      cancel.addEventListener("click", () => done(null));
+      acts.appendChild(cancel);
+      overlay.addEventListener("click", (e) => {
+        if (e.target === overlay) done(null);
+      });
+      shadow.appendChild(overlay);
+    });
+  }
+
+  // Режим кнопки «Добавить всех» / «Отписаться от всех» считается по состоянию:
+  // есть кого добавлять → добавление; добавлять некого, но есть подписанные → отписка.
+  function updateAddAllBtn() {
+    const btn = els.lbAddAll;
+    if (!btn) return;
+    const rankings = (lastLbData && lastLbData.cohort && lastLbData.cohort.rankings) || [];
+    const myId = String(getMyId() || "");
+    let canAdd = 0;
+    let canUnf = 0;
+    if (rankings.length && leagueSocial.following) {
+      for (const u of rankings) {
+        if (String(u.user_id) === myId) continue;
+        const st = leagueStateOf(u.user_id);
+        if (st === "none") canAdd++;
+        else if (st !== "unknown") canUnf++;
+      }
+    }
+    if (canAdd) {
+      btn.disabled = false;
+      btn.textContent = t("lb.massAdd") + " (" + canAdd + ")";
+      btn.classList.remove("dh-btn-danger");
+    } else if (canUnf) {
+      btn.disabled = false;
+      btn.textContent = t("lb.massUnf") + " (" + canUnf + ")";
+      btn.classList.add("dh-btn-danger");
+    } else {
+      btn.disabled = true;
+      btn.textContent = t("lb.massAdd");
+      btn.classList.remove("dh-btn-danger");
+    }
+  }
+
+  async function onLeagueMass() {
+    const rankings = ((lastLbData && lastLbData.cohort && lastLbData.cohort.rankings) || []).slice();
+    const myId = String(getMyId() || "");
+    if (!rankings.length || !leagueSocial.following) {
+      showToast(t("lb.needTable"), true);
+      return;
+    }
+    const mine = rankings.filter((u) => String(u.user_id) !== myId);
+    const toAdd = mine.filter((u) => leagueStateOf(u.user_id) === "none");
+    const toUnfAll = mine.filter((u) => {
+      const st = leagueStateOf(u.user_id);
+      return st === "oneway" || st === "mutual";
+    });
+    const toUnfNonf = mine.filter((u) => leagueStateOf(u.user_id) === "oneway");
+    const delay = Math.max(150, DATA.settings.requestDelay || 350);
+
+    if (toAdd.length) {
+      const okGo = await showConfirm(t("lb.massAddAsk", { n: toAdd.length }), t("lb.massAdd"));
+      if (!okGo) return;
+      const ids = [];
+      let ok = 0;
+      for (let i = 0; i < toAdd.length; i++) {
+        setLbStatus(t("lb.massProgress", { i: i + 1, n: toAdd.length }));
+        const success = await followUser(toAdd[i].user_id);
+        if (success) {
+          ok++;
+          ids.push(String(toAdd[i].user_id));
+          if (leagueSocial.following) leagueSocial.following.add(String(toAdd[i].user_id));
+        }
+        await new Promise((r) => setTimeout(r, delay + Math.floor(Math.random() * 250)));
+      }
+      logAction({ type: "follow_mass", ids, name: t("lb.massAdd") + " (" + ok + ")" });
+      if (lastLbData) renderLeaderboard(lastLbData);
+      setLbStatus(t("lb.massDone", { ok, n: toAdd.length }));
+      showToast(t("lb.massDone", { ok, n: toAdd.length }));
+      return;
+    }
+
+    if (!toUnfAll.length) {
+      showToast(t("lb.massAddNone"));
+      return;
+    }
+    // выбор: отписаться от всех из лиги или только от неподписанных
+    const choice = await showChoice(t("lb.massUnfAsk"), t("lb.massUnf"), [
+      { id: "all", label: t("lb.massUnfAll") + " (" + toUnfAll.length + ")", danger: true },
+      { id: "nonf", label: t("lb.massUnfNonf") + " (" + toUnfNonf.length + ")", danger: true },
+    ]);
+    if (!choice) return;
+    const targets = choice === "all" ? toUnfAll : toUnfNonf;
+    if (!targets.length) {
+      showToast(t("lb.massUnfNone"));
+      return;
+    }
+    const ids = [];
+    let ok = 0;
+    for (let i = 0; i < targets.length; i++) {
+      setLbStatus(t("lb.massProgress", { i: i + 1, n: targets.length }));
+      const success = await unfollowUser(targets[i].user_id);
+      if (success) {
+        ok++;
+        ids.push(String(targets[i].user_id));
+        if (leagueSocial.following) leagueSocial.following.delete(String(targets[i].user_id));
+        if (leagueSocial.followers) leagueSocial.followers.delete(String(targets[i].user_id));
+      }
+      await new Promise((r) => setTimeout(r, delay + Math.floor(Math.random() * 250)));
+    }
+    logAction({ type: "unfollow_mass", ids, name: t("lb.massUnf") + " (" + ok + ")" });
+    if (lastLbData) renderLeaderboard(lastLbData);
+    setLbStatus(t("lb.massDone", { ok, n: targets.length }));
+    showToast(t("lb.massDone", { ok, n: targets.length }));
+  }
+
+  // Карта username / display_name → userId из последних данных лиги (для кнопок на сайте)
+  async function ensureLbUsers() {
+    if (lastLbUsers) return lastLbUsers;
+    if (lbUsersLoading) return null;
+    // защита от тесного цикла: повтор не чаще раза в минуту
+    if (Date.now() - lbUsersLastTry < 60000) return null;
+    lbUsersLoading = true;
+    lbUsersLastTry = Date.now();
+    try {
+      const data = lastLbData || (await fetchLeaderboard());
+      // НЕ переносим данные в lastLbData: иначе «Лига» показывала бы
+      // таблицу без нажатия «Таблица»
+      const map = new Map();
+      const rws = (data && data.cohort && data.cohort.rankings) || [];
+      for (const r of rws) {
+        const id = String(r.user_id);
+        if (r.username) map.set(String(r.username).toLowerCase(), id);
+        const dn = r.display_name || r.name;
+        if (dn) map.set(String(dn).toLowerCase(), id);
+      }
+      lastLbUsers = map;
+    } catch (e) {
+      /* кеш остаётся пустым */
+    } finally {
+      lbUsersLoading = false;
+    }
+    return lastLbUsers;
+  }
+
+  // ID участника из строки лидерборда на сайте (ссылка ведёт на профиль)
+  function leagueIdForRow(el) {
+    const href = el.getAttribute("href") || "";
+    let m = href.match(/\/profile\/(\d+)/);
+    if (m) return m[1];
+    m = href.match(/\/profile\/([^/?#]+)/);
+    const byHref = m ? decodeURIComponent(m[1]).toLowerCase() : "";
+    if (lastLbUsers) {
+      if (byHref && lastLbUsers.has(byHref)) return lastLbUsers.get(byHref);
+      const key = (el.textContent || "").trim().toLowerCase();
+      if (key && lastLbUsers.has(key)) return lastLbUsers.get(key);
+      // имя внутри строки (текст склеен со счётом) — ищем вхождение
+      for (const [k, v] of lastLbUsers) {
+        if (k && key.indexOf(k) !== -1) return v;
+      }
+      if (byHref) return null;
+    }
+    return null;
+  }
+
+  // Кнопки заявок на странице сайта; состояние — из кеша, видны постоянно
+  function injectLeagueActions(rows) {
+    if (!leagueSocial.following) {
+      if (!leagueSocial.loading) {
+        // перерисовываем только при успехе — иначе получится тесный цикл
+        refreshLeagueSocial().then((r) => {
+          try { if (r && lbSiteRefresh) lbSiteRefresh(); } catch (e) {}
+        });
+      }
+      return;
+    }
+    if (!lastLbUsers) {
+      ensureLbUsers().then((m) => {
+        try { if (m && lbSiteRefresh) lbSiteRefresh(); } catch (e) {}
+      });
+      return;
+    }
+    const myId = String(getMyId() || "");
+    for (let i = 0; i < rows.length; i++) {
+      const el = rows[i];
+      const id = String(leagueIdForRow(el) || "");
+      const old = el.querySelector(".dh-lb-act");
+      if (!id || id === myId) {
+        if (old) old.remove();
+        continue;
+      }
+      const st = leagueStateOf(id);
+      // идемпотентно: пока состояние прежнее — DOM не трогаем
+      if (old && old.getAttribute("data-lb-st") === st) continue;
+      if (old) old.remove();
+      const chip = document.createElement("button");
+      chip.type = "button";
+      chip.className = "dh-lb-act";
+      chip.setAttribute("data-lb-st", st);
+      chip.textContent = st === "mutual" ? "✅" : st === "oneway" ? "✕" : "➕";
+      chip.title = st === "mutual" ? t("friends.fMutual") : st === "oneway" ? t("lb.unfTitle") : t("lb.addTitle");
+      chip.setAttribute(st === "none" ? "data-lb-add" : "data-lb-unf", id);
+      // стиль один в один с бейджем разрыва (кнопка дополнительно наследует шрифт)
+      chip.style.cssText =
+        "margin-left:8px;padding:1px 6px;border-radius:8px;font-size:11px;font-weight:700;white-space:nowrap;vertical-align:middle;cursor:pointer;border:none;font-family:inherit;line-height:inherit;" +
+        (st === "oneway"
+          ? "background:rgba(192,57,43,0.12);color:#B02A1E;"
+          : "background:rgba(88,204,2,0.15);color:#1F7A1F;");
+      bindLeagueRowActions(chip);
+      el.appendChild(chip);
+    }
   }
 
   async function loadLeague() {
@@ -7333,8 +7774,13 @@ const BUILD_KIND = "github";
         setLbStatus(t("lb.noLeague"));
         els.lbList.innerHTML =
           `<div class="dh-muted">${t("lb.notIn")}</div>`;
+        lastLbData = null;
+        updateAddAllBtn();
         return;
       }
+      lastLbData = data;
+      // статусы подписок: подтягиваем при загрузке таблицы (внутри — пауза 60с)
+      await refreshLeagueSocial(true);
       renderLeaderboard(data);
     } catch (e) {
       setLbStatus(t("f.error", { msg: e && e.message }));
@@ -9939,27 +10385,50 @@ function savePage() {
       }
       if (myXp === null) return;
 
-      // убираем старые
-      var old = document.querySelectorAll(".dh-lb-gap");
-      for (var b = 0; b < old.length; b++) old[b].remove();
-
-      // вставляем бейджи
+      // бейджи разрывов: обновляем на месте и только при изменении
       for (var m = 0; m < entries.length; m++) {
         var e = entries[m];
         if (e.isMe) continue;
         var gap = e.xp - myXp;
-        if (gap === 0) continue;
-        var badge = document.createElement("span");
-        badge.className = "dh-lb-gap";
-        badge.textContent = (gap > 0 ? "+" : "") + fmtNum(gap);
-        badge.style.cssText = "margin-left:8px;padding:1px 6px;border-radius:8px;font-size:11px;font-weight:700;white-space:nowrap;vertical-align:middle;pointer-events:none;" +
+        var badge = e.el.querySelector(".dh-lb-gap");
+        if (gap === 0) {
+          if (badge) badge.remove();
+          continue;
+        }
+        var txt = (gap > 0 ? "+" : "") + fmtNum(gap);
+        var css = "margin-left:8px;padding:1px 6px;border-radius:8px;font-size:11px;font-weight:700;white-space:nowrap;vertical-align:middle;pointer-events:none;" +
           (gap > 0
             ? "background:rgba(88,204,2,0.15);color:#1F7A1F;"
             : "background:rgba(192,57,43,0.12);color:#B02A1E;");
+        var mark = txt + "|" + (gap > 0 ? "g" : "r");
+        if (badge) {
+          if (badge.getAttribute("data-gap") !== mark) {
+            badge.textContent = txt;
+            badge.setAttribute("data-gap", mark);
+            badge.style.cssText = css;
+          }
+          continue;
+        }
+        badge = document.createElement("span");
+        badge.className = "dh-lb-gap";
+        badge.textContent = txt;
+        badge.setAttribute("data-gap", mark);
+        badge.style.cssText = css;
         e.el.appendChild(badge);
       }
+      // чистим бейджи строк, которых больше нет в данных
+      var stale = document.querySelectorAll(".dh-lb-gap");
+      var live = new Set();
+      for (var m2 = 0; m2 < entries.length; m2++) live.add(entries[m2].el);
+      for (var b = 0; b < stale.length; b++) {
+        if (!live.has(stale[b].parentElement)) stale[b].remove();
+      }
+
+      // кнопки заявок в друзья — состояние из кеша подписок
+      injectLeagueActions(rows);
     }
 
+    lbSiteRefresh = injectGaps;
     var gapMs = Math.max(1, Math.min(60, (DATA.settings && DATA.settings.lbGapRefresh) || 2)) * 1000;
     setInterval(function() {
       try { injectGaps(); } catch (e) { console.warn("[DH-LB] error", e); }
@@ -11182,7 +11651,13 @@ function savePage() {
   async function onNavigate() {
     const path = location.pathname;
     if (path === lastPath) return;
+    const prevPath = lastPath;
     lastPath = path;
+    // профиль: статус могли изменить нативной кнопкой Duolingo — ловим и заход
+    // на профиль, и возврат с него (с игнорированием паузы)
+    if (isProfilePage() || (prevPath && prevPath.indexOf("/profile") !== -1)) {
+      refreshLeagueSocialIfStale(true);
+    }
 
     // смена аккаунта в SPA / после логина
     const curAcc = getMyId();
@@ -11193,6 +11668,8 @@ function savePage() {
     syncTagFormFromProfile();
 
     if (isProfilePage()) {
+      // статус подписок мог измениться в обход лиги (например, кнопкой профиля)
+      refreshLeagueSocialIfStale(true);
       const u = getProfileUsername();
       els.userInput.value = u || "";
       // обновляем DATA.me перед проверкой — username мог смениться
@@ -11248,7 +11725,7 @@ function savePage() {
   // версия из Tampermonkey — не расходится с @version в шапке
   const CURRENT_VERSION =
     (typeof GM_info !== "undefined" && GM_info.script && GM_info.script.version) ||
-    "0.11.11";
+    "0.12.0";
   // запасная ссылка установки, если API не дал download_url
   let installUrl =
     "https://raw.githubusercontent.com/Vidrimers/Duolingo-helper/refs/heads/master/duo-helper.user.js";
@@ -12226,6 +12703,10 @@ function savePage() {
           const isOpen = acc.classList.contains("open");
           els.accs.forEach((a) => a.classList.remove("open"));
           if (!isOpen) acc.classList.add("open");
+          if (!isOpen && acc.querySelector("#dh-lb-list")) {
+            // «Лига» открыта — подтягиваем статусы подписок
+            try { refreshLeagueSocial().then(() => { if (lastLbData && els.lbList && els.lbList.children.length) renderLeaderboard(lastLbData); }); } catch {}
+          }
         });
       });
     }
@@ -12302,6 +12783,9 @@ function savePage() {
 
     if (els.lbLoad) {
       els.lbLoad.addEventListener("click", () => loadLeague());
+    }
+    if (els.lbAddAll) {
+      els.lbAddAll.addEventListener("click", () => onLeagueMass());
     }
     if (els.lbJoin) {
       els.lbJoin.addEventListener("click", () => joinLeague());
@@ -12937,6 +13421,8 @@ function savePage() {
     });
 
     if (isProfilePage()) {
+      // статус подписок мог измениться в обход лиги (например, кнопкой профиля)
+      refreshLeagueSocialIfStale(true);
       const u = getProfileUsername();
       if (u) els.userInput.value = u;
       if (u && isOwnProfile(u)) {

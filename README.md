@@ -6,7 +6,7 @@
 
 A userscript for Tampermonkey — an extension for Duolingo with follow-back checking, user tagging and tools for managing friends. A themed window (10 themes), badges on profiles, custom tags.
 
-> Version: 0.11.11 | Works on `*.duolingo.com`
+> Version: 0.12.0 | Works on `*.duolingo.com`
 
 ---
 
@@ -292,8 +292,11 @@ The input is the number of days (1–365).
 | --------------- | ---------------------------------------------------------- |
 | Table           | Cards with top-3 medals, "you" highlighted, gap to neighbor |
 | Join            | Join the weekly league                                     |
+| Add everyone    | Friend requests to the whole league at once (with confirm)  |
 | Farm to place   | Farms XP via stories until you reach the place (cheat)     |
 | Stop            | Interrupt the farm                                         |
+
+**Friend requests** — each player row has a state button: **➕** send a request, **❌** "Not following back" (one-way) with **✕** to unfollow, **✅** "Mutual" — you are friends, clicking unfollows with confirmation. "Add everyone" turns into "Unfollow everyone" after the mass send, with a choice: everyone in the league or only those who don't follow back. The button activates after the table loads. The same buttons appear on the `duolingo.com/leaderboard` page next to names.
 
 **XP gaps on the page** — when opening `duolingo.com/leaderboard`, the gap (+/− XP vs you) is shown automatically next to each player.
 
