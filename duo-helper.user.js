@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Duolingo Helper
 // @namespace    https://github.com/Vidrimers/Duolingo-helper
-// @version      0.12.0
+// @version      0.13.0
 // @description  Follow-back check for Duolingo profiles. Panel, badges, cache. / Проверка взаимной подписки на профилях Duolingo.
 // @author       Vidrimers
 // @license      CC BY-NC-ND 4.0
@@ -7239,6 +7239,7 @@ const BUILD_KIND = "github";
       }
       setStreakStatus(t("stk.done", { ok: saved }));
       showToast(saved ? t("stk.toast", { n: saved }) : t("stk.failToast"));
+      if (saved > 0) logFarmDays(saved);
     } catch (e) {
       setStreakStatus(t("f.error", { msg: e && e.message }));
       showToast(t("stk.error"), true);
@@ -7251,6 +7252,92 @@ const BUILD_KIND = "github";
   function stopStreakFarm() {
     streakRunning = false;
     showToast(t("stk.stopped"));
+  }
+
+  // ========== УЧЁТ НАКРУТКИ (журнал для дайджеста бота) ==========
+  // Всё, что XP/дни даёт автоматика «Инструментов», копится здесь и
+  // уезжает в бота со следующим sync-stats (устойчиво к обрывам сети).
+  function farmLog() {
+    DATA.farmLog = DATA.farmLog || { xp: [], days: [] };
+    return DATA.farmLog;
+  }
+
+  function logFarmXp(amount) {
+    const n = Math.round(Number(amount) || 0);
+    if (n <= 0) return;
+    farmLog().xp.push({ amount: n, ts: Date.now() });
+    saveData();
+  }
+
+  function logFarmDays(days) {
+    const n = Math.round(Number(days) || 0);
+    if (n <= 0) return;
+    farmLog().days.push({ days: n, ts: Date.now() });
+    saveData();
+  }
+
+  function fetchTotalXpNow() {
+    return new Promise((resolve) => {
+      const myId = getMyId();
+      if (!myId) {
+        resolve(null);
+        return;
+      }
+      GM_xmlhttpRequest({
+        method: "GET",
+        url: "https://www.duolingo.com/2017-06-30/users/" + myId + "?fields=totalXp",
+        headers: { accept: "application/json" },
+        timeout: 10000,
+        onload(r) {
+          try {
+            const j = JSON.parse(r.responseText || "{}");
+            const v = j.totalXp != null ? j.totalXp : (j.body && j.body.totalXp);
+            resolve(v == null ? null : Number(v));
+          } catch (e) {
+            resolve(null);
+          }
+        },
+        onerror() { resolve(null); },
+        ontimeout() { resolve(null); },
+      });
+    });
+  }
+
+  // Сессии «Уроков» (солвер/шортенеры/автопрактика) — XP за них считаем
+  // накруткой: пользователь в них почти не участвует.
+  let lessonXpBaseline = null;
+  let lessonXpLogged = false;
+  function installFarmXpWatcher() {
+    setInterval(async () => {
+      try {
+        const toolsOn =
+          !!DATA.settings.lessonShortener ||
+          !!DATA.settings.autoSolver ||
+          !!DATA.settings.storiesShortener;
+        // во время фарма лиги учёт идёт по счёту лиги — не дублируем
+        if (!toolsOn || lbRunning) {
+          lessonXpBaseline = null;
+          lessonXpLogged = false;
+          return;
+        }
+        const done =
+          document.querySelector('[data-test="session-over"]') ||
+          document.querySelector('[data-test="session-complete-slide"]') ||
+          document.querySelector('[data-test="session-complete"]');
+        if (!done) {
+          lessonXpLogged = false;
+          if (lessonXpBaseline === null) lessonXpBaseline = await fetchTotalXpNow();
+          return;
+        }
+        if (lessonXpLogged) return;
+        lessonXpLogged = true;
+        const nowXp = await fetchTotalXpNow();
+        if (lessonXpBaseline != null && nowXp != null && nowXp > lessonXpBaseline) {
+          logFarmXp(nowXp - lessonXpBaseline);
+        }
+        lessonXpBaseline = null;
+      } catch (e) {}
+    }, 5000);
   }
 
   // ========== League ==========
@@ -7856,6 +7943,7 @@ const BUILD_KIND = "github";
     setLbStatus(t("lb.farmTo", { n: targetRank }));
 
     try {
+      let lastScore = null; // счёт до прогона — разница и есть накрученный XP
       let joins = 0;
       let fails = 0;
       while (lbRunning) {
@@ -7880,6 +7968,10 @@ const BUILD_KIND = "github";
         // цель — обогнать того, кто сейчас на целевом месте (+50 XP)
         const targetPerson = rankings[targetRank - 1] || null;
         const myScore = me ? Number(me.score || 0) : 0;
+        if (lastScore !== null && myScore > lastScore) {
+          logFarmXp(myScore - lastScore);
+        }
+        lastScore = myScore;
         const targetScore =
           targetPerson && String(targetPerson.user_id) !== myId
             ? Number(targetPerson.score || 0) + 50
@@ -8186,6 +8278,8 @@ const BUILD_KIND = "github";
       if (typeof renderStats === "function") renderStats();
       // синхронизируем xpLog с сервером бота
       try {
+        const sentXp = farmLog().xp.slice();
+        const sentDays = farmLog().days.slice();
         GM_xmlhttpRequest({
           method: "POST",
           url: BOT_API + "/api/sync-stats",
@@ -8199,6 +8293,8 @@ const BUILD_KIND = "github";
             excludeList: DATA.excludeList || [],
             scriptVersion: (typeof GM_info !== "undefined" && GM_info.script && GM_info.script.version) || "",
             build: BUILD_KIND,
+            farmXp: sentXp,
+            farmDays: sentDays,
             lang: uiLang(),
           }),
           timeout: 5000,
@@ -8208,6 +8304,11 @@ const BUILD_KIND = "github";
               const d = JSON.parse(r.responseText || "null");
               if (d && Array.isArray(d.pendingActions)) mergeBotActions(d.pendingActions);
               if (d && Array.isArray(d.pendingChanges)) mergeBotChanges(d.pendingChanges);
+              // сервер принял журнал накруток — убираем только отправленное
+              const fl = farmLog();
+              fl.xp = fl.xp.filter((e) => sentXp.indexOf(e) === -1);
+              fl.days = fl.days.filter((e) => sentDays.indexOf(e) === -1);
+              saveData();
             } catch {}
           },
           onerror() {},
@@ -11725,7 +11826,7 @@ function savePage() {
   // версия из Tampermonkey — не расходится с @version в шапке
   const CURRENT_VERSION =
     (typeof GM_info !== "undefined" && GM_info.script && GM_info.script.version) ||
-    "0.12.0";
+    "0.13.0";
   // запасная ссылка установки, если API не дал download_url
   let installUrl =
     "https://raw.githubusercontent.com/Vidrimers/Duolingo-helper/refs/heads/master/duo-helper.user.js";
@@ -13384,6 +13485,7 @@ function savePage() {
     installLessonTools();
     syncLessonFlags();
     try { installLeaderboardGaps(); } catch (e) { console.warn("[DH-LB] install failed", e); }
+    try { installFarmXpWatcher(); } catch {}
     installXpBoostHook();
     syncXpBoostFlag();
     updateChangesBadge();

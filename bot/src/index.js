@@ -2567,7 +2567,7 @@ const httpServer = createServer((req, res) => {
     req.on("data", (chunk) => { body += chunk; });
     req.on("end", () => {
       try {
-        const { duolingoUserId, duolingoUsername, xpLog, totalXp, streak, excludeList, scriptVersion, lang, build } = JSON.parse(body || "{}");
+        const { duolingoUserId, duolingoUsername, xpLog, totalXp, streak, excludeList, scriptVersion, lang, build, farmXp, farmDays } = JSON.parse(body || "{}");
         if (!duolingoUserId) {
           res.writeHead(400, { "Content-Type": "application/json" });
           res.end(JSON.stringify({ error: "duolingoUserId required" }));
@@ -2604,6 +2604,23 @@ const httpServer = createServer((req, res) => {
             }
             if (build) {
               db.prepare("UPDATE script_installs SET build = ? WHERE duolingo_user_id = ?").run(String(build), String(duolingoUserId));
+            }
+          }
+        } catch {}
+        // журнал накруток из скрипта (XP и дни серии) — для дайджеста
+        try {
+          if (Array.isArray(farmXp) && farmXp.length) {
+            const ins = db.prepare("INSERT INTO xp_farm_log (duolingo_user_id, amount, ts) VALUES (?, ?, ?)");
+            for (const e of farmXp) {
+              const amt = Number(e && e.amount);
+              if (amt > 0) ins.run(String(duolingoUserId), amt, Number(e && e.ts) || Date.now());
+            }
+          }
+          if (Array.isArray(farmDays) && farmDays.length) {
+            const ins2 = db.prepare("INSERT INTO streak_farm_log (duolingo_user_id, days, ts) VALUES (?, ?, ?)");
+            for (const e of farmDays) {
+              const d = Number(e && e.days);
+              if (d > 0) ins2.run(String(duolingoUserId), d, Number(e && e.ts) || Date.now());
             }
           }
         } catch {}
@@ -2990,6 +3007,12 @@ async function checkWeeklyDigest() {
           .get(String(u.duolingo_user_id), startMs);
         farmedXp = Number(r && r.s) || 0;
       } catch {}
+      let farmedDays = 0;
+      try {
+        const r = db.prepare("SELECT SUM(days) AS s FROM streak_farm_log WHERE duolingo_user_id = ? AND ts >= ?")
+          .get(String(u.duolingo_user_id), startMs);
+        farmedDays = Number(r && r.s) || 0;
+      } catch {}
 
       // активность по последнему скану
       const DL = userLang(u);
@@ -3017,6 +3040,7 @@ async function checkWeeklyDigest() {
         t(DL, "n.digestFollow", { a: followed, b: unfollowed }) +
         t(DL, "n.digestXp", { n: fmtSigned(weekXp, DL) }) +
         t(DL, "n.digestFarmed", { n: fmtNum(farmedXp, DL) }) +
+        t(DL, "n.digestFarmedDays", { n: fmtNum(farmedDays, DL) }) +
         actBlock;
 
       await bot.api.sendMessage(u.tg_user_id, text, {

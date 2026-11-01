@@ -188,5 +188,9 @@ try {
 try {
   db.exec(`ALTER TABLE script_installs ADD COLUMN build TEXT`);
 } catch {}
+// миграция: журнал накрутки дней серии (для дайджеста)
+try {
+  db.exec(`CREATE TABLE IF NOT EXISTS streak_farm_log (duolingo_user_id TEXT, days INTEGER, ts INTEGER)`);
+} catch {}
 
 export default db;

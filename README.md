@@ -6,7 +6,7 @@
 
 A userscript for Tampermonkey — an extension for Duolingo with follow-back checking, user tagging and tools for managing friends. A themed window (10 themes), badges on profiles, custom tags.
 
-> Version: 0.12.0 | Works on `*.duolingo.com`
+> Version: 0.13.0 | Works on `*.duolingo.com`
 
 ---
 
@@ -323,7 +323,7 @@ The input is the number of days (1–365).
 - 📊 **Stats** — XP, league XP, streak, day status, a 7-day chart, the "Get XP" and "Streak" buttons (farming, at your own risk), "Donate"
 - 🏆 **League** — a table with gaps, farming to a target place
 - 👥 Friends — following/followers, unfollowing non-followers, activity check (the threshold is chosen before the check), unfollow/block inactive (🛡 exceptions from the script's settings; actions land in the script's "History" with undo)
-- ⚙️ Settings — notifications (time to practice, league overtake, who followed/unfollowed, weekly digest, script updates), linking (status, unlink with data deletion)
+- ⚙️ Settings — notifications (time to practice, league overtake, who followed/unfollowed, weekly digest with farmed XP and streak days, script updates), linking (status, unlink with data deletion)
 - 🌐 Open site — a link to duolingo.com
 - 🔧 Admin panel (for the administrator only)
 
