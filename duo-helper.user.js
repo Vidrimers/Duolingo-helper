@@ -9890,6 +9890,28 @@ function savePage() {
     if (window.__dhLbGaps) return;
     window.__dhLbGaps = true;
 
+    // Счёт строки: ищем элемент/текстовый узел, который содержит только
+    // «число + очк», — так цифры из ника не склеиваются со счётом
+    // («gweTqWc2356 очков» → 356, а не 2356).
+    var XP_RE = /^(\d{1,3}(?: \d{3})*|\d+)\s*очк/;
+    function extractRowXp(row) {
+      var norm = function (s) { return (s || "").replace(/\s+/g, " ").trim(); };
+      var pick = function (m) { return parseInt(m[1].replace(/\s/g, ""), 10); };
+      // сначала самые вложенные элементы: ячейка со счётом своим текстом
+      var all = row.querySelectorAll("*");
+      for (var i = all.length - 1; i >= 0; i--) {
+        var m = norm(all[i].textContent).match(XP_RE);
+        if (m) return pick(m);
+      }
+      // затем отдельные текстовые узлы строки
+      for (var j = row.childNodes.length - 1; j >= 0; j--) {
+        if (row.childNodes[j].nodeType !== 3) continue;
+        var m2 = norm(row.childNodes[j].textContent).match(XP_RE);
+        if (m2) return pick(m2);
+      }
+      return null;
+    }
+
     function injectGaps() {
       if (location.pathname.indexOf("/leaderboard") === -1) return;
       if (!window.__dhLbDebug) {
@@ -9902,14 +9924,8 @@ function savePage() {
       var entries = [];
       for (var i = 0; i < rows.length; i++) {
         var el = rows[i];
-        var t = (el.textContent || "").replace(/\s+/g, " ").trim();
-        // XP — число перед «очк». Паттерн не захватывает цифры из ника
-        // («gweTqWc2 356» → 356, «trần 2010 9» → 9): начало числа — только
-        // после не-буквы/не-цифры, группы разрядов — ровно по 3 цифры.
-        var xpM = t.match(/(?:^|[^\p{L}\p{N}_])(\d{1,3}(?: \d{3})*|\d+)\s*очк/u);
-        if (!xpM) continue;
-        var xp = parseInt(xpM[1].replace(/\s/g, ""), 10);
-        if (isNaN(xp)) continue;
+        var xp = extractRowXp(el);
+        if (xp === null) continue;
         // «я» — класс MytTp
         var isMe = (el.className || "").indexOf("MytTp") !== -1;
         entries.push({ el: el, xp: xp, isMe: isMe });
