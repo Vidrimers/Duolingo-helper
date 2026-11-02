@@ -6,7 +6,7 @@
 
 A userscript for Tampermonkey — an extension for Duolingo with follow-back checking, user tagging and tools for managing friends. A themed window (10 themes), badges on profiles, custom tags.
 
-> Version: 0.13.0 | Works on `*.duolingo.com`
+> Version: 0.13.1 | Works on `*.duolingo.com`
 
 ---
 
@@ -65,6 +65,7 @@ The script panel is a draggable window with ten themes (Win95 by default): title
 - The window **can be dragged by the titlebar** anywhere on the page
 - The position is remembered after dragging and restored on reload
 - The **"Reset"** button in settings returns the window to its default place
+- **FAB magnetically docks to Universal Marker** — if that script is also on the page, the FABs snap to each other horizontally or vertically; to undock — just drag it away while dragging
 
 **Themes** — in settings:
 

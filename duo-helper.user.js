@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Duolingo Helper
 // @namespace    https://github.com/Vidrimers/Duolingo-helper
-// @version      0.13.0
+// @version      0.13.1
 // @description  Follow-back check for Duolingo profiles. Panel, badges, cache. / Проверка взаимной подписки на профилях Duolingo.
 // @author       Vidrimers
 // @license      CC BY-NC-ND 4.0
@@ -4548,6 +4548,7 @@ const BUILD_KIND = "github";
     fab.textContent = "🦉";
     fab.title = "Duolingo Helper";
     shadow.appendChild(fab);
+    ensureFabAnchor(fab);
 
     // Badge
     const badge = document.createElement("div");
@@ -11826,7 +11827,7 @@ function savePage() {
   // версия из Tampermonkey — не расходится с @version в шапке
   const CURRENT_VERSION =
     (typeof GM_info !== "undefined" && GM_info.script && GM_info.script.version) ||
-    "0.13.0";
+    "0.13.1";
   // запасная ссылка установки, если API не дал download_url
   let installUrl =
     "https://raw.githubusercontent.com/Vidrimers/Duolingo-helper/refs/heads/master/duo-helper.user.js";
@@ -12230,6 +12231,63 @@ function savePage() {
     };
   }
 
+  // Якорь FAB в DOM страницы: для магнитной стыковки с FAB другого скрипта.
+  // Свой FAB живёт в Shadow DOM и другому скрипту не виден — зеркалим позицию
+  // в обычный элемент страницы (прозрачный, без перехвата кликов).
+  let fabAnchor = null;
+  function syncFabAnchor() {
+    if (!fabAnchor || !els.fab) return;
+    const r = els.fab.getBoundingClientRect();
+    fabAnchor.style.left = r.left + "px";
+    fabAnchor.style.top = r.top + "px";
+    fabAnchor.style.width = r.width + "px";
+    fabAnchor.style.height = r.height + "px";
+  }
+  function ensureFabAnchor(fabEl) {
+    const old = document.querySelector(".dh-fab-anchor");
+    if (old) old.remove();
+    fabAnchor = document.createElement("div");
+    fabAnchor.className = "dh-fab-anchor";
+    fabAnchor.setAttribute("aria-hidden", "true");
+    fabAnchor.style.cssText =
+      "position:fixed;left:0;top:0;width:0;height:0;pointer-events:none;opacity:0;z-index:-1;";
+    document.documentElement.appendChild(fabAnchor);
+    if (fabEl) {
+      const r = fabEl.getBoundingClientRect();
+      fabAnchor.style.left = r.left + "px";
+      fabAnchor.style.top = r.top + "px";
+      fabAnchor.style.width = r.width + "px";
+      fabAnchor.style.height = r.height + "px";
+    }
+  }
+  // Магнитная стыковка: вертикаль и горизонталь. Чужой FAB виден через его
+  // якорь в DOM страницы; притягиваем только к нему. Отстыковка — увести в сторону.
+  function snapFabToOther(p) {
+    const other = document.querySelector(".vm-fab-anchor");
+    if (!other) return p;
+    const o = other.getBoundingClientRect();
+    if (o.width < 4 || o.height < 4) return p;
+    const w = (els.fab && els.fab.offsetWidth) || 40;
+    const h = (els.fab && els.fab.offsetHeight) || 28;
+    const gap = 8;
+    const radius = 36;
+    const cands = [
+      { x: o.right + gap, y: o.top + (o.height - h) / 2 },           // справа
+      { x: o.left - gap - w, y: o.top + (o.height - h) / 2 },        // слева
+      { x: o.left + (o.width - w) / 2, y: o.bottom + gap },          // снизу
+      { x: o.left + (o.width - w) / 2, y: o.top - gap - h },         // сверху
+    ];
+    let best = null;
+    let bestD = Infinity;
+    for (const c of cands) {
+      const cc = clampFabPos(c.x, c.y);
+      const d = (cc.x - p.x) * (cc.x - p.x) + (cc.y - p.y) * (cc.y - p.y);
+      if (d < bestD) { bestD = d; best = cc; }
+    }
+    if (best && bestD <= radius * radius) return best;
+    return p;
+  }
+
   function applyFabPos() {
     if (!els.fab) return;
     const saved = DATA.settings.fabPos;
@@ -12237,6 +12295,7 @@ function savePage() {
       els.fab.style.left = "24px";
       els.fab.style.top = "auto";
       els.fab.style.bottom = "24px";
+      syncFabAnchor();
       return;
     }
     let x, y;
@@ -12251,6 +12310,7 @@ function savePage() {
     els.fab.style.left = p.x + "px";
     els.fab.style.top = p.y + "px";
     els.fab.style.bottom = "auto";
+    syncFabAnchor();
   }
 
   function saveFabPos() {
@@ -12283,16 +12343,19 @@ function savePage() {
       const dx = e.clientX - startX;
       const dy = e.clientY - startY;
       if (Math.abs(dx) > 3 || Math.abs(dy) > 3) moved = true;
-      const p = clampFabPos(origX + dx, origY + dy);
+      let p = clampFabPos(origX + dx, origY + dy);
+      p = snapFabToOther(p);
       fab.style.left = p.x + "px";
       fab.style.top = p.y + "px";
       fab.style.bottom = "auto";
+      syncFabAnchor();
     };
 
     const onUp = () => {
       if (!dragging) return;
       dragging = false;
       if (moved) saveFabPos();
+      syncFabAnchor();
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerup", onUp);
     };
