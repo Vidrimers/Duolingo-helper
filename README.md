@@ -6,7 +6,7 @@
 
 A userscript for Tampermonkey — an extension for Duolingo with follow-back checking, user tagging and tools for managing friends. A themed window (10 themes), badges on profiles, custom tags.
 
-> Version: 0.13.1 | Works on `*.duolingo.com`
+> Version: 0.14.0 | Works on `*.duolingo.com`
 
 ---
 
@@ -229,12 +229,13 @@ The blocks in "Tools" are an **accordion**: one opens at a time, the rest collap
 
 <p align="center"><img src="img/XP%20boost.jpg" alt="XP / boost" /></p>
 
-> ⚠️ **Cheats. At your own risk.** The field is the XP target (how much to earn).
+> ⚠️ **Cheats. At your own risk.** The field is the XP target (how much to earn; min 50, step 50).
 
 | What     | Description                                                                           |
 | -------- | ------------------------------------------------------------------------------------- |
 | Stories  | XP farming via `stories/.../complete` (~50+ XP per run)                               |
 | Sessions | XP farming via `POST/PUT /sessions` (`UNIT_TEST` + bonuses), verified against `totalXp` |
+| **Keep streak** | Toggle: if the streak wasn't extended during the day, the bot adds a minimum of XP by the end of the day to save it. Requires Telegram linking; the toggle is synced with the bot |
 
 ### Quests
 

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Duolingo Helper
 // @namespace    https://github.com/Vidrimers/Duolingo-helper
-// @version      0.13.1
+// @version      0.14.0
 // @description  Follow-back check for Duolingo profiles. Panel, badges, cache. / Проверка взаимной подписки на профилях Duolingo.
 // @author       Vidrimers
 // @license      CC BY-NC-ND 4.0
@@ -290,6 +290,10 @@ const BUILD_KIND = "github";
       "tool.xpNote1": "* Sessions — экспериментально, может не начислять XP",
       "tool.xpNote2": "Stories — истории Duolingo; за «пройденную» историю реально дают XP.",
       "tool.xpNote3": "Sessions — имитация учебной сессии/урока без прохождения.",
+    "tool.streakSaver": "Не терять стрик",
+    "tool.streakSaverDesc": "Автоматически поддерживает серию: если за день не было XP, бот начислит минимум к концу дня.",
+    "tool.streakSaverOn": "«Не терять стрик» включён",
+    "tool.streakSaverOff": "«Не терять стрик» выключен",
       "tool.quests": "⚠️ Квесты {risk}",
       "tool.questsDesc": "Инъекция прогресса в daily / monthly квесты. Нарушает правила Duolingo.",
       "tool.questClaimAll": "Забрать все",
@@ -911,6 +915,10 @@ const BUILD_KIND = "github";
       "tool.xpNote1": "* Sessions — experimental, may not credit XP",
       "tool.xpNote2": "Stories — Duolingo stories; a \"completed\" story really gives XP.",
       "tool.xpNote3": "Sessions — an imitation of a study session/lesson without solving it.",
+    "tool.streakSaver": "Keep streak",
+    "tool.streakSaverDesc": "Automatically maintains the streak: if there was no XP during the day, the bot adds a minimum by the end of the day.",
+    "tool.streakSaverOn": "Keep streak — enabled",
+    "tool.streakSaverOff": "Keep streak — disabled",
       "tool.quests": "⚠️ Quests {risk}",
       "tool.questsDesc": "Progress injection into daily / monthly quests. Violates Duolingo rules.",
       "tool.questClaimAll": "Claim all",
@@ -1400,6 +1408,7 @@ const BUILD_KIND = "github";
       autoSolver: false,
       fakeXpBoost: false,
       xpBoostMins: 15,
+      streakSaver: false,
       notifyHideSec: 5,
     lbGapRefresh: 2,
     };
@@ -4867,7 +4876,7 @@ const BUILD_KIND = "github";
                             ${t("tool.xpDesc")}
                         </div>
                         <div class="dh-row" style="margin-bottom:6px">
-                            <input class="dh-num-input" id="dh-xp-amount" type="number" min="1" max="99999" value="500" style="width:72px" />
+                            <input class="dh-num-input" id="dh-xp-amount" type="number" min="50" max="99999" value="50" step="50" style="width:72px" />
                             <button class="dh-btn dh-btn-primary" id="dh-xp-stories">Stories</button>
                             <button class="dh-btn dh-btn-danger" id="dh-xp-sessions" title="${t("tool.xpSessionsTitle")}">Sessions *</button>
                             <button class="dh-btn" id="dh-xp-stop">${t("tool.stop")}</button>
@@ -4876,6 +4885,13 @@ const BUILD_KIND = "github";
                             ${t("tool.xpNote1")}<br/>
                             <small>${t("tool.xpNote2")}</small><br/>
                             <small>${t("tool.xpNote3")}</small>
+                        </div>
+                        <div class="dh-setting-row" style="border-bottom:none;padding:4px 0">
+                            <div class="dh-setting-label">
+                                ${t("tool.streakSaver")}
+                                <small>${t("tool.streakSaverDesc")}</small>
+                            </div>
+                            <div class="dh-switch" id="dh-set-streaksaver"></div>
                         </div>
                         <div class="dh-muted dh-op-status" id="dh-xp-status"></div>
                     </div></div>
@@ -5190,6 +5206,7 @@ const BUILD_KIND = "github";
       setXpBoost: modal.querySelector("#dh-set-xpboost"),
       xpBoost15: modal.querySelector("#dh-xpboost-15"),
       xpBoost60: modal.querySelector("#dh-xpboost-60"),
+      setStreakSaver: modal.querySelector("#dh-set-streaksaver"),
       xpAmount: modal.querySelector("#dh-xp-amount"),
       xpStories: modal.querySelector("#dh-xp-stories"),
       xpSessions: modal.querySelector("#dh-xp-sessions"),
@@ -7306,6 +7323,9 @@ const BUILD_KIND = "github";
 
   // Сессии «Уроков» (солвер/шортенеры/автопрактика) — XP за них считаем
   // накруткой: пользователь в них почти не участвует.
+  // «Не терять стрик»: в бота значение шлём только после локальной смены тумблера
+  let pendingStreakSaverPush = false;
+  let streakSaverLocalTs = 0;
   let lessonXpBaseline = null;
   let lessonXpLogged = false;
   function installFarmXpWatcher() {
@@ -8077,6 +8097,7 @@ const BUILD_KIND = "github";
     if (els.setLbGap) els.setLbGap.value = DATA.settings.lbGapRefresh || 2;
     if (els.setInactive) els.setInactive.value = DATA.settings.inactiveDays;
     if (els.setFreeSuper) els.setFreeSuper.classList.toggle("on", !!DATA.settings.freeSuper);
+    if (els.setStreakSaver) els.setStreakSaver.classList.toggle("on", !!DATA.settings.streakSaver);
   }
 
   /** Обновляет UI после смены аккаунта (тема, позиция, списки). */
@@ -8297,6 +8318,7 @@ const BUILD_KIND = "github";
             farmXp: sentXp,
             farmDays: sentDays,
             lang: uiLang(),
+            streakSaver: pendingStreakSaverPush ? !!DATA.settings.streakSaver : undefined,
           }),
           timeout: 5000,
           onload(r) {
@@ -8305,6 +8327,17 @@ const BUILD_KIND = "github";
               const d = JSON.parse(r.responseText || "null");
               if (d && Array.isArray(d.pendingActions)) mergeBotActions(d.pendingActions);
               if (d && Array.isArray(d.pendingChanges)) mergeBotChanges(d.pendingChanges);
+              if (d && d.ok) pendingStreakSaverPush = false;
+              if (
+                d &&
+                typeof d.streakSaver === "boolean" &&
+                Date.now() - streakSaverLocalTs > 30000 &&
+                !!DATA.settings.streakSaver !== d.streakSaver
+              ) {
+                DATA.settings.streakSaver = d.streakSaver;
+                saveData();
+                if (els.setStreakSaver) els.setStreakSaver.classList.toggle("on", d.streakSaver);
+              }
               // сервер принял журнал накруток — убираем только отправленное
               const fl = farmLog();
               fl.xp = fl.xp.filter((e) => sentXp.indexOf(e) === -1);
@@ -10651,7 +10684,7 @@ function savePage() {
 
   async function farmXp(mode) {
     if (xpRunning) return;
-    const target = Math.max(1, Math.min(99999, parseInt(els.xpAmount && els.xpAmount.value, 10) || 500));
+    const target = Math.max(50, Math.min(99999, parseInt(els.xpAmount && els.xpAmount.value, 10) || 50));
     xpRunning = true;
     if (els.xpStories) els.xpStories.disabled = true;
     if (els.xpSessions) els.xpSessions.disabled = true;
@@ -11827,7 +11860,7 @@ function savePage() {
   // версия из Tampermonkey — не расходится с @version в шапке
   const CURRENT_VERSION =
     (typeof GM_info !== "undefined" && GM_info.script && GM_info.script.version) ||
-    "0.13.1";
+    "0.14.0";
   // запасная ссылка установки, если API не дал download_url
   let installUrl =
     "https://raw.githubusercontent.com/Vidrimers/Duolingo-helper/refs/heads/master/duo-helper.user.js";
@@ -12913,6 +12946,21 @@ function savePage() {
     }
     if (els.xpStop) {
       els.xpStop.addEventListener("click", () => stopXpFarm());
+    }
+    if (els.setStreakSaver) {
+      els.setStreakSaver.addEventListener("click", () => {
+        DATA.settings.streakSaver = !DATA.settings.streakSaver;
+        pendingStreakSaverPush = true;
+        streakSaverLocalTs = Date.now();
+        saveData();
+        els.setStreakSaver.classList.toggle("on", !!DATA.settings.streakSaver);
+        showToast(
+          DATA.settings.streakSaver
+            ? t("tool.streakSaverOn")
+            : t("tool.streakSaverOff"),
+        );
+        try { collectStats(); } catch {}
+      });
     }
 
     if (els.questDaily) {

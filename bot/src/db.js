@@ -192,5 +192,9 @@ try {
 try {
   db.exec(`CREATE TABLE IF NOT EXISTS streak_farm_log (duolingo_user_id TEXT, days INTEGER, ts INTEGER)`);
 } catch {}
+// миграция: функция «Не терять стрик» (автосохранение серии)
+try {
+  db.exec(`ALTER TABLE users ADD COLUMN streak_saver INTEGER DEFAULT 0`);
+} catch {}
 
 export default db;

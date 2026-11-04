@@ -116,9 +116,16 @@ function mainMenuKeyboard(isAdmin, L) {
   return { inline_keyboard: rows };
 }
 
-function settingsMenuKeyboard(L) {
+function settingsMenuKeyboard(L, tgId) {
+  let saverOn = 0;
+  try {
+    const su = db.prepare("SELECT streak_saver FROM users WHERE tg_user_id = ?").get(tgId);
+    saverOn = su ? Number(su.streak_saver) || 0 : 0;
+  } catch {}
+  const flag = (v) => (v ? "✅" : "🔕");
   return {
     inline_keyboard: [
+      [{ text: t(L, "settings.streakSaver", { flag: flag(saverOn) }), callback_data: "settings_toggle_streaksaver" }],
       [{ text: t(L, "settings.notify"), callback_data: "settings_notify" }],
       [{ text: t(L, "settings.link"), callback_data: "settings_link" }],
       [{ text: t(L, "common.back"), callback_data: "menu_main" }],
@@ -170,7 +177,7 @@ function adminMenuKeyboard() {
     inline_keyboard: [
       [
         { text: "📊 Статистика бота", callback_data: "admin_stats" },
-        { text: "👥 Пользователи", callback_data: "admin_users" },
+        { text: "👥 Пользователи с тг", callback_data: "admin_users" },
       ],
       [
         { text: "📦 Установки", callback_data: "admin_installs" },
@@ -986,7 +993,7 @@ bot.on("callback_query", async (ctx) => {
   if (data === "menu_settings") {
     const L = langOf(ctx.from.id);
     await ctx.editMessageText(t(L, "settings.title"), {
-      reply_markup: settingsMenuKeyboard(L),
+      reply_markup: settingsMenuKeyboard(L, ctx.from.id),
     });
     return;
   }
@@ -1340,16 +1347,17 @@ bot.on("callback_query", async (ctx) => {
     const p = Math.max(1, Math.min(page, totalPages));
     const rows = db.prepare("SELECT * FROM users ORDER BY linked_at DESC LIMIT " + perPage + " OFFSET " + ((p - 1) * perPage)).all();
 
-    let text = `👥 <b>Пользователи</b> (${total})\n\n`;
+    let text = `👥 <b>Пользователи с тг</b> (${total})\n\n`;
     if (!rows.length) {
       text += "Нет привязанных аккаунтов.";
     }
     const kb = [];
     for (const r of rows) {
       const duoName = r.duolingo_username || r.duolingo_user_id || "—";
+      const duoNameHtml = profileLink({ name: duoName, username: r.duolingo_username, id: r.duolingo_user_id });
       const tgName = r.tg_username || r.tg_user_id;
       const hasJwt = r.jwt_encrypted ? "✓" : "✗";
-      text += `👤 <b>${duoName}</b>\n`;
+      text += `👤 <b>${duoNameHtml}</b>\n`;
       text += `   🆔 <code>${r.duolingo_user_id || "—"}</code>\n`;
       text += `   📱 @${tgName} · <code>${r.tg_user_id}</code>\n`;
       text += `   🔑 JWT: ${hasJwt} · 📅 ${r.linked_at}\n\n`;
@@ -1387,7 +1395,8 @@ bot.on("callback_query", async (ctx) => {
     }
     for (const r of rows) {
       const name = r.username || r.duolingo_user_id;
-      text += `📦 <b>${name}</b> · <code>${r.duolingo_user_id}</code>\n`;
+      const nameHtml = profileLink({ name, username: r.username, id: r.duolingo_user_id });
+      text += `📦 <b>${nameHtml}</b> · <code>${r.duolingo_user_id}</code>\n`;
       text += `   📅 ${r.first_seen}${r.version ? " · v" + r.version : ""}${r.build ? " · " + r.build : ""}\n\n`;
     }
     const kb = [];
@@ -1829,6 +1838,19 @@ bot.on("callback_query", async (ctx) => {
     await safeEdit(ctx, text, {
       parse_mode: "HTML",
       reply_markup: { inline_keyboard: kb },
+    });
+    return;
+  }
+
+  // === НЕ ТЕРЯТЬ СТРИК ===
+  if (data === "settings_toggle_streaksaver") {
+    try {
+      const su = db.prepare("SELECT streak_saver FROM users WHERE tg_user_id = ?").get(ctx.from.id);
+      const on = su ? Number(su.streak_saver) || 0 : 0;
+      db.prepare("UPDATE users SET streak_saver = ? WHERE tg_user_id = ?").run(on ? 0 : 1, ctx.from.id);
+    } catch {}
+    await safeEdit(ctx, t(L, "settings.title"), {
+      reply_markup: settingsMenuKeyboard(L, ctx.from.id),
     });
     return;
   }
@@ -2567,7 +2589,7 @@ const httpServer = createServer((req, res) => {
     req.on("data", (chunk) => { body += chunk; });
     req.on("end", () => {
       try {
-        const { duolingoUserId, duolingoUsername, xpLog, totalXp, streak, excludeList, scriptVersion, lang, build, farmXp, farmDays } = JSON.parse(body || "{}");
+        const { duolingoUserId, duolingoUsername, xpLog, totalXp, streak, excludeList, scriptVersion, lang, build, farmXp, farmDays, streakSaver } = JSON.parse(body || "{}");
         if (!duolingoUserId) {
           res.writeHead(400, { "Content-Type": "application/json" });
           res.end(JSON.stringify({ error: "duolingoUserId required" }));
@@ -2654,6 +2676,12 @@ const httpServer = createServer((req, res) => {
         try {
           if (lang) db.prepare("UPDATE users SET lang = ? WHERE duolingo_user_id = ?").run(String(lang), String(duolingoUserId));
         } catch {}
+        // тумблер «Не терять стрик» из скрипта (приходит только при смене)
+        try {
+          if (typeof streakSaver === "boolean") {
+            db.prepare("UPDATE users SET streak_saver = ? WHERE duolingo_user_id = ?").run(streakSaver ? 1 : 0, String(duolingoUserId));
+          }
+        } catch {}
 
         // сохраняем записи xpLog в user_stats.
         // total_xp пишем только для последней даты (реальный итог Duolingo);
@@ -2701,8 +2729,13 @@ const httpServer = createServer((req, res) => {
             db.prepare("UPDATE pending_changes SET delivered = 1 WHERE duolingo_user_id = ? AND delivered = 0").run(String(duolingoUserId));
           }
         } catch {}
+        let streakSaverVal = 0;
+        try {
+          const ssRow = db.prepare("SELECT streak_saver FROM users WHERE duolingo_user_id = ?").get(String(duolingoUserId));
+          streakSaverVal = ssRow ? Number(ssRow.streak_saver) || 0 : 0;
+        } catch {}
         res.writeHead(200, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ ok: true, synced: Array.isArray(xpLog) ? xpLog.length : 0, pendingActions, pendingChanges }));
+        res.end(JSON.stringify({ ok: true, synced: Array.isArray(xpLog) ? xpLog.length : 0, pendingActions, pendingChanges, streakSaver: !!streakSaverVal }));
       } catch (e) {
         res.writeHead(500, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ error: e.message }));
@@ -2782,6 +2815,73 @@ async function checkPracticeReminders() {
       markReminder(u.tg_user_id, todayUser);
     } catch {}
   }
+}
+
+// 1.5) «Не терять стрик» — в 19:00 по таймзоне аккаунта, если серия сегодня
+// не продлена, накручиваем минимум XP, чтобы её сохранить.
+async function checkStreakSaver() {
+  const rows = db.prepare(`
+    SELECT u.tg_user_id, u.duolingo_user_id, u.jwt_encrypted, u.timezone, u.lang
+    FROM users u
+    WHERE u.tg_user_id IS NOT NULL
+      AND u.streak_saver = 1
+      AND u.tg_user_id NOT IN (SELECT tg_user_id FROM banned_users)
+  `).all();
+  const now = new Date();
+  for (const u of rows) {
+    try {
+      const jwt = decryptJWT(u.jwt_encrypted);
+      if (!jwt) continue;
+      let tz = u.timezone;
+      // ранняя отсечка по кешированной таймзоне
+      if (tz && Number(tzParts(tz, now).hour) < 19) continue;
+      const res = await fetch(
+        `https://www.duolingo.com/2017-06-30/users/${u.duolingo_user_id}?fields=timezone,streakData`,
+        { headers: { accept: "application/json", cookie: `jwt_token=${jwt}` } }
+      );
+      const d = await res.json();
+      if (!tz) {
+        tz = d.timezone || "Europe/Moscow";
+        db.prepare("UPDATE users SET timezone = ? WHERE tg_user_id = ?").run(tz, u.tg_user_id);
+      }
+      const todayUser = dateStrInTz(tz, now);
+      if (Number(tzParts(tz, now).hour) < 19) continue;
+      const lastExt = d.streakData && d.streakData.currentStreak && d.streakData.currentStreak.lastExtendedDate;
+      if (lastExt && lastExt >= todayUser) continue;
+      if (streakSaverLastDate(u.tg_user_id) === todayUser) continue;
+      if (xpRunning.has(u.tg_user_id)) continue;
+      markStreakSaver(u.tg_user_id, todayUser);
+      let earned = 0;
+      xpRunning.add(u.tg_user_id);
+      try {
+        earned = await runXpFarm(u, 50);
+      } finally {
+        xpRunning.delete(u.tg_user_id);
+      }
+      if (earned > 0) {
+        try {
+          db.prepare("INSERT INTO xp_farm_log (duolingo_user_id, amount, ts) VALUES (?, ?, ?)")
+            .run(String(u.duolingo_user_id), earned, Date.now());
+        } catch {}
+        await bot.api.sendMessage(u.tg_user_id, t(userLang(u), "n.streakSaved"), { parse_mode: "HTML" }).catch(() => {});
+      } else {
+        await bot.api.sendMessage(u.tg_user_id, t(userLang(u), "n.streakSaveFail"), { parse_mode: "HTML" }).catch(() => {});
+      }
+    } catch {}
+  }
+}
+
+function streakSaverLastDate(tgId) {
+  try {
+    const r = db.prepare("SELECT value FROM bot_kv WHERE key = ?").get("streak_saver_last:" + tgId);
+    return r ? r.value : null;
+  } catch { return null; }
+}
+
+function markStreakSaver(tgId, date) {
+  try {
+    db.prepare("INSERT OR REPLACE INTO bot_kv (key, value) VALUES (?, ?)").run("streak_saver_last:" + tgId, date);
+  } catch {}
 }
 
 // 2) «Обход в лиге» — по снапшоту таблицы, уведомляем только на пересечении
@@ -3094,6 +3194,8 @@ async function checkScriptUpdates() {
 
 checkPracticeReminders();
 setInterval(checkPracticeReminders, 15 * 60 * 1000);
+checkStreakSaver();
+setInterval(checkStreakSaver, 15 * 60 * 1000);
 checkLeagueOvertakes();
 setInterval(checkLeagueOvertakes, 30 * 60 * 1000);
 checkFollowChanges();

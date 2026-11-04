@@ -30,6 +30,7 @@ const dicts = {
     "settings.title": "⚙️ Настройки\n\nВыберите раздел:",
     "settings.notify": "🔔 Уведомления",
     "settings.link": "🔗 Линковка",
+"settings.streakSaver": "🔥 Не терять стрик: {flag}",
     "settings.notLinked": "❌ Аккаунт не привязан\n\nВыберите действие:",
     // уведомления (тумблеры)
     "notify.title": "🔔 <b>Уведомления</b>\n\nВыберите, что уведомлять:",
@@ -185,6 +186,8 @@ const dicts = {
     "donate.usdtInfo": "⚠️ <b>Важно:</b> используйте только сеть TRON (TRC-20)!\nОтправка через другие сети приведёт к потере средств.",
     // уведомления
     "n.practice": "🔥 <b>Пора позаниматься!</b>\n\nСегодня вы ещё не занимались. Позанимайся либо получи XP, чтобы не потерять серию.",
+    "n.streakSaved": "🔥 <b>Стрик спасён, можешь отдыхать</b>",
+    "n.streakSaveFail": "⚠️ <b>Не получилось сохранить стрик</b>",
     "n.overtakeOne": "🏆 <b>Тебя обогнал {name}</b>\nНа {n} очков.",
     "n.overtakeMany": "🏆 <b>Тебя обогнали</b>\n\n",
     "n.overtakeRow": "{name} — на {n} очков",
@@ -233,6 +236,7 @@ const dicts = {
     "settings.title": "⚙️ Settings\n\nChoose a section:",
     "settings.notify": "🔔 Notifications",
     "settings.link": "🔗 Linking",
+"settings.streakSaver": "🔥 Keep streak: {flag}",
     "settings.notLinked": "❌ Account not linked\n\nChoose an action:",
     // notify toggles
     "notify.title": "🔔 <b>Notifications</b>\n\nChoose what to notify about:",
@@ -388,6 +392,8 @@ const dicts = {
     "donate.usdtInfo": "⚠️ <b>Important:</b> use the TRON network (TRC-20) only!\nSending via other networks will result in lost funds.",
     // notifications
     "n.practice": "🔥 <b>Time to practice!</b>\n\nYou haven't practiced today. Do a lesson or get XP so you don't lose your streak.",
+    "n.streakSaved": "🔥 <b>Streak saved — you can relax</b>",
+    "n.streakSaveFail": "⚠️ <b>Couldn't save the streak</b>",
     "n.overtakeOne": "🏆 <b>{name} overtook you</b>\nBy {n} points.",
     "n.overtakeMany": "🏆 <b>You have been overtaken</b>\n\n",
     "n.overtakeRow": "{name} — by {n} points",
