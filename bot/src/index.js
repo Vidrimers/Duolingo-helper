@@ -256,16 +256,26 @@ async function buildStatsText(user) {
     }
   } catch {}
 
-  // дневной/недельный XP — из разницы итогов total_xp (привязаны к реальному итогу Duolingo);
-  // SUM(xp) не используется: колонка xp исторически размазана по дням и завышена
+  // дневной/недельный XP — из разницы итогов total_xp (привязаны к реальному итогу Duolingo).
+  // База дня = «конец прошлого дня»: итог пред-предыдущей строки + XP прошлого дня (колонка xp
+  // приходит от скрипта по дням) — вечерние XP прошлого дня не уезжают в «сегодня».
   const today = localDateStr();
   const weekStart = localDateStr(new Date(Date.now() - 7 * 86400000));
   const anchor = (before) =>
-    db.prepare("SELECT total_xp FROM user_stats WHERE duolingo_user_id = ? AND date < ? AND total_xp IS NOT NULL ORDER BY date DESC LIMIT 1")
+    db.prepare("SELECT date, xp, total_xp FROM user_stats WHERE duolingo_user_id = ? AND date < ? AND total_xp IS NOT NULL ORDER BY date DESC LIMIT 1")
       .get(user.duolingo_user_id, before);
+  const endOfDayBase = (row) => {
+    if (!row) return null;
+    if (row.xp != null) {
+      const prev = db.prepare("SELECT total_xp FROM user_stats WHERE duolingo_user_id = ? AND date < ? AND total_xp IS NOT NULL ORDER BY date DESC LIMIT 1")
+        .get(user.duolingo_user_id, row.date);
+      if (prev) return Number(prev.total_xp) + Number(row.xp);
+    }
+    return Number(row.total_xp);
+  };
   const todayBase = anchor(today);
   const weekBase = anchor(weekStart);
-  const dayXp = todayBase ? totalXp - Number(todayBase.total_xp) : null;
+  const dayXp = todayBase ? totalXp - endOfDayBase(todayBase) : null;
   db.prepare(`
     INSERT INTO user_stats (duolingo_user_id, date, xp, streak, total_xp)
     VALUES (?, ?, ?, ?, ?)
@@ -281,7 +291,7 @@ async function buildStatsText(user) {
     todayXp = Number(tRow && tRow.xp) || 0;
   }
   let weekXp;
-  if (weekBase) weekXp = totalXp - Number(weekBase.total_xp);
+  if (weekBase) weekXp = totalXp - endOfDayBase(weekBase);
   else {
     const wRow = db.prepare("SELECT SUM(xp) as total FROM user_stats WHERE duolingo_user_id = ? AND date >= ?").get(user.duolingo_user_id, weekStart);
     weekXp = wRow && wRow.total ? wRow.total : 0;
@@ -293,9 +303,11 @@ async function buildStatsText(user) {
   let chart = "";
   if (statsRows.length > 0) {
     const valOf = (r, nxt) =>
-      r.total_xp != null && nxt && nxt.total_xp != null
-        ? Number(r.total_xp) - Number(nxt.total_xp)
-        : Number(r.xp) || 0;
+      r.xp != null
+        ? Number(r.xp) || 0
+        : (r.total_xp != null && nxt && nxt.total_xp != null
+            ? Number(r.total_xp) - Number(nxt.total_xp)
+            : 0);
     const revRows = statsRows
       .slice(0, 7)
       .map((r, i) => ({ date: r.date, xp: valOf(r, statsRows[i + 1]) }))

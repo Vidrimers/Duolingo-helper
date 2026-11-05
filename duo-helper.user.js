@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Duolingo Helper
 // @namespace    https://github.com/Vidrimers/Duolingo-helper
-// @version      0.14.0
+// @version      0.14.1
 // @description  Follow-back check for Duolingo profiles. Panel, badges, cache. / Проверка взаимной подписки на профилях Duolingo.
 // @author       Vidrimers
 // @license      CC BY-NC-ND 4.0
@@ -8262,7 +8262,7 @@ const BUILD_KIND = "github";
       const res = await new Promise((resolve) => {
         GM_xmlhttpRequest({
           method: "GET",
-          url: `https://www.duolingo.com/2017-06-30/users/${myId}?fields=totalXp,streak`,
+          url: `https://www.duolingo.com/2017-06-30/users/${myId}?fields=totalXp,streak,streakData`,
           headers: { accept: "application/json" },
           timeout: 10000,
           onload(r) { try { resolve(JSON.parse(r.responseText || "{}")); } catch { resolve(null); } },
@@ -8280,19 +8280,42 @@ const BUILD_KIND = "github";
       const today = localDateStr(new Date(now));
       const last = stats.lastSnapshot;
 
+      // хвост прошлого дня, ошибочно записанный на сегодня:
+      // XP за сегодня есть, а серия сегодня не продлена — значит это вчерашние XP
+      try {
+        const sd = res.streakData || (res.body && res.body.streakData) || null;
+        const lastExt = sd && sd.currentStreak && sd.currentStreak.lastExtendedDate;
+        const tEntry = stats.xpLog.find((e) => e.date === today);
+        if (tEntry && tEntry.xp > 0 && lastExt && lastExt < today) {
+          const yd = new Date(now);
+          yd.setDate(yd.getDate() - 1);
+          const yDate = localDateStr(yd);
+          const yEntry = stats.xpLog.find((e) => e.date === yDate);
+          if (yEntry) yEntry.xp += tEntry.xp;
+          else stats.xpLog.push({ date: yDate, xp: tEntry.xp });
+          tEntry.xp = 0;
+        }
+      } catch {}
+
       // записываем XP за день (накапливаем разницу)
       if (last && last.totalXp != null) {
-        const delta = totalXp - last.totalXp;
-        const existing = stats.xpLog.find((e) => e.date === today);
+        const delta = Math.max(0, totalXp - last.totalXp);
+        // разрыв через полночь — хвост прошлого дня, а не «сегодня»
+        const lastDate = localDateStr(new Date(last.ts));
+        const targetDate = lastDate !== today ? lastDate : today;
+        const existing = stats.xpLog.find((e) => e.date === targetDate);
         if (existing) {
-          existing.xp = Math.max(0, existing.xp + Math.max(0, delta));
-        } else {
-          stats.xpLog.push({ date: today, xp: Math.max(0, delta) });
+          existing.xp = Math.max(0, existing.xp + delta);
+        } else if (delta > 0) {
+          stats.xpLog.push({ date: targetDate, xp: delta });
         }
         // обрезаем до 90 дней
         const cutoff = localDateStr(new Date(now - 90 * 86400000));
         stats.xpLog = stats.xpLog.filter((e) => e.date >= cutoff);
       }
+      // запись за сегодня нужна всегда (даже нулевая) — уходит в бота и
+      // перетирает устаревшее значение прошлой логики
+      if (!stats.xpLog.find((e) => e.date === today)) stats.xpLog.push({ date: today, xp: 0 });
 
       stats.lastSnapshot = { ts: now, totalXp, streak: streak ?? (last && last.streak) };
       DATA.stats = stats;
@@ -10813,6 +10836,7 @@ function savePage() {
         }
         await new Promise((r) => setTimeout(r, 350 + Math.floor(Math.random() * 350)));
       }
+      if (earned > 0) logFarmXp(earned);
       setXpStatus(earned ? t("xp.done", { n: earned }) : t("xp.nothing"));
       showToast(earned ? t("xp.toast", { n: earned }) : t("xp.nothingToast"), !earned);
     } catch (e) {
@@ -11860,7 +11884,7 @@ function savePage() {
   // версия из Tampermonkey — не расходится с @version в шапке
   const CURRENT_VERSION =
     (typeof GM_info !== "undefined" && GM_info.script && GM_info.script.version) ||
-    "0.14.0";
+    "0.14.1";
   // запасная ссылка установки, если API не дал download_url
   let installUrl =
     "https://raw.githubusercontent.com/Vidrimers/Duolingo-helper/refs/heads/master/duo-helper.user.js";
