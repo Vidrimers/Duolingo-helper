@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Duolingo Helper
 // @namespace    https://github.com/Vidrimers/Duolingo-helper
-// @version      0.14.1
+// @version      0.14.2
 // @description  Follow-back check for Duolingo profiles. Panel, badges, cache. / Проверка взаимной подписки на профилях Duolingo.
 // @author       Vidrimers
 // @license      CC BY-NC-ND 4.0
@@ -286,10 +286,7 @@ const BUILD_KIND = "github";
       "tool.stop": "Стоп",
       "tool.xp": "⚠️ XP / буст {risk}",
       "tool.xpDesc": "Накрутка XP (реальное начисление, чит). Поле — цель в XP.",
-      "tool.xpSessionsTitle": "Экспериментально — может не начислять XP",
-      "tool.xpNote1": "* Sessions — экспериментально, может не начислять XP",
       "tool.xpNote2": "Stories — истории Duolingo; за «пройденную» историю реально дают XP.",
-      "tool.xpNote3": "Sessions — имитация учебной сессии/урока без прохождения.",
     "tool.streakSaver": "Не терять стрик",
     "tool.streakSaverDesc": "Автоматически поддерживает серию: если за день не было XP, бот начислит минимум к концу дня.",
     "tool.streakSaverOn": "«Не терять стрик» включён",
@@ -911,10 +908,7 @@ const BUILD_KIND = "github";
       "tool.stop": "Stop",
       "tool.xp": "⚠️ XP / boost {risk}",
       "tool.xpDesc": "XP farming (real crediting, cheat). The field is the XP target.",
-      "tool.xpSessionsTitle": "Experimental — may not credit XP",
-      "tool.xpNote1": "* Sessions — experimental, may not credit XP",
       "tool.xpNote2": "Stories — Duolingo stories; a \"completed\" story really gives XP.",
-      "tool.xpNote3": "Sessions — an imitation of a study session/lesson without solving it.",
     "tool.streakSaver": "Keep streak",
     "tool.streakSaverDesc": "Automatically maintains the streak: if there was no XP during the day, the bot adds a minimum by the end of the day.",
     "tool.streakSaverOn": "Keep streak — enabled",
@@ -4877,14 +4871,10 @@ const BUILD_KIND = "github";
                         </div>
                         <div class="dh-row" style="margin-bottom:6px">
                             <input class="dh-num-input" id="dh-xp-amount" type="number" min="50" max="99999" value="50" step="50" style="width:72px" />
-                            <button class="dh-btn dh-btn-primary" id="dh-xp-stories">Stories</button>
-                            <button class="dh-btn dh-btn-danger" id="dh-xp-sessions" title="${t("tool.xpSessionsTitle")}">Sessions *</button>
-                            <button class="dh-btn" id="dh-xp-stop">${t("tool.stop")}</button>
+                            <button class="dh-btn dh-btn-primary" id="dh-xp-toggle">${t("tool.start")}</button>
                         </div>
                         <div class="dh-muted" style="margin-top:2px">
-                            ${t("tool.xpNote1")}<br/>
-                            <small>${t("tool.xpNote2")}</small><br/>
-                            <small>${t("tool.xpNote3")}</small>
+                            <small>${t("tool.xpNote2")}</small>
                         </div>
                         <div class="dh-setting-row" style="border-bottom:none;padding:4px 0">
                             <div class="dh-setting-label">
@@ -5208,9 +5198,7 @@ const BUILD_KIND = "github";
       xpBoost60: modal.querySelector("#dh-xpboost-60"),
       setStreakSaver: modal.querySelector("#dh-set-streaksaver"),
       xpAmount: modal.querySelector("#dh-xp-amount"),
-      xpStories: modal.querySelector("#dh-xp-stories"),
-      xpSessions: modal.querySelector("#dh-xp-sessions"),
-      xpStop: modal.querySelector("#dh-xp-stop"),
+      xpToggle: modal.querySelector("#dh-xp-toggle"),
       xpStatus: modal.querySelector("#dh-xp-status"),
       accs: [...modal.querySelectorAll("[data-acc]")],
       questDaily: modal.querySelector("#dh-quest-daily"),
@@ -10693,24 +10681,12 @@ function savePage() {
 
   const STORY_SLUG = "fr-en-le-passeport";
 
-  async function getMyTotalXp() {
-    const myId = getMyId();
-    if (!myId) return null;
-    try {
-      const u = await apiGet(`${API.users}/${myId}?fields=totalXp`);
-      const v = Number(u && u.totalXp);
-      return Number.isFinite(v) ? v : null;
-    } catch {
-      return null;
-    }
-  }
 
   async function farmXp(mode) {
     if (xpRunning) return;
     const target = Math.max(50, Math.min(99999, parseInt(els.xpAmount && els.xpAmount.value, 10) || 50));
     xpRunning = true;
-    if (els.xpStories) els.xpStories.disabled = true;
-    if (els.xpSessions) els.xpSessions.disabled = true;
+    if (els.xpToggle) els.xpToggle.textContent = t("tool.stop");
     setXpStatus(t("xp.start", { mode, target }));
 
     const langs = await getMeLanguages();
@@ -10761,65 +10737,6 @@ function savePage() {
           if (res.status === 200) {
             got = Number((res.body && (res.body.awardedXp || res.body.xpGain)) || 499);
           }
-        } else {
-          // sessions: создать UNIT_TEST, закрыть с бонусами, проверить прирост XP
-          const xpBefore = await getMyTotalXp();
-          const sr = await sessionRequest("POST", "https://www.duolingo.com/2017-06-30/sessions", {
-            challengeTypes: [],
-            fromLanguage: langs.fromLanguage,
-            learningLanguage: langs.learningLanguage,
-            type: "UNIT_TEST",
-            isFinalLevel: false,
-            isV2: true,
-            juicy: true,
-            smartTipsVersion: 2,
-          });
-          if (sr.status === 200 && sr.body && sr.body.id) {
-            const now = Math.floor(Date.now() / 1000);
-            const ur = await sessionRequest(
-              "PUT",
-              `https://www.duolingo.com/2017-06-30/sessions/${sr.body.id}`,
-              {
-                id: sr.body.id,
-                metadata: sr.body.metadata,
-                type: "UNIT_TEST",
-                fromLanguage: langs.fromLanguage,
-                learningLanguage: langs.learningLanguage,
-                challenges: [],
-                adaptiveChallenges: [],
-                sessionExperimentRecord: [],
-                experiments_with_treatment_contexts: [],
-                adaptiveInterleavedChallenges: [],
-                sessionStartExperiments: [],
-                trackingProperties: [],
-                ttsAnnotations: [],
-                heartsLeft: 5,
-                startTime: now,
-                enableBonusPoints: true,
-                endTime: now + 60,
-                failed: false,
-                maxInLessonStreak: 9,
-                shouldLearnThings: true,
-                hasBoost: true,
-                happyHourBonusXp: 10,
-                pathLevelSpecifics: { unitIndex: 0 },
-              },
-            );
-            if (ur.status === 200) {
-              const b = ur.body || {};
-              got = Number(
-                b.awardedXp || b.xpGain || b.xp || b.totalXp || 0,
-              );
-              // если тело не дало XP — проверяем реальный баланс
-              if (!got) {
-                await new Promise((r) => setTimeout(r, 800));
-                const xpAfter = await getMyTotalXp();
-                if (xpBefore != null && xpAfter != null && xpAfter > xpBefore) {
-                  got = xpAfter - xpBefore;
-                }
-              }
-            }
-          }
         }
 
         if (got > 0) {
@@ -10844,8 +10761,7 @@ function savePage() {
       showToast(t("xp.error"), true);
     } finally {
       xpRunning = false;
-      if (els.xpStories) els.xpStories.disabled = false;
-      if (els.xpSessions) els.xpSessions.disabled = false;
+      if (els.xpToggle) els.xpToggle.textContent = t("tool.start");
     }
   }
 
@@ -11884,7 +11800,7 @@ function savePage() {
   // версия из Tampermonkey — не расходится с @version в шапке
   const CURRENT_VERSION =
     (typeof GM_info !== "undefined" && GM_info.script && GM_info.script.version) ||
-    "0.14.1";
+    "0.14.2";
   // запасная ссылка установки, если API не дал download_url
   let installUrl =
     "https://raw.githubusercontent.com/Vidrimers/Duolingo-helper/refs/heads/master/duo-helper.user.js";
@@ -12962,14 +12878,11 @@ function savePage() {
         showToast(t("tg.xpBoost60"));
       });
     }
-    if (els.xpStories) {
-      els.xpStories.addEventListener("click", () => farmXp("stories"));
-    }
-    if (els.xpSessions) {
-      els.xpSessions.addEventListener("click", () => farmXp("sessions"));
-    }
-    if (els.xpStop) {
-      els.xpStop.addEventListener("click", () => stopXpFarm());
+    if (els.xpToggle) {
+      els.xpToggle.addEventListener("click", () => {
+        if (xpRunning) stopXpFarm();
+        else farmXp("stories");
+      });
     }
     if (els.setStreakSaver) {
       els.setStreakSaver.addEventListener("click", () => {
