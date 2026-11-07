@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Duolingo Helper
 // @namespace    https://github.com/Vidrimers/Duolingo-helper
-// @version      0.14.3
+// @version      0.14.4
 // @description  Follow-back check for Duolingo profiles. Panel, badges, cache. / Проверка взаимной подписки на профилях Duolingo.
 // @author       Vidrimers
 // @license      CC BY-NC-ND 4.0
@@ -7314,6 +7314,7 @@ const BUILD_KIND = "github";
   // «Не терять стрик»: в бота значение шлём только после локальной смены тумблера
   let pendingStreakSaverPush = false;
   let streakSaverLocalTs = 0;
+  let streakSaverLocked = false;
   let lessonXpBaseline = null;
   let lessonXpLogged = false;
   function installFarmXpWatcher() {
@@ -11813,7 +11814,7 @@ function savePage() {
   // версия из Tampermonkey — не расходится с @version в шапке
   const CURRENT_VERSION =
     (typeof GM_info !== "undefined" && GM_info.script && GM_info.script.version) ||
-    "0.14.3";
+    "0.14.4";
   // запасная ссылка установки, если API не дал download_url
   let installUrl =
     "https://raw.githubusercontent.com/Vidrimers/Duolingo-helper/refs/heads/master/duo-helper.user.js";
@@ -12899,6 +12900,7 @@ function savePage() {
     }
     if (els.setStreakSaver) {
       els.setStreakSaver.addEventListener("click", () => {
+        if (streakSaverLocked) { showToast(t("set.needTg"), true); return; }
         DATA.settings.streakSaver = !DATA.settings.streakSaver;
         pendingStreakSaverPush = true;
         streakSaverLocalTs = Date.now();
@@ -13246,6 +13248,15 @@ function savePage() {
   }
 
   /** Обновляет блок «Облачные сохранения»: доступность кнопок и дату бэкапа. */
+  /** Тумблер «Не терять стрик» работает только с привязкой Telegram — сейвер живёт в боте. */
+  function updateStreakSaverLock(linked) {
+    const sw = els.setStreakSaver;
+    if (!sw) return;
+    streakSaverLocked = linked === false;
+    sw.style.opacity = linked === false ? "0.45" : "";
+    sw.title = linked === false ? t("set.needTg") : "";
+  }
+
   async function updateCloudBlock() {
     const saveBtn = els.cloudSave;
     const loadBtn = els.cloudLoad;
@@ -13255,6 +13266,7 @@ function savePage() {
     const myId = getMyId();
     const lock = (net) => {
       const msg = net ? t("tglink.netError") : t("set.needTg");
+      updateStreakSaverLock(net ? null : false);
       saveBtn.disabled = true;
       loadBtn.disabled = true;
       saveBtn.title = msg;
@@ -13272,6 +13284,7 @@ function savePage() {
     if (!linked.linked) { lock(); return; }
     saveBtn.disabled = false;
     saveBtn.title = "";
+    updateStreakSaverLock(true);
     const meta = await cloudRequest(
       BOT_API + "/api/backup?duolingoUserId=" + encodeURIComponent(myId) + "&meta=1",
       { method: "GET", headers: { authorization: "Bearer " + (getToken() || "") } }
