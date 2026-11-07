@@ -256,26 +256,16 @@ async function buildStatsText(user) {
     }
   } catch {}
 
-  // дневной/недельный XP — из разницы итогов total_xp (привязаны к реальному итогу Duolingo).
-  // База дня = «конец прошлого дня»: итог пред-предыдущей строки + XP прошлого дня (колонка xp
-  // приходит от скрипта по дням) — вечерние XP прошлого дня не уезжают в «сегодня».
+  // дневной/недельный XP — из разницы итогов total_xp: концы дней фиксирует
+  // ежедневный снапшот (snapshotEndOfDay), разница соседних итогов = точный XP за день.
   const today = localDateStr();
   const weekStart = localDateStr(new Date(Date.now() - 7 * 86400000));
   const anchor = (before) =>
-    db.prepare("SELECT date, xp, total_xp FROM user_stats WHERE duolingo_user_id = ? AND date < ? AND total_xp IS NOT NULL ORDER BY date DESC LIMIT 1")
+    db.prepare("SELECT total_xp FROM user_stats WHERE duolingo_user_id = ? AND date < ? AND total_xp IS NOT NULL ORDER BY date DESC LIMIT 1")
       .get(user.duolingo_user_id, before);
-  const endOfDayBase = (row) => {
-    if (!row) return null;
-    if (row.xp != null) {
-      const prev = db.prepare("SELECT total_xp FROM user_stats WHERE duolingo_user_id = ? AND date < ? AND total_xp IS NOT NULL ORDER BY date DESC LIMIT 1")
-        .get(user.duolingo_user_id, row.date);
-      if (prev) return Number(prev.total_xp) + Number(row.xp);
-    }
-    return Number(row.total_xp);
-  };
   const todayBase = anchor(today);
   const weekBase = anchor(weekStart);
-  const dayXp = todayBase ? totalXp - endOfDayBase(todayBase) : null;
+  const dayXp = todayBase ? totalXp - Number(todayBase.total_xp) : null;
   db.prepare(`
     INSERT INTO user_stats (duolingo_user_id, date, xp, streak, total_xp)
     VALUES (?, ?, ?, ?, ?)
@@ -291,7 +281,7 @@ async function buildStatsText(user) {
     todayXp = Number(tRow && tRow.xp) || 0;
   }
   let weekXp;
-  if (weekBase) weekXp = totalXp - endOfDayBase(weekBase);
+  if (weekBase) weekXp = totalXp - Number(weekBase.total_xp);
   else {
     const wRow = db.prepare("SELECT SUM(xp) as total FROM user_stats WHERE duolingo_user_id = ? AND date >= ?").get(user.duolingo_user_id, weekStart);
     weekXp = wRow && wRow.total ? wRow.total : 0;
@@ -303,11 +293,9 @@ async function buildStatsText(user) {
   let chart = "";
   if (statsRows.length > 0) {
     const valOf = (r, nxt) =>
-      r.xp != null
-        ? Number(r.xp) || 0
-        : (r.total_xp != null && nxt && nxt.total_xp != null
-            ? Number(r.total_xp) - Number(nxt.total_xp)
-            : 0);
+      r.total_xp != null && nxt && nxt.total_xp != null
+        ? Number(r.total_xp) - Number(nxt.total_xp)
+        : Number(r.xp) || 0;
     const revRows = statsRows
       .slice(0, 7)
       .map((r, i) => ({ date: r.date, xp: valOf(r, statsRows[i + 1]) }))
@@ -2746,8 +2734,16 @@ const httpServer = createServer((req, res) => {
           const ssRow = db.prepare("SELECT streak_saver FROM users WHERE duolingo_user_id = ?").get(String(duolingoUserId));
           streakSaverVal = ssRow ? Number(ssRow.streak_saver) || 0 : 0;
         } catch {}
+        // точные дни (разницы итогов конца дня) — скрипт показывает те же цифры
+        let daysOut = [];
+        try {
+          const dRows = db.prepare("SELECT date, total_xp FROM user_stats WHERE duolingo_user_id = ? AND total_xp IS NOT NULL ORDER BY date DESC LIMIT 9").all(String(duolingoUserId));
+          for (let i = 0; i < dRows.length - 1; i++) {
+            daysOut.push({ date: dRows[i].date, xp: Number(dRows[i].total_xp) - Number(dRows[i + 1].total_xp) });
+          }
+        } catch {}
         res.writeHead(200, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ ok: true, synced: Array.isArray(xpLog) ? xpLog.length : 0, pendingActions, pendingChanges, streakSaver: !!streakSaverVal }));
+        res.end(JSON.stringify({ ok: true, synced: Array.isArray(xpLog) ? xpLog.length : 0, pendingActions, pendingChanges, streakSaver: !!streakSaverVal, days: daysOut }));
       } catch (e) {
         res.writeHead(500, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ error: e.message }));
@@ -2894,6 +2890,44 @@ function markStreakSaver(tgId, date) {
   try {
     db.prepare("INSERT OR REPLACE INTO bot_kv (key, value) VALUES (?, ?)").run("streak_saver_last:" + tgId, date);
   } catch {}
+}
+
+// 1.6) «Итог дня» — снимок totalXp в конце дня по таймзоне аккаунта:
+// разница итогов соседних дней = точный XP за день (телефон, скрипт, накрутки)
+async function snapshotEndOfDay() {
+  const rows = db.prepare(`
+    SELECT u.tg_user_id, u.duolingo_user_id, u.jwt_encrypted, u.timezone
+    FROM users u
+    WHERE u.tg_user_id IS NOT NULL
+      AND u.tg_user_id NOT IN (SELECT tg_user_id FROM banned_users)
+  `).all();
+  const now = new Date();
+  for (const u of rows) {
+    try {
+      const jwt = decryptJWT(u.jwt_encrypted);
+      if (!jwt) continue;
+      let tz = u.timezone;
+      if (tz && Number(tzParts(tz, now).hour) < 23) continue;
+      const res = await fetch(
+        `https://www.duolingo.com/2017-06-30/users/${u.duolingo_user_id}?fields=timezone,totalXp,streak`,
+        { headers: { accept: "application/json", cookie: `jwt_token=${jwt}` } }
+      );
+      const d = await res.json();
+      if (!tz) {
+        tz = d.timezone || "Europe/Moscow";
+        db.prepare("UPDATE users SET timezone = ? WHERE tg_user_id = ?").run(tz, u.tg_user_id);
+      }
+      const todayUser = dateStrInTz(tz, now);
+      if (Number(tzParts(tz, now).hour) < 23) continue;
+      db.prepare(`
+        INSERT INTO user_stats (duolingo_user_id, date, xp, streak, total_xp)
+        VALUES (?, ?, NULL, ?, ?)
+        ON CONFLICT(duolingo_user_id, date) DO UPDATE SET
+          streak = COALESCE(excluded.streak, user_stats.streak),
+          total_xp = COALESCE(excluded.total_xp, user_stats.total_xp)
+      `).run(String(u.duolingo_user_id), todayUser, Number(d.streak) || 0, Number(d.totalXp) || 0);
+    } catch {}
+  }
 }
 
 // 2) «Обход в лиге» — по снапшоту таблицы, уведомляем только на пересечении
@@ -3208,6 +3242,8 @@ checkPracticeReminders();
 setInterval(checkPracticeReminders, 15 * 60 * 1000);
 checkStreakSaver();
 setInterval(checkStreakSaver, 15 * 60 * 1000);
+snapshotEndOfDay();
+setInterval(snapshotEndOfDay, 15 * 60 * 1000);
 checkLeagueOvertakes();
 setInterval(checkLeagueOvertakes, 30 * 60 * 1000);
 checkFollowChanges();

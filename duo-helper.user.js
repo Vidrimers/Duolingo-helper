@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Duolingo Helper
 // @namespace    https://github.com/Vidrimers/Duolingo-helper
-// @version      0.14.2
+// @version      0.14.3
 // @description  Follow-back check for Duolingo profiles. Panel, badges, cache. / Проверка взаимной подписки на профилях Duolingo.
 // @author       Vidrimers
 // @license      CC BY-NC-ND 4.0
@@ -8349,6 +8349,19 @@ const BUILD_KIND = "github";
                 saveData();
                 if (els.setStreakSaver) els.setStreakSaver.classList.toggle("on", d.streakSaver);
               }
+              // точные дни от бота (снимки «итога дня») — показываем те же цифры, что и в тг
+              if (Array.isArray(d.days) && d.days.length) {
+                for (const e of d.days) {
+                  if (!e || !e.date) continue;
+                  const v = Number(e.xp);
+                  if (!Number.isFinite(v)) continue;
+                  const ex = stats.xpLog.find((x) => x.date === e.date);
+                  if (ex) ex.xp = v;
+                  else stats.xpLog.push({ date: e.date, xp: v });
+                }
+                saveData();
+                if (typeof renderStats === "function") renderStats();
+              }
               // сервер принял журнал накруток — убираем только отправленное
               const fl = farmLog();
               fl.xp = fl.xp.filter((e) => sentXp.indexOf(e) === -1);
@@ -11800,7 +11813,7 @@ function savePage() {
   // версия из Tampermonkey — не расходится с @version в шапке
   const CURRENT_VERSION =
     (typeof GM_info !== "undefined" && GM_info.script && GM_info.script.version) ||
-    "0.14.2";
+    "0.14.3";
   // запасная ссылка установки, если API не дал download_url
   let installUrl =
     "https://raw.githubusercontent.com/Vidrimers/Duolingo-helper/refs/heads/master/duo-helper.user.js";
