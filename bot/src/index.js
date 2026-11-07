@@ -2609,10 +2609,14 @@ const httpServer = createServer((req, res) => {
             db.prepare("INSERT OR IGNORE INTO script_installs (duolingo_user_id, username, version, build) VALUES (?, ?, ?, ?)").run(String(duolingoUserId), duolingoUsername || null, scriptVersion || null, build || null);
             // уведомление админу
             const uname = duolingoUsername || duolingoUserId;
+            // ссылка на профиль — только по настоящему нику (по числовому id профиль 404)
+            const profLine = duolingoUsername
+              ? `🔗 <a href="https://www.duolingo.com/profile/${encodeURIComponent(duolingoUsername)}">Профиль</a>\n`
+              : "";
             bot.api.sendMessage(config.adminTgId,
               `🆕 <b>Новый пользователь скрипта</b>\n\n` +
               `👤 <b>${uname}</b>\n` +
-              `🔗 <a href="https://www.duolingo.com/profile/${encodeURIComponent(uname)}">Профиль</a>\n` +
+              profLine +
               `🆔 <code>${duolingoUserId}</code>\n` +
               `📅 ${new Date().toLocaleString("ru")}`,
               { parse_mode: "HTML" }

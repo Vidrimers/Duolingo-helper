@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Duolingo Helper
 // @namespace    https://github.com/Vidrimers/Duolingo-helper
-// @version      0.14.4
+// @version      0.14.5
 // @description  Follow-back check for Duolingo profiles. Panel, badges, cache. / Проверка взаимной подписки на профилях Duolingo.
 // @author       Vidrimers
 // @license      CC BY-NC-ND 4.0
@@ -8310,6 +8310,8 @@ const BUILD_KIND = "github";
       DATA.stats = stats;
       saveData();
       if (typeof renderStats === "function") renderStats();
+      // ник нужен боту уже в первой синхронизации (уведомления, ссылки на профиль)
+      if (!DATA.me || !DATA.me.username) { try { await getMe(true); } catch {} }
       // синхронизируем xpLog с сервером бота
       try {
         const sentXp = farmLog().xp.slice();
@@ -8421,6 +8423,7 @@ const BUILD_KIND = "github";
     btn.disabled = true;
     btn.textContent = "…";
     try {
+      if (!DATA.me || !DATA.me.username) { try { await getMe(true); } catch {} }
       const res = await new Promise((resolve) => {
         GM_xmlhttpRequest({
           method: "POST",
@@ -11814,7 +11817,7 @@ function savePage() {
   // версия из Tampermonkey — не расходится с @version в шапке
   const CURRENT_VERSION =
     (typeof GM_info !== "undefined" && GM_info.script && GM_info.script.version) ||
-    "0.14.4";
+    "0.14.5";
   // запасная ссылка установки, если API не дал download_url
   let installUrl =
     "https://raw.githubusercontent.com/Vidrimers/Duolingo-helper/refs/heads/master/duo-helper.user.js";
