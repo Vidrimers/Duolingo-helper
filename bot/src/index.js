@@ -3165,18 +3165,6 @@ async function checkWeeklyDigest() {
           weekXp = Number(r && r.s) || 0;
         }
       } catch {}
-      let farmedXp = 0;
-      try {
-        const r = db.prepare("SELECT SUM(amount) AS s FROM xp_farm_log WHERE duolingo_user_id = ? AND ts >= ?")
-          .get(String(u.duolingo_user_id), startMs);
-        farmedXp = Number(r && r.s) || 0;
-      } catch {}
-      let farmedDays = 0;
-      try {
-        const r = db.prepare("SELECT SUM(days) AS s FROM streak_farm_log WHERE duolingo_user_id = ? AND ts >= ?")
-          .get(String(u.duolingo_user_id), startMs);
-        farmedDays = Number(r && r.s) || 0;
-      } catch {}
 
       // активность по последнему скану
       const DL = userLang(u);
@@ -3203,8 +3191,6 @@ async function checkWeeklyDigest() {
         t(DL, "n.digestFollowers", { n: followers == null ? "—" : followers, net: netStr }) +
         t(DL, "n.digestFollow", { a: followed, b: unfollowed }) +
         t(DL, "n.digestXp", { n: fmtSigned(weekXp, DL) }) +
-        t(DL, "n.digestFarmed", { n: fmtNum(farmedXp, DL) }) +
-        t(DL, "n.digestFarmedDays", { n: fmtNum(farmedDays, DL) }) +
         actBlock;
 
       await bot.api.sendMessage(u.tg_user_id, text, {

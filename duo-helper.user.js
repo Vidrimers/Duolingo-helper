@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Duolingo Helper
 // @namespace    https://github.com/Vidrimers/Duolingo-helper
-// @version      0.14.6
+// @version      2026.11.0
 // @description  Follow-back check for Duolingo profiles. Panel, badges, cache. / Проверка взаимной подписки на профилях Duolingo.
 // @author       Vidrimers
 // @license      CC BY-NC-ND 4.0
@@ -11821,7 +11821,7 @@ function savePage() {
   // версия из Tampermonkey — не расходится с @version в шапке
   const CURRENT_VERSION =
     (typeof GM_info !== "undefined" && GM_info.script && GM_info.script.version) ||
-    "0.14.6";
+    "2026.11.0";
   // запасная ссылка установки, если API не дал download_url
   let installUrl =
     "https://raw.githubusercontent.com/Vidrimers/Duolingo-helper/refs/heads/master/duo-helper.user.js";
