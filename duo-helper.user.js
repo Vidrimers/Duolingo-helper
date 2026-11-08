@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Duolingo Helper
 // @namespace    https://github.com/Vidrimers/Duolingo-helper
-// @version      2026.11.0
+// @version      2026.11.1
 // @description  Follow-back check for Duolingo profiles. Panel, badges, cache. / Проверка взаимной подписки на профилях Duolingo.
 // @author       Vidrimers
 // @license      CC BY-NC-ND 4.0
@@ -266,12 +266,12 @@ const BUILD_KIND = "github";
       "tags.deleted": "Метка удалена",
       "tags.needProfile": "Сначала открой профиль пользователя",
       // вкладка «Инструменты»: общее
-      "tool.risk": "— на свой страх и риск",
+      "tool.riskNote": "Функции этого раздела вмешиваются в механику Duolingo — используй на свой страх и риск, возможна блокировка аккаунта.",
       "tool.hearts": "Защита сердец",
       "tool.heartsBlock": "Блокировать списание сердец",
       "tool.heartsDesc": "Не даёт Duolingo уменьшать сердца при ошибках в уроках",
       "tool.heartsStatus": "Статус: ",
-      "tool.lessons": "⚠️ Уроки {risk}",
+      "tool.lessons": "Уроки",
       "tool.short": "Короткие уроки",
       "tool.shortDesc": "Вместо полного урока 1–2 простых задания",
       "tool.solver": "Автосолвер",
@@ -284,30 +284,30 @@ const BUILD_KIND = "github";
       "tool.apCountTitle": "Количество уроков",
       "tool.start": "Старт",
       "tool.stop": "Стоп",
-      "tool.xp": "⚠️ XP / буст {risk}",
-      "tool.xpDesc": "Накрутка XP (реальное начисление, чит). Поле — цель в XP.",
+      "tool.xp": "XP / буст",
+      "tool.xpDesc": "Накрутка XP (реальное начисление). Поле — цель в XP.",
       "tool.xpNote2": "Stories — истории Duolingo; за «пройденную» историю реально дают XP.",
     "tool.streakSaver": "Не терять стрик",
     "tool.streakSaverDesc": "Автоматически поддерживает серию: если за день не было XP, бот начислит минимум к концу дня.",
     "tool.streakSaverOn": "«Не терять стрик» включён",
     "tool.streakSaverOff": "«Не терять стрик» выключен",
-      "tool.quests": "⚠️ Квесты {risk}",
-      "tool.questsDesc": "Инъекция прогресса в daily / monthly квесты. Нарушает правила Duolingo.",
+      "tool.quests": "Квесты",
+      "tool.questsDesc": "Инъекция прогресса в daily / monthly квесты.",
       "tool.questClaimAll": "Забрать все",
-      "tool.gems": "⚠️ Гемы (алмазы) {risk}",
+      "tool.gems": "Гемы (алмазы)",
       "tool.gemsDesc": "Сбор rewardBundles (SKILL_COMPLETION).",
       "tool.gemsOnce": "Собрать",
       "tool.gemsFarm": "Фарм",
       "tool.gemsFastTitle": "8 потоков одновременно — быстрее, но опаснее (rate limit)",
       "tool.gemsFastNote": "* Фарм ×8 — 8 параллельных запросов. Быстрее, но выше риск rate limit.",
-      "tool.freeMax": "⚠️ Free Max / Super {risk}",
+      "tool.freeMax": "Free Max / Super",
       "tool.freeMaxDesc": "Подмена ответа GET /users — клиент видит Super/Max. Разблокирует клиентские функции, серверную подписку не даёт.",
       "tool.freeMaxLabel": "Free Max / Super",
       "tool.freeMaxSub": "Подменяет hasPlus и gold_subscription",
-      "tool.stk": "⚠️ Streak {risk}",
-      "tool.stkDesc": "Восстановление/накрутка дней серии через подмену дат в sessions. Нарушает правила Duolingo.",
+      "tool.stk": "Streak",
+      "tool.stkDesc": "Восстановление/накрутка дней серии через подмену дат в sessions.",
       "tool.stkRun": "Накрутить дни",
-      "tool.lb": "⚠️ Лига {risk}",
+      "tool.lb": "Лига",
       "tool.lbDesc": "Таблица лиги, вступление и накрутка до целевого места.",
       "tool.lbTable": "Таблица",
       "tool.lbJoin": "Вступить",
@@ -888,12 +888,12 @@ const BUILD_KIND = "github";
       "tags.deleted": "Tag deleted",
       "tags.needProfile": "Open a user's profile first",
       // Tools tab: common
-      "tool.risk": "— at your own risk",
+      "tool.riskNote": "These features interfere with Duolingo's mechanics — use at your own risk; the account may be banned.",
       "tool.hearts": "Heart protection",
       "tool.heartsBlock": "Block heart spending",
       "tool.heartsDesc": "Stops Duolingo from reducing hearts on mistakes in lessons",
       "tool.heartsStatus": "Status: ",
-      "tool.lessons": "⚠️ Lessons {risk}",
+      "tool.lessons": "Lessons",
       "tool.short": "Short lessons",
       "tool.shortDesc": "1–2 simple tasks instead of a full lesson",
       "tool.solver": "Auto solver",
@@ -906,30 +906,30 @@ const BUILD_KIND = "github";
       "tool.apCountTitle": "Number of lessons",
       "tool.start": "Start",
       "tool.stop": "Stop",
-      "tool.xp": "⚠️ XP / boost {risk}",
-      "tool.xpDesc": "XP farming (real crediting, cheat). The field is the XP target.",
+      "tool.xp": "XP / boost",
+      "tool.xpDesc": "XP farming (real crediting). The field is the XP target.",
       "tool.xpNote2": "Stories — Duolingo stories; a \"completed\" story really gives XP.",
     "tool.streakSaver": "Keep streak",
     "tool.streakSaverDesc": "Automatically maintains the streak: if there was no XP during the day, the bot adds a minimum by the end of the day.",
     "tool.streakSaverOn": "Keep streak — enabled",
     "tool.streakSaverOff": "Keep streak — disabled",
-      "tool.quests": "⚠️ Quests {risk}",
-      "tool.questsDesc": "Progress injection into daily / monthly quests. Violates Duolingo rules.",
+      "tool.quests": "Quests",
+      "tool.questsDesc": "Progress injection into daily / monthly quests.",
       "tool.questClaimAll": "Claim all",
-      "tool.gems": "⚠️ Gems {risk}",
+      "tool.gems": "Gems",
       "tool.gemsDesc": "Collecting rewardBundles (SKILL_COMPLETION).",
       "tool.gemsOnce": "Collect",
       "tool.gemsFarm": "Farm",
       "tool.gemsFastTitle": "8 parallel requests — faster but riskier (rate limit)",
       "tool.gemsFastNote": "* Farm ×8 — 8 parallel requests. Faster, but a higher rate-limit risk.",
-      "tool.freeMax": "⚠️ Free Max / Super {risk}",
+      "tool.freeMax": "Free Max / Super",
       "tool.freeMaxDesc": "Replaces the GET /users response — the client sees Super/Max. Unlocks client-side features, doesn't grant a server subscription.",
       "tool.freeMaxLabel": "Free Max / Super",
       "tool.freeMaxSub": "Replaces hasPlus and gold_subscription",
-      "tool.stk": "⚠️ Streak {risk}",
-      "tool.stkDesc": "Restoring/farming streak days by faking dates in sessions. Violates Duolingo rules.",
+      "tool.stk": "Streak",
+      "tool.stkDesc": "Restoring/farming streak days by faking dates in sessions.",
       "tool.stkRun": "Add streak days",
-      "tool.lb": "⚠️ League {risk}",
+      "tool.lb": "League",
       "tool.lbDesc": "League table, joining and farming to a target place.",
       "tool.lbTable": "Table",
       "tool.lbJoin": "Join",
@@ -4820,7 +4820,7 @@ const BUILD_KIND = "github";
 
                 <div class="dh-acc" data-acc>
                     <button type="button" class="dh-acc-head">
-                        <span class="dh-acc-title">${t("tool.lessons", { risk: t("tool.risk") })}</span>
+                        <span class="dh-acc-title">${t("tool.lessons")}</span>
                         <span class="dh-acc-arrow">▾</span>
                     </button>
                     <div class="dh-acc-body"><div class="dh-acc-inner">
@@ -4866,7 +4866,7 @@ const BUILD_KIND = "github";
 
                 <div class="dh-acc" data-acc>
                     <button type="button" class="dh-acc-head">
-                        <span class="dh-acc-title">${t("tool.xp", { risk: t("tool.risk") })}</span>
+                        <span class="dh-acc-title">${t("tool.xp")}</span>
                         <span class="dh-acc-arrow">▾</span>
                     </button>
                     <div class="dh-acc-body"><div class="dh-acc-inner">
@@ -4893,7 +4893,7 @@ const BUILD_KIND = "github";
 
                 <div class="dh-acc" data-acc>
                     <button type="button" class="dh-acc-head">
-                        <span class="dh-acc-title">${t("tool.quests", { risk: t("tool.risk") })}</span>
+                        <span class="dh-acc-title">${t("tool.quests")}</span>
                         <span class="dh-acc-arrow">▾</span>
                     </button>
                     <div class="dh-acc-body"><div class="dh-acc-inner">
@@ -4912,7 +4912,49 @@ const BUILD_KIND = "github";
 
                 <div class="dh-acc" data-acc>
                     <button type="button" class="dh-acc-head">
-                        <span class="dh-acc-title">${t("tool.gems", { risk: t("tool.risk") })}</span>
+                        <span class="dh-acc-title">${t("tool.stk")}</span>
+                        <span class="dh-acc-arrow">▾</span>
+                    </button>
+                    <div class="dh-acc-body"><div class="dh-acc-inner">
+                        <div class="dh-muted" style="margin-bottom:8px">
+                            ${t("tool.stkDesc")}
+                        </div>
+                        <div class="dh-row" style="margin-bottom:6px">
+                            <input class="dh-num-input" id="dh-streak-days" type="number" min="1" max="365" value="7" style="width:64px" />
+                            <button class="dh-btn dh-btn-primary" id="dh-streak-run">${t("tool.stkRun")}</button>
+                            <button class="dh-btn" id="dh-streak-stop">${t("tool.stop")}</button>
+                        </div>
+                        <div class="dh-muted dh-op-status" id="dh-streak-status"></div>
+                    </div></div>
+                </div>
+
+                <div class="dh-acc" data-acc>
+                    <button type="button" class="dh-acc-head">
+                        <span class="dh-acc-title">${t("tool.lb")}</span>
+                        <span class="dh-acc-arrow">▾</span>
+                    </button>
+                    <div class="dh-acc-body"><div class="dh-acc-inner">
+                        <div class="dh-muted" style="margin-bottom:8px">
+                            ${t("tool.lbDesc")}
+                        </div>
+                        <div class="dh-row" style="margin-bottom:6px">
+                            <button class="dh-btn dh-btn-primary" id="dh-lb-load">${t("tool.lbTable")}</button>
+                            <button class="dh-btn" id="dh-lb-join">${t("tool.lbJoin")}</button>
+                            <button class="dh-btn" id="dh-lb-addall" disabled>${t("lb.massAdd")}</button>
+                        </div>
+                        <div class="dh-row" style="margin-bottom:6px">
+                            <input class="dh-num-input" id="dh-lb-target" type="number" min="1" max="100" value="3" style="width:56px" />
+                            <button class="dh-btn dh-btn-danger" id="dh-lb-farm">${t("tool.lbFarm")}</button>
+                            <button class="dh-btn" id="dh-lb-stop">${t("tool.stop")}</button>
+                        </div>
+                        <div class="dh-muted dh-op-status" id="dh-lb-status"></div>
+                        <div id="dh-lb-list" style="margin-top:8px;display:flex;flex-direction:column;gap:4px"></div>
+                    </div></div>
+                </div>
+
+                <div class="dh-acc" data-acc>
+                    <button type="button" class="dh-acc-head">
+                        <span class="dh-acc-title">${t("tool.gems")}</span>
                         <span class="dh-acc-arrow">▾</span>
                     </button>
                     <div class="dh-acc-body"><div class="dh-acc-inner">
@@ -4934,7 +4976,7 @@ const BUILD_KIND = "github";
 
                 <div class="dh-acc" data-acc>
                     <button type="button" class="dh-acc-head">
-                        <span class="dh-acc-title">${t("tool.freeMax", { risk: t("tool.risk") })}</span>
+                        <span class="dh-acc-title">${t("tool.freeMax")}</span>
                         <span class="dh-acc-arrow">▾</span>
                     </button>
                     <div class="dh-acc-body"><div class="dh-acc-inner">
@@ -4951,47 +4993,9 @@ const BUILD_KIND = "github";
                     </div></div>
                 </div>
 
-                <div class="dh-acc" data-acc>
-                    <button type="button" class="dh-acc-head">
-                        <span class="dh-acc-title">${t("tool.stk", { risk: t("tool.risk") })}</span>
-                        <span class="dh-acc-arrow">▾</span>
-                    </button>
-                    <div class="dh-acc-body"><div class="dh-acc-inner">
-                        <div class="dh-muted" style="margin-bottom:8px">
-                            ${t("tool.stkDesc")}
+                        <div class="dh-muted" style="margin-top:10px;padding:8px 12px;border-top:1px solid rgba(128,128,128,0.2);font-size:10px;line-height:1.5;opacity:0.7">
+                            ${t("tool.riskNote")}
                         </div>
-                        <div class="dh-row" style="margin-bottom:6px">
-                            <input class="dh-num-input" id="dh-streak-days" type="number" min="1" max="365" value="7" style="width:64px" />
-                            <button class="dh-btn dh-btn-primary" id="dh-streak-run">${t("tool.stkRun")}</button>
-                            <button class="dh-btn" id="dh-streak-stop">${t("tool.stop")}</button>
-                        </div>
-                        <div class="dh-muted dh-op-status" id="dh-streak-status"></div>
-                    </div></div>
-                </div>
-
-                <div class="dh-acc" data-acc>
-                    <button type="button" class="dh-acc-head">
-                        <span class="dh-acc-title">${t("tool.lb", { risk: t("tool.risk") })}</span>
-                        <span class="dh-acc-arrow">▾</span>
-                    </button>
-                    <div class="dh-acc-body"><div class="dh-acc-inner">
-                        <div class="dh-muted" style="margin-bottom:8px">
-                            ${t("tool.lbDesc")}
-                        </div>
-                        <div class="dh-row" style="margin-bottom:6px">
-                            <button class="dh-btn dh-btn-primary" id="dh-lb-load">${t("tool.lbTable")}</button>
-                            <button class="dh-btn" id="dh-lb-join">${t("tool.lbJoin")}</button>
-                            <button class="dh-btn" id="dh-lb-addall" disabled>${t("lb.massAdd")}</button>
-                        </div>
-                        <div class="dh-row" style="margin-bottom:6px">
-                            <input class="dh-num-input" id="dh-lb-target" type="number" min="1" max="100" value="3" style="width:56px" />
-                            <button class="dh-btn dh-btn-danger" id="dh-lb-farm">${t("tool.lbFarm")}</button>
-                            <button class="dh-btn" id="dh-lb-stop">${t("tool.stop")}</button>
-                        </div>
-                        <div class="dh-muted dh-op-status" id="dh-lb-status"></div>
-                        <div id="dh-lb-list" style="margin-top:8px;display:flex;flex-direction:column;gap:4px"></div>
-                    </div></div>
-                </div>
             </div>
 
             <div class="dh-tab-content" data-tab="settings">
@@ -11821,7 +11825,7 @@ function savePage() {
   // версия из Tampermonkey — не расходится с @version в шапке
   const CURRENT_VERSION =
     (typeof GM_info !== "undefined" && GM_info.script && GM_info.script.version) ||
-    "2026.11.0";
+    "2026.11.1";
   // запасная ссылка установки, если API не дал download_url
   let installUrl =
     "https://raw.githubusercontent.com/Vidrimers/Duolingo-helper/refs/heads/master/duo-helper.user.js";

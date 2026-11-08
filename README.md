@@ -6,7 +6,7 @@
 
 A userscript for Tampermonkey — an extension for Duolingo with follow-back checking, user tagging and tools for managing friends. A themed window (10 themes), badges on profiles, custom tags.
 
-> Version: 2026.11.0 | Works on `*.duolingo.com`
+> Version: 2026.11.1 | Works on `*.duolingo.com`
 
 ---
 
@@ -205,13 +205,13 @@ The **"Tools"** tab — blocks heart-spending requests on mistakes in lessons (`
 - **UI sync**: during a lesson the counter is kept equal to the server (a local drop is rolled back), after the lesson — reconciled via the API
 - Can be turned off at any moment, without a reload
 
-> This protects the game's mechanics in your own account, not farming. Still, interfering with the site can formally break Duolingo's rules — at your own risk.
+> This protects the game's mechanics in your own account, not farming.
 
 ### Lessons
 
 <p align="center"><img src="img/Lessons.jpg" alt="Lessons" /></p>
 
-> ⚠️ **Cheats. At your own risk.** Shortening lessons and the auto solver break Duolingo's rules. **Disabled by default.**
+> Shortening lessons and the auto solver. **Disabled by default.**
 
 | Parameter        | Description                                                                                       |
 | ---------------- | ------------------------------------------------------------------------------------------------- |
@@ -225,11 +225,13 @@ The auto solver runs in the background on `/lesson` and `/practice` when enabled
 
 The blocks in "Tools" are an **accordion**: one opens at a time, the rest collapse.
 
+> These features interfere with Duolingo's mechanics — use at your own risk; the account may be banned.
+
 ### XP / boost
 
 <p align="center"><img src="img/XP%20boost.jpg" alt="XP / boost" /></p>
 
-> ⚠️ **Cheats. At your own risk.** The field is the XP target (how much to earn; min 50, step 50).
+> The field is the XP target (how much to earn; min 50, step 50).
 
 | What     | Description                                                                           |
 | -------- | ------------------------------------------------------------------------------------- |
@@ -240,7 +242,7 @@ The blocks in "Tools" are an **accordion**: one opens at a time, the rest collap
 
 <p align="center"><img src="img/Quests.jpg" alt="Quests" /></p>
 
-> ⚠️ **Cheat. At your own risk.** Progress injection into quests via `goals-api.duolingo.com`. Breaks Duolingo's rules, the account may be banned.
+> Progress injection into quests via `goals-api.duolingo.com`.
 
 The **"Tools"** tab:
 
@@ -253,7 +255,7 @@ The **"Tools"** tab:
 
 ### Gems
 
-> ⚠️ **Cheat. At your own risk.** Collecting `rewardBundles` (`SKILL_COMPLETION`) via PATCH `/rewards/{id}`. Breaks Duolingo's rules.
+> Collecting `rewardBundles` (`SKILL_COMPLETION`) via PATCH `/rewards/{id}`.
 
 **Gems are diamonds** (the premium currency).
 
@@ -266,7 +268,7 @@ The **"Tools"** tab:
 
 ### Free Max / Super
 
-> ⚠️ **Cheat. At your own risk.** Replaces the `GET /users` response — the client sees Super/Max. Unlocks client-side features (unlimited hearts, premium sections), but doesn't grant a server subscription.
+> Replaces the `GET /users` response — the client sees Super/Max. Unlocks client-side features (unlimited hearts, premium sections), but doesn't grant a server subscription.
 
 | Button           | Action                                          |
 | ---------------- | ----------------------------------------------- |
@@ -276,7 +278,7 @@ The **"Tools"** tab:
 
 <p align="center"><img src="img/Streak.jpg" alt="Streak" /></p>
 
-> ⚠️ **Cheat. At your own risk.** Farming/restoring streak days via `POST/PUT /2017-06-30/sessions` with faked dates. Breaks Duolingo's rules.
+> Farming/restoring streak days via `POST/PUT /2017-06-30/sessions` with faked dates.
 
 | Button          | Action                                                              |
 | --------------- | ------------------------------------------------------------------- |
@@ -321,7 +323,7 @@ The input is the number of days (1–365).
 [@Duolingo_Helperbot](https://t.me/Duolingo_Helperbot) — manage your Duolingo account through Telegram.
 
 **Menu (inline buttons):**
-- 📊 **Stats** — XP, league XP, streak, day status, a 7-day chart, the "Get XP" and "Streak" buttons (farming, at your own risk), "Donate"
+- 📊 **Stats** — XP, league XP, streak, day status, a 7-day chart, the "Get XP" and "Streak" buttons, "Donate"
 - 🏆 **League** — a table with gaps, farming to a target place
 - 👥 Friends — following/followers, unfollowing non-followers, activity check (the threshold is chosen before the check), unfollow/block inactive (🛡 exceptions from the script's settings; actions land in the script's "History" with undo)
 - ⚙️ Settings — notifications (time to practice, league overtake, who followed/unfollowed, weekly digest with farmed XP and streak days, script updates), linking (status, unlink with data deletion)
