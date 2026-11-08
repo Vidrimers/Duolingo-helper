@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Duolingo Helper
 // @namespace    https://github.com/Vidrimers/Duolingo-helper
-// @version      0.14.5
+// @version      0.14.6
 // @description  Follow-back check for Duolingo profiles. Panel, badges, cache. / Проверка взаимной подписки на профилях Duolingo.
 // @author       Vidrimers
 // @license      CC BY-NC-ND 4.0
@@ -1676,18 +1676,22 @@ const BUILD_KIND = "github";
       const u = await apiGet(
         `${API.users}/${myId}?fields=id,username,name,picture`,
       );
-      DATA.me = {
+      const meObj = {
         id: String(u.id ?? myId),
         username: u.username || "",
         name: u.name || u.username || "",
         picture: u.picture || null,
       };
-      saveData();
-      try { captureJWT(); } catch {}
-      return DATA.me;
+      // гонка: пока шёл запрос, аккаунт мог смениться — чужие данные не пишем
+      if (String(DATA._accountId) === myId) {
+        DATA.me = meObj;
+        saveData();
+        try { captureJWT(); } catch {}
+      }
+      return meObj;
     } catch (e) {
       console.warn("[DuoHelper] getMe failed", e);
-      return DATA.me || { id: myId, username: "", name: "" };
+      return (DATA.me && String(DATA.me.id) === myId) ? DATA.me : { id: myId, username: "", name: "" };
     }
   }
 
@@ -8310,8 +8314,8 @@ const BUILD_KIND = "github";
       DATA.stats = stats;
       saveData();
       if (typeof renderStats === "function") renderStats();
-      // ник нужен боту уже в первой синхронизации (уведомления, ссылки на профиль)
-      if (!DATA.me || !DATA.me.username) { try { await getMe(true); } catch {} }
+      // ник нужен боту уже в первой синхронизации; имя чужого слота не отправляем
+      if (!DATA.me || String(DATA.me.id) !== myId || !DATA.me.username) { try { await getMe(true); } catch {} }
       // синхронизируем xpLog с сервером бота
       try {
         const sentXp = farmLog().xp.slice();
@@ -8322,7 +8326,7 @@ const BUILD_KIND = "github";
           headers: { "content-type": "application/json" },
           data: JSON.stringify({
             duolingoUserId: myId,
-            duolingoUsername: (DATA.me && DATA.me.username) || "",
+            duolingoUsername: (DATA.me && String(DATA.me.id) === myId && DATA.me.username) || "",
             xpLog: stats.xpLog,
             totalXp,
             streak,
@@ -8423,13 +8427,13 @@ const BUILD_KIND = "github";
     btn.disabled = true;
     btn.textContent = "…";
     try {
-      if (!DATA.me || !DATA.me.username) { try { await getMe(true); } catch {} }
+      if (!DATA.me || String(DATA.me.id) !== myId || !DATA.me.username) { try { await getMe(true); } catch {} }
       const res = await new Promise((resolve) => {
         GM_xmlhttpRequest({
           method: "POST",
           url: BOT_API + "/api/link-code",
           headers: { "content-type": "application/json" },
-          data: JSON.stringify({ duolingoUserId: myId, duolingoUsername: (DATA.me && DATA.me.username) || "", jwt: jwt }),
+          data: JSON.stringify({ duolingoUserId: myId, duolingoUsername: (DATA.me && String(DATA.me.id) === myId && DATA.me.username) || "", jwt: jwt }),
           timeout: 10000,
           onload(r) {
             try { resolve(JSON.parse(r.responseText || "{}")); } catch { resolve(null); }
@@ -11817,7 +11821,7 @@ function savePage() {
   // версия из Tampermonkey — не расходится с @version в шапке
   const CURRENT_VERSION =
     (typeof GM_info !== "undefined" && GM_info.script && GM_info.script.version) ||
-    "0.14.5";
+    "0.14.6";
   // запасная ссылка установки, если API не дал download_url
   let installUrl =
     "https://raw.githubusercontent.com/Vidrimers/Duolingo-helper/refs/heads/master/duo-helper.user.js";

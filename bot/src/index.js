@@ -2587,7 +2587,7 @@ const httpServer = createServer((req, res) => {
   if (req.method === "POST" && req.url === "/api/sync-stats") {
     let body = "";
     req.on("data", (chunk) => { body += chunk; });
-    req.on("end", () => {
+    req.on("end", async () => {
       try {
         const { duolingoUserId, duolingoUsername, xpLog, totalXp, streak, excludeList, scriptVersion, lang, build, farmXp, farmDays, streakSaver } = JSON.parse(body || "{}");
         if (!duolingoUserId) {
@@ -2655,25 +2655,39 @@ const httpServer = createServer((req, res) => {
           if (duolingoUsername) {
             const prevUser = db.prepare("SELECT duolingo_username FROM users WHERE duolingo_user_id = ?").get(String(duolingoUserId));
             const oldName = prevUser ? prevUser.duolingo_username : null;
+            let newName = duolingoUsername;
             if (oldName && oldName !== duolingoUsername) {
-              // имя сменилось — уведомление админу
-              bot.api.sendMessage(config.adminTgId,
-                `✏️ <b>Смена имени Duolingo</b>\n\n` +
-                `Было: <b>${oldName}</b>\n` +
-                `Стало: <b>${duolingoUsername}</b>\n` +
-                `🆔 <code>${duolingoUserId}</code>\n` +
-                `📅 ${new Date().toLocaleString("ru")}`,
-                {
-                  parse_mode: "HTML",
-                  reply_markup: {
-                    inline_keyboard: (prevUser && prevUser.tg_user_id) ? [[
-                      { text: "🚫 Забанить", callback_data: "ban_user_" + prevUser.tg_user_id },
-                    ]] : [],
-                  },
+              // подозрение на смену имени — сверяем ник с API (защита от мусорных пар id+имя)
+              let checked = false;
+              try {
+                const urow = db.prepare("SELECT jwt_encrypted FROM users WHERE duolingo_user_id = ?").get(String(duolingoUserId));
+                const jwt = urow ? decryptJWT(urow.jwt_encrypted) : null;
+                if (jwt) {
+                  const rr = await fetch(`https://www.duolingo.com/2017-06-30/users/${duolingoUserId}?fields=username`, { headers: { accept: "application/json", cookie: `jwt_token=${jwt}` } });
+                  const dd = await rr.json();
+                  if (dd && dd.username) { newName = String(dd.username); checked = true; }
                 }
-              ).catch(() => {});
+              } catch {}
+              if (!checked || newName !== oldName) {
+                // имя сменилось — уведомление админу
+                bot.api.sendMessage(config.adminTgId,
+                  `✏️ <b>Смена имени Duolingo</b>\n\n` +
+                  `Было: <b>${oldName}</b>\n` +
+                  `Стало: <b>${newName}</b>\n` +
+                  `🆔 <code>${duolingoUserId}</code>\n` +
+                  `📅 ${new Date().toLocaleString("ru")}`,
+                  {
+                    parse_mode: "HTML",
+                    reply_markup: {
+                      inline_keyboard: (prevUser && prevUser.tg_user_id) ? [[
+                        { text: "🚫 Забанить", callback_data: "ban_user_" + prevUser.tg_user_id },
+                      ]] : [],
+                    },
+                  }
+                ).catch(() => {});
+              }
             }
-            db.prepare("UPDATE users SET duolingo_username = ? WHERE duolingo_user_id = ?").run(duolingoUsername, String(duolingoUserId));
+            db.prepare("UPDATE users SET duolingo_username = ? WHERE duolingo_user_id = ?").run(newName, String(duolingoUserId));
           }
         } catch {}
         // язык интерфейса из скрипта — для рендера сообщений бота

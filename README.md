@@ -6,7 +6,7 @@
 
 A userscript for Tampermonkey — an extension for Duolingo with follow-back checking, user tagging and tools for managing friends. A themed window (10 themes), badges on profiles, custom tags.
 
-> Version: 0.14.5 | Works on `*.duolingo.com`
+> Version: 0.14.6 | Works on `*.duolingo.com`
 
 ---
 
